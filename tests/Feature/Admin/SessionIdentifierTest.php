@@ -233,6 +233,7 @@ test('the accounts screen sends nothing that could be a session identifier', fun
             'created_at',
             'created_at_diff',
             'is_self',
+            'can_impersonate',
         ]);
     }
 

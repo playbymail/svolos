@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\GameSeatController;
 use App\Http\Controllers\Admin\InvitationController;
 use App\Http\Controllers\Admin\SessionController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use Illuminate\Support\Facades\Route;
 
@@ -32,6 +33,19 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 });
+
+/*
+ * Ending an impersonation is the one half of the feature that must **not** be in the admin area.
+ * The session making this request is the account being impersonated — a member — so `admin` would
+ * refuse the request that ends the impersonation, and `verified` would strand an administrator who
+ * impersonated an account that has not verified its address. `auth` alone is the whole gate: the
+ * only thing the route does is read an id the session already holds and put that account back.
+ *
+ * Starting is the mirror image and lives in the admin group below, as `admin.users.impersonate`.
+ */
+Route::delete('impersonate', [ImpersonationController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('impersonation.stop');
 
 /*
  * The administration area. `admin` has to come after `auth` so a guest is redirected to the login
@@ -77,6 +91,13 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::put('users/{user}/role', [UserController::class, 'updateRole'])->name('users.role.update');
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+
+        /*
+         * Starting an impersonation. Only an administrator can, only a member can be the target, and
+         * `ImpersonationController::store()` is where both are decided. Stopping is deliberately
+         * *not* here — see `impersonation.stop` above.
+         */
+        Route::post('users/{user}/impersonate', [ImpersonationController::class, 'store'])->name('users.impersonate');
 
         /*
          * Sessions are **not** addressed by a route parameter. A `sessions.id` is the live value in

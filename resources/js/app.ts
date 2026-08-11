@@ -4,6 +4,7 @@ import AuthLayout from '@/layouts/AuthLayout.svelte';
 import PublicLayout from '@/layouts/PublicLayout.svelte';
 import SettingsLayout from '@/layouts/settings/Layout.svelte';
 import { initializeFlashToast } from '@/lib/flash-toast';
+import { initializeImpersonationBanner } from '@/lib/impersonation-banner';
 import { initializeTheme } from '@/lib/theme.svelte';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
@@ -46,3 +47,6 @@ initializeTheme();
 
 // This will listen for flash toast data from the server...
 initializeFlashToast();
+
+// This will show the impersonation banner on every layout while an administrator is impersonating...
+initializeImpersonationBanner();

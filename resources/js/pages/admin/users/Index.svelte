@@ -22,7 +22,9 @@
     import KeyRound from 'lucide-svelte/icons/key-round';
     import MailWarning from 'lucide-svelte/icons/mail-warning';
     import Trash2 from 'lucide-svelte/icons/trash-2';
+    import UserRoundCog from 'lucide-svelte/icons/user-round-cog';
     import UserController from '@/actions/App/Http/Controllers/Admin/UserController';
+    import ImpersonationController from '@/actions/App/Http/Controllers/ImpersonationController';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';
     import { Badge } from '@/components/ui/badge';
@@ -134,6 +136,81 @@
                         </td>
                         <td class="px-4 py-3">
                             <div class="flex items-center justify-end">
+                                {#if user.can_impersonate}
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            {#snippet children(props)}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onclick={props.onClick}
+                                                    data-test="impersonate-user-{user.id}"
+                                                >
+                                                    <UserRoundCog
+                                                        class="h-4 w-4"
+                                                    />
+                                                    <span class="sr-only">
+                                                        Sign in as {user.name}
+                                                    </span>
+                                                </Button>
+                                            {/snippet}
+                                        </DialogTrigger>
+
+                                        <DialogContent>
+                                            <Form
+                                                {...ImpersonationController.store.form(
+                                                    user.id,
+                                                )}
+                                                class="space-y-6"
+                                            >
+                                                {#snippet children({
+                                                    processing,
+                                                })}
+                                                    <DialogTitle>
+                                                        Sign in as this account?
+                                                    </DialogTitle>
+                                                    <DialogDescription>
+                                                        You will see the
+                                                        application exactly as
+                                                        {user.name}
+                                                        ({user.email}) does, and
+                                                        anything you do will be
+                                                        done as them. This
+                                                        administration area is
+                                                        closed while you are
+                                                        signed in as somebody
+                                                        else — a banner at the
+                                                        bottom of every screen
+                                                        brings you back.
+                                                    </DialogDescription>
+
+                                                    <DialogFooter class="gap-2">
+                                                        <DialogClose asChild>
+                                                            {#snippet children(
+                                                                props,
+                                                            )}
+                                                                <Button
+                                                                    variant="secondary"
+                                                                    onclick={props.onClick}
+                                                                >
+                                                                    Cancel
+                                                                </Button>
+                                                            {/snippet}
+                                                        </DialogClose>
+                                                        <Button
+                                                            type="submit"
+                                                            disabled={processing}
+                                                            data-test="confirm-impersonate-user-{user.id}"
+                                                        >
+                                                            Sign in as {user.name}
+                                                        </Button>
+                                                    </DialogFooter>
+                                                {/snippet}
+                                            </Form>
+                                        </DialogContent>
+                                    </Dialog>
+                                {/if}
+
                                 {#if !user.is_self}
                                     <Dialog>
                                         <DialogTrigger asChild>
