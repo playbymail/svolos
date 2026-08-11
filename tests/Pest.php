@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\Invitation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Transport\ArrayTransport;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 /*
@@ -47,4 +50,53 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Create an invitation together with the plain-text token that would have been emailed.
+ *
+ * `invitations.token` stores a sha256 hash, so nothing can recover the plain text from a row — not
+ * even a factory. A test that needs to follow the link therefore has to mint the token itself and
+ * store the hash of it, which is exactly what `App\Actions\Invitations\IssueInvitation` does.
+ *
+ * @param  array<string, mixed>  $attributes
+ * @return array{0: Invitation, 1: string} the invitation, and the token that reaches the mailbox
+ */
+function invitationWithToken(array $attributes = []): array
+{
+    $token = Invitation::generateToken();
+
+    $invitation = Invitation::factory()->create([
+        ...$attributes,
+        'token' => Invitation::hashToken($token),
+    ]);
+
+    return [$invitation, $token];
+}
+
+/**
+ * Read the invitation token out of the most recent email the application actually sent.
+ *
+ * `MAIL_MAILER=array` in `phpunit.xml`, so this reads the real outgoing message rather than a faked
+ * notification: the assertion is that the token reaches the mailbox, not that a method was called.
+ * The HTML body is read unencoded, because the transport's raw form is quoted-printable and would
+ * fold a 64-character token across lines.
+ */
+function invitationTokenFromLastEmail(): string
+{
+    $transport = Mail::mailer()->getSymfonyTransport();
+
+    expect($transport)->toBeInstanceOf(ArrayTransport::class);
+
+    $sent = $transport->messages()->last();
+
+    expect($sent)->not->toBeNull();
+
+    $body = (string) $sent->getOriginalMessage()->getHtmlBody();
+
+    expect($body)->toMatch('#/invitations/[A-Za-z0-9]{64}#');
+
+    preg_match('#/invitations/([A-Za-z0-9]{64})#', $body, $matches);
+
+    return $matches[1];
 }

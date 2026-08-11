@@ -29,6 +29,10 @@ through this action so the password and profile rules stay in exactly one place,
 `FortifyServiceProvider::configureActions()` still binds it via `Fortify::createUsersUsing()`. Do not
 delete it.
 
+It sets no `role` and does not verify the email address, and both omissions are correct.
+`InvitationAcceptanceController` assigns the role explicitly afterwards, and an invited account is
+supposed to arrive **unverified** — see [invitations.md](invitations.md).
+
 ## Credential validation rules live in one place
 
 `App\Concerns\PasswordValidationRules` (`passwordRules()`, `currentPasswordRules()`) and
@@ -38,7 +42,9 @@ invitation acceptance — uses these traits rather than re-declaring rules inlin
 
 ## `User` implements `MustVerifyEmail`
 
-So the `verified` middleware genuinely blocks unverified users. The starter kit shipped with the
+So the `verified` middleware genuinely blocks unverified users — including a brand new account that
+has just accepted an invitation, which is the intended path and not an accident
+([invitations.md](invitations.md)). The starter kit shipped with the
 interface commented out, which made `verified` a no-op and silently let unverified users through
 every "verified" route. If a test needs to bypass verification, use a verified factory user
 (the default) — do not remove the interface.

@@ -98,8 +98,15 @@ Non-interactive runs fail closed: `ask()` returns null (validation then rejects 
 `UPDATE users SET email_verified_at = now() WHERE email_verified_at IS NULL`. It exists because
 `User` implements `MustVerifyEmail`, so a null column really does block an account from `/admin` —
 and accounts predating the invitation-only flow have a null that means "never asked", not "asked and
-refused". Every account created since is verified at source (invitation acceptance proves mailbox
-control; `app:create-admin` runs on the console).
+refused".
+
+Accounts created since are **not** all verified at source, and this is the one place that used to say
+otherwise: `app:create-admin` verifies the administrator it creates (a shell on the server is a
+stronger claim than a clicked link, and there is no mailbox to send to yet), but **invitation
+acceptance deliberately leaves the address unverified** — clicking a mailed link proves somebody read
+the mailbox, not that the person filling in the form controls it. See [invitations.md](invitations.md).
+The backfill is therefore about the accounts that predate the flow, not a general guarantee that
+every account arrives verified.
 
 Running it unconditionally is safe and is why there is no guard: on an empty `users` table — fresh
 install, `migrate:fresh`, every test run — it matches no rows, and it can never clear a timestamp
