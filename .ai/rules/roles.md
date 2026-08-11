@@ -1,17 +1,19 @@
 # Roles and the administrator boundary
 
-Globs: `app/Enums/UserRole.php`, `app/Models/User.php`, `app/Http/Middleware/EnsureUserIsAdmin.php`,
-`app/Console/Commands/CreateAdmin.php`, `routes/web.php`, `resources/js/pages/admin/**`
+Globs: `app/Enums/UserRole.php`, `app/Enums/GameRole.php`, `app/Models/User.php`,
+`app/Http/Middleware/EnsureUserIsAdmin.php`, `app/Console/Commands/CreateAdmin.php`, `routes/web.php`,
+`resources/js/pages/admin/**`
 
-## `UserRole` and any future game role are two unrelated systems — never unify them
+## `UserRole` and `GameRole` are two unrelated systems — never unify them
 
 `App\Enums\UserRole` (`admin` | `member`) is an **application** role. `admin` is the only thing that
 grants access to `/admin`, and it is a plain indexed string column on `users`.
 
-A later feature adds a **game** role (`player` | `gamemaster`), scoped to a single game through the
-seat that joins a user to it. It carries **zero** application permissions: a gamemaster seat does not
-make anyone an administrator of anything, and an administrator is not automatically a gamemaster of
-any game.
+`App\Enums\GameRole` (`player` | `gamemaster`) is a **game** role, scoped to a single game through the
+`game_seats` row that joins a user to it. It carries **zero** application permissions: a gamemaster
+seat does not make anyone an administrator of anything, and an administrator is not automatically a
+gamemaster of any game. The enum's own doc block says so, which is where somebody adding a case will
+read it. See [games.md](games.md) for the rest of the seat rules.
 
 They look similar enough to invite a merge. Do not merge them:
 
@@ -26,6 +28,18 @@ The reason is a security one, not a taxonomy one. The two have different blast r
 handed out by whoever runs a game, to anyone they invite, and is meant to be cheap to grant. An
 application role reaches every account in the installation. Anything that lets the first imply the
 second turns "let me run a game" into a privilege escalation path.
+
+`tests/Feature/Admin/GameRoleSeparationTest.php` is the file that holds the line. The test that earns
+its place is the escalation direction: a **member holding a gamemaster seat at the very game the route
+addresses** is refused on every game admin route, on the neighbouring admin screens, and by the
+middleware mounted on a bare route. It sweeps the route collection rather than listing routes, so a
+game admin route added later is covered without anybody adding a case, and it posts a payload that
+*would* have succeeded for an administrator so a 403 is never a validation failure in disguise. It also
+reads `EnsureUserIsAdmin` and `GameSeatController` **with comments stripped** and asserts neither
+mentions the other system — a behavioural test cannot see a check that is present but currently
+redundant, and stripping comments is what lets the prose keep explaining the boundary without reading
+as a breach of it. The two enums are additionally asserted to share no case values, so neither can be
+passed where the other is expected and match by accident.
 
 ## `role` is not mass-assignable, and `#[Fillable]` is where that is enforced
 
