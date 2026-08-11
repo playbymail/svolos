@@ -41,23 +41,25 @@ dotenv parser throw, and because the Wayfinder Vite plugin boots the Laravel app
 routes, that throw fails `npm run build` (and therefore the whole gate) with an error that does not
 mention the env file.
 
-## PHPStan runs at level 7 with an explicit memory limit
+## PHPStan runs at level 8 with an explicit memory limit
 
 `composer types:check` is `phpstan analyse --memory-limit=1G`. The limit is explicit because a stock
 PHP CLI with no `php.ini` defaults to `memory_limit=128M`, which crashes the PHPStan parallel workers
 with "PHPStan process crashed because it reached configured PHP memory limit" — a failure that looks
 like an analysis error but is not one.
 
-Level 7 is the highest level that passes with **zero** errors and **zero** ignores or baseline
-entries. Level 8 reports 10 `method.nonObject` / `property.nonObject` errors, all of them the same
-thing: `$request->user()` is typed `?User`, and the starter-kit auth/settings code calls straight
-through it. The blocked files are `app/Http/Controllers/Settings/ProfileController.php`,
-`app/Http/Controllers/Settings/SecurityController.php`, and
-`app/Http/Requests/Settings/ProfileUpdateRequest.php`. Raising the level is worth doing once those
-controllers are rewritten, but only by fixing the null-safety at the call sites — never by adding a
-baseline file, `ignoreErrors`, `@phpstan-ignore` comments, inline `@var` overrides, or
+Level 8 (nullsafety) passes with **zero** errors and **zero** ignores or baseline entries. It used to
+be level 7: the ten `method.nonObject` / `property.nonObject` errors that blocked the raise were
+`$request->user()` being typed `?User` in the settings controllers, plus one genuinely nullable
+`$passkey->created_at`, and all ten were fixed at the call sites — see the authenticated-user idiom in
+[php.md](php.md). Do not lower the level back, and never raise or hold one with a baseline file,
+`ignoreErrors`, `@phpstan-ignore` comments, inline `@var` overrides, `assert()`, or
 `treatPhpDocTypesAsCertain: false`. A level that only "passes" because of suppressions is not a
-higher level.
+higher level. `phpstan.neon` has no `ignoreErrors` section and no baseline include; keep it that way.
+
+Level 9 (`mixed` strictness) reports 3 errors, all in the Fortify wiring
+(`app/Providers/FortifyServiceProvider.php` and `config/fortify.php`, reading `mixed` out of config
+and env), so it is a separate piece of work rather than a follow-on to this one.
 
 ## Databases
 

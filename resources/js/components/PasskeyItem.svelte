@@ -94,9 +94,13 @@
                 {/if}
             </div>
             <p class="text-sm text-muted-foreground">
-                Added {passkey.created_at_diff}
+                {#if passkey.created_at_diff}
+                    Added {passkey.created_at_diff}
+                {/if}
                 {#if passkey.last_used_at_diff}
-                    <span class="mx-1 text-muted-foreground/50">/</span>
+                    {#if passkey.created_at_diff}
+                        <span class="mx-1 text-muted-foreground/50">/</span>
+                    {/if}
                     Last used {passkey.last_used_at_diff}
                 {/if}
             </p>
