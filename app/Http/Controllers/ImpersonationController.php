@@ -62,6 +62,11 @@ class ImpersonationController extends Controller
      * A request that is not impersonating is a 403 rather than a quiet redirect: this route only
      * ever exists to undo something, and reporting "you are back in your own account" to a session
      * that was never anywhere else would be telling the user something that did not happen.
+     *
+     * A null return from `stop()` means there was no administrator left to return to — deleted, or
+     * demoted mid-impersonation — and the session has been abandoned. One message covers both,
+     * because the two are the same fact from the user's side: the account they were driving from is
+     * no longer one they can be signed back into.
      */
     public function destroy(Request $request): RedirectResponse
     {
@@ -72,7 +77,7 @@ class ImpersonationController extends Controller
         if (! $impersonator instanceof User) {
             Inertia::flash('toast', [
                 'type' => 'error',
-                'message' => __('The account you were signed in as no longer exists. Please sign in again.'),
+                'message' => __('The administrator account you started from is no longer available. Please sign in again.'),
             ]);
 
             return to_route('login');

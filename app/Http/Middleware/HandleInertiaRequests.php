@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Actions\Impersonation\ImpersonationSession;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -37,14 +36,12 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $impersonator = ImpersonationSession::impersonator($request);
-
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
-                'impersonator' => $this->presentImpersonator($impersonator),
+                'impersonator' => $this->presentImpersonator($request),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
@@ -53,23 +50,32 @@ class HandleInertiaRequests extends Middleware
     /**
      * Shape the administrator behind an impersonated session for the banner, or null for everyone else.
      *
+     * The question asked here is `isActive()`, **not** whether an administrator was found. The banner
+     * is the only way out of an impersonated session, so a session that is impersonating always gets
+     * one: if the administrator behind it was deleted or demoted mid-impersonation there is nobody to
+     * name, and the prop carries nulls for the banner to render as "an administrator" rather than
+     * disappearing and stranding the session with no exit. Returning null here for a session that is
+     * still impersonating would hide the control that ends it.
+     *
      * Built by hand rather than by sharing the model: `auth.user` is the account being impersonated
      * and is *meant* to be complete, but this is a second account appearing in the props of a
      * session that does not belong to it, so it carries only what the banner says out loud — the
      * name to identify who is really driving, and the email to disambiguate two people with the
      * same one.
      *
-     * @return array{name: string, email: string}|null
+     * @return array{name: string|null, email: string|null}|null
      */
-    private function presentImpersonator(?User $impersonator): ?array
+    private function presentImpersonator(Request $request): ?array
     {
-        if (! $impersonator instanceof User) {
+        if (! ImpersonationSession::isActive($request)) {
             return null;
         }
 
+        $impersonator = ImpersonationSession::impersonator($request);
+
         return [
-            'name' => $impersonator->name,
-            'email' => $impersonator->email,
+            'name' => $impersonator?->name,
+            'email' => $impersonator?->email,
         ];
     }
 }

@@ -245,6 +245,29 @@ test('stopping signs the browser out when the administrator behind it no longer 
     $this->assertGuest();
 });
 
+test('stopping signs the browser out when the administrator behind it has been demoted', function () {
+    /*
+     * The other half of the same failure. A second administrator can demote the first one to a
+     * member mid-impersonation, and nothing about a role change touches the session row. Signing
+     * that account back in would hand the session to somebody the impersonation was never
+     * authorised for, so a demoted administrator takes the same way out as a deleted one.
+     */
+    $admin = User::factory()->admin()->create();
+    $member = User::factory()->create();
+
+    $request = actingAsImpersonated($member, $admin);
+
+    $admin->role = UserRole::Member;
+    $admin->save();
+
+    $response = $request->delete(route('impersonation.stop'));
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionMissing(ImpersonationSession::SESSION_KEY);
+
+    $this->assertGuest();
+});
+
 test('the stop route is deliberately outside the admin area', function () {
     /*
      * The session calling it is a member's, so `admin` would refuse the one request that ends the
@@ -254,6 +277,7 @@ test('the stop route is deliberately outside the admin area', function () {
     $route = Route::getRoutes()->getByName('impersonation.stop');
 
     expect($route)->toBeInstanceOf(RoutingRoute::class);
+    expect($route?->uri())->toBe('impersonate');
     expect((string) $route?->getName())->not->toStartWith('admin.');
 
     $middleware = $route?->gatherMiddleware() ?? [];
@@ -281,6 +305,59 @@ test('the shared props name the administrator behind an impersonated session', f
             ->has('auth.impersonator', fn (Assert $impersonator) => $impersonator
                 ->where('name', 'Ada Lovelace')
                 ->where('email', 'ada@example.com'),
+            ),
+        );
+});
+
+test('the shared props still expose an impersonator when the administrator has been deleted', function () {
+    /*
+     * The banner is the only way out of an impersonated session, so a session that is impersonating
+     * always gets one — even with nobody left to name. `auth.impersonator` therefore answers "is
+     * this session impersonating?", and its `name` separately answers "by whom?", which here has no
+     * answer and renders as "an administrator". Returning null for the whole prop would hide the
+     * control that ends the impersonation and strand the browser inside somebody else's account.
+     */
+    $admin = User::factory()->admin()->create();
+    $member = User::factory()->create(['name' => 'Grace Hopper']);
+
+    $request = actingAsImpersonated($member, $admin);
+
+    $admin->delete();
+
+    $request->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('auth.user.name', 'Grace Hopper')
+            /* Same key set as a named impersonator — no `->etc()` — with nothing to put in it. */
+            ->has('auth.impersonator', fn (Assert $impersonator) => $impersonator
+                ->where('name', null)
+                ->where('email', null),
+            ),
+        );
+});
+
+test('the shared props still expose an impersonator when the administrator has been demoted', function () {
+    /*
+     * A demoted administrator is as gone as a deleted one for this purpose: there is no account to
+     * be handed back, so there is nobody to name, and the way out still has to be on screen.
+     */
+    $admin = User::factory()->admin()->create(['name' => 'Ada Lovelace']);
+    $member = User::factory()->create(['name' => 'Grace Hopper']);
+
+    $request = actingAsImpersonated($member, $admin);
+
+    $admin->role = UserRole::Member;
+    $admin->save();
+
+    $request->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard')
+            ->where('auth.user.name', 'Grace Hopper')
+            ->has('auth.impersonator', fn (Assert $impersonator) => $impersonator
+                ->where('name', null)
+                ->where('email', null),
             ),
         );
 });

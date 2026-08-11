@@ -25,7 +25,7 @@ Start and stop sit on opposite sides of the administrator boundary, which is why
 registered by two routes rather than living in `Admin\`:
 
 - `admin.users.impersonate` (`POST /admin/users/{user}/impersonate`) is inside the admin group;
-- `impersonation.stop` (`DELETE /impersonation`) is on **`auth` alone**.
+- `impersonation.stop` (`DELETE /impersonate`) is on **`auth` alone**.
 
 By the time stop is called the session is a *member's*. Behind `admin` it would 403 the one request
 that ends the impersonation; behind `verified` an administrator who impersonated an account that has
@@ -52,11 +52,19 @@ this check that promotion silently upgrades a borrowed member session into a ful
 The check is what makes "impersonation never reaches `/admin`" a property of the boundary rather than
 a consequence of a rule enforced one controller away. Do not delete it as duplication.
 
+## Deleted and demoted are the same case, and both end in `abandon()`
+
 `stop()` handles the one account that can vanish mid-impersonation: an administrator's own. Deleting
 an account removes its session rows, but the impersonating browser's row belongs to the **target** by
-then, so it survives. There is nobody to go back to, so the session is signed out entirely — leaving
-it signed in as the target would turn a deleted administrator into an anonymous foothold in somebody
-else's account.
+then, so it survives; **demoting** the account touches no session row at all. Neither leaves an
+administrator to hand the browser back to, so both take `ImpersonationSession::abandon()` — logout,
+invalidate, regenerate the token — and land on the login page with an error toast.
+
+Checking only that the row still exists is the tempting half-fix and it is the dangerous one: it
+signs a demoted account back in, which is exactly "handing the session to a non-admin". So the role
+is re-checked on **every** lookup, in `findImpersonator()`: the session key records that an
+administrator started this, not that they still are one. Losing the session costs one login; the two
+alternatives cost an account.
 
 ## The banner is mounted at the app root, not in a layout
 
@@ -73,6 +81,17 @@ hand as `{name, email}` and nothing else. `auth.user` is the impersonated accoun
 complete; this is a *second* account appearing in the props of a session that is not its own, so it
 carries only what the banner says out loud. `ImpersonationTest` pins the key set with a scoped
 `has()` and no `->etc()`.
+
+### A session that is impersonating always gets a banner, even with nobody to name
+
+`presentImpersonator()` asks `isActive()`, **not** whether an administrator was found, and the two
+fields are nullable while the object is not. That looks like a missing null check and is not: with
+the administrator deleted or demoted mid-session, `impersonator()` returns null, and returning null
+for the whole prop would remove the banner — the only exit — and strand the browser inside somebody
+else's account with no way back. So `auth.impersonator` is non-null whenever `isActive()` is true,
+the name and email are null when there is nobody to name, and the banner renders "an administrator"
+in their place. Non-null answers "is this session impersonating"; `name` separately answers "by
+whom", and may have no answer. An ordinary session still gets a plain `null`.
 
 `can_impersonate` on the accounts screen is presentation only, exactly like `is_self` — the server
 refuses the requester and every administrator whether or not a button was rendered.

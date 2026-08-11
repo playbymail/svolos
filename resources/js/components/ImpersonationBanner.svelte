@@ -13,6 +13,17 @@
      */
     const impersonator = $derived(page.props.auth?.impersonator ?? null);
     const impersonated = $derived(page.props.auth?.user ?? null);
+
+    /*
+     * A non-null `impersonator` means the session *is* impersonating; its `name` only says by whom,
+     * and there may be nobody left to name if the administrator was deleted or demoted mid-session.
+     * The banner still renders in that case, because it carries the only way out.
+     */
+    const impersonatorLabel = $derived(
+        impersonator?.name
+            ? `${impersonator.name} (${impersonator.email})`
+            : 'an administrator',
+    );
 </script>
 
 {#if impersonator}
@@ -29,7 +40,7 @@
                 <span>
                     You are signed in as
                     <strong>{impersonated?.name}</strong>. Your own account is
-                    {impersonator.name} ({impersonator.email}).
+                    {impersonatorLabel}.
                 </span>
             </p>
 

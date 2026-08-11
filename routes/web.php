@@ -43,7 +43,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
  *
  * Starting is the mirror image and lives in the admin group below, as `admin.users.impersonate`.
  */
-Route::delete('impersonation', [ImpersonationController::class, 'destroy'])
+Route::delete('impersonate', [ImpersonationController::class, 'destroy'])
     ->middleware('auth')
     ->name('impersonation.stop');
 

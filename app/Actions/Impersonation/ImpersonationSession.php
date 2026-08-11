@@ -58,26 +58,18 @@ final class ImpersonationSession
      * The key is `pull()`ed rather than read and then forgotten, so the session cannot come out of
      * this method still marked as impersonating whichever way the account lookup goes.
      *
-     * A null return means the administrator's account no longer exists — another administrator can
-     * delete it while this browser is impersonating, because the session row belongs to the *target*
-     * account by then and so is not among the rows that deletion removes. There is nobody to go back
-     * to, so the session is signed out entirely instead: leaving the browser signed in as the target
-     * would turn a deleted administrator into a permanent anonymous foothold in somebody else's
-     * account.
+     * A null return means there is no administrator left to go back to — the account was deleted, or
+     * demoted to a member, by a second administrator while this browser was impersonating. Either is
+     * reachable: the session row belongs to the *target* account by then, so it is not among the rows
+     * that deleting the administrator removes, and nothing about a role change touches it at all.
+     * Both take the same way out, `abandon()`.
      */
     public static function stop(Request $request): ?User
     {
-        $impersonatorId = $request->session()->pull(self::SESSION_KEY);
-
-        $impersonator = is_int($impersonatorId) || is_string($impersonatorId)
-            ? User::query()->find($impersonatorId)
-            : null;
+        $impersonator = self::findImpersonator($request->session()->pull(self::SESSION_KEY));
 
         if (! $impersonator instanceof User) {
-            Auth::logout();
-
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+            self::abandon($request);
 
             return null;
         }
@@ -85,6 +77,28 @@ final class ImpersonationSession
         Auth::login($impersonator);
 
         return $impersonator;
+    }
+
+    /**
+     * End an impersonation that cannot be unwound, by signing the browser out entirely.
+     *
+     * This is the answer whenever the administrator behind the session is gone — deleted, or no
+     * longer an administrator — because the alternatives are both worse than a sign-in prompt.
+     * Leaving the browser signed in as the target turns a removed administrator into an anonymous
+     * foothold in somebody else's account, and signing a demoted account back in hands the session
+     * to somebody the impersonation was never authorised for. Losing the session costs one login;
+     * the other two cost an account.
+     *
+     * `invalidate()` flushes the impersonation key along with everything else, and the token is
+     * regenerated so the login form the user lands on is not posting a CSRF token minted for a
+     * session that no longer exists.
+     */
+    public static function abandon(Request $request): void
+    {
+        Auth::logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
     }
 
     /**
@@ -99,10 +113,15 @@ final class ImpersonationSession
     }
 
     /**
-     * Get the administrator behind an impersonated session, if there is one.
+     * Get the administrator behind an impersonated session, if there is still one.
      *
      * Returns null on an ordinary session, so the shared Inertia props cost no query for the
      * requests that are not impersonated — which is all of them, nearly all of the time.
+     *
+     * It also returns null on an impersonated session whose administrator has gone, so callers get
+     * one answer to "is there an account to go back to?" rather than each deciding for themselves.
+     * Note what that means for the banner: a null impersonator does **not** mean the session is not
+     * impersonating. Ask `isActive()` for that — see `HandleInertiaRequests`.
      */
     public static function impersonator(Request $request): ?User
     {
@@ -110,10 +129,23 @@ final class ImpersonationSession
             return null;
         }
 
-        $impersonatorId = $request->session()->get(self::SESSION_KEY);
+        return self::findImpersonator($request->session()->get(self::SESSION_KEY));
+    }
 
-        return is_int($impersonatorId) || is_string($impersonatorId)
+    /**
+     * Resolve a session value into the administrator it names, or null if it names nobody usable.
+     *
+     * The role is re-checked on every lookup rather than trusted from when the key was written: the
+     * key records that an administrator started this, not that they still are one, and a second
+     * administrator can demote them at any point in between. Treating a demoted account as absent is
+     * what keeps `stop()` from signing a session back in as somebody who is no longer allowed there.
+     */
+    private static function findImpersonator(mixed $impersonatorId): ?User
+    {
+        $impersonator = is_int($impersonatorId) || is_string($impersonatorId)
             ? User::query()->find($impersonatorId)
             : null;
+
+        return $impersonator instanceof User && $impersonator->isAdmin() ? $impersonator : null;
     }
 }
