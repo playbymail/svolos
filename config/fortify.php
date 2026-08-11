@@ -158,10 +158,12 @@ return [
     | by removing them from this array. You're free to only remove some of
     | these features, or you can even remove all of these if you need to.
     |
+    | Features::registration() is deliberately absent: accounts are created only
+    | by accepting an invitation, so /register must not exist. See .ai/rules/auth.md.
+    |
     */
 
     'features' => [
-        Features::registration(),
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([
