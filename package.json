@@ -10,7 +10,7 @@
         "format:check": "prettier --check resources/",
         "lint": "eslint . --fix",
         "lint:check": "eslint .",
-        "types:check": "svelte-check --tsconfig ./tsconfig.json"
+        "types:check": "svelte-check --tsconfig ./tsconfig.json --config ./vite.config.ts"
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",
