@@ -32,6 +32,11 @@ Globs: `app/**`
 - Test the authorisation boundary on every protected route: guest, member, administrator, and
   self-targeting where a self-target is forbidden.
 - Never delete or weaken an existing test to make a change pass.
+- `Inertia::flash()` does **not** land in props. It goes to the session, and the *next* Inertia
+  response carries it in the page object's `flash` bag. Assert it with `assertInertiaFlash('toast',
+  [...])` on the redirect response, and/or `hasFlash('toast', [...])` inside `assertInertia` after
+  following the redirect — `$page->has('toast')` will never find it. See
+  `tests/Feature/AppShellTest.php`.
 - `tests/Pest.php` binds `Tests\TestCase` and `RefreshDatabase` to the `Feature` suite only. The
   `Unit` suite is listed in `phpunit.xml` and kept alive by `tests/Unit/.gitkeep`; deleting that file
   makes PHPUnit abort with `Test directory ... not found`.
