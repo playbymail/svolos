@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin\GameController;
+use App\Http\Controllers\Admin\GameSeatController;
 use App\Http\Controllers\Admin\InvitationController;
 use App\Http\Controllers\Admin\SessionController;
 use App\Http\Controllers\Admin\UserController;
@@ -47,6 +49,30 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::post('invitations', [InvitationController::class, 'store'])->name('invitations.store');
         Route::post('invitations/{invitation}/resend', [InvitationController::class, 'resend'])->name('invitations.resend');
         Route::delete('invitations/{invitation}', [InvitationController::class, 'destroy'])->name('invitations.destroy');
+
+        Route::get('games', [GameController::class, 'index'])->name('games.index');
+        Route::post('games', [GameController::class, 'store'])->name('games.store');
+        Route::get('games/{game}', [GameController::class, 'show'])->name('games.show');
+        Route::put('games/{game}', [GameController::class, 'update'])->name('games.update');
+        Route::delete('games/{game}', [GameController::class, 'destroy'])->name('games.destroy');
+
+        /*
+         * Seat routes are nested under their game and **scoped** to it. `scopeBindings()` makes `{seat}`
+         * resolve through `Game::seats()` instead of globally, so a seat id from another game 404s here
+         * rather than being edited through the wrong game's URL — an administrator who mistypes a URL
+         * must not be able to reach a roster they were not looking at. Without it, both ids bind
+         * independently and the mismatch goes unnoticed.
+         *
+         * There is deliberately **no destroy route**. A seat is retired (`is_active = false`), never
+         * deleted, because engine history keeps referring to it; `retire` is the delete button and
+         * `reactivate` is why keeping the row is worth it. See `.ai/rules/games.md`.
+         */
+        Route::scopeBindings()->group(function () {
+            Route::post('games/{game}/seats', [GameSeatController::class, 'store'])->name('games.seats.store');
+            Route::put('games/{game}/seats/{seat}/role', [GameSeatController::class, 'updateRole'])->name('games.seats.role.update');
+            Route::put('games/{game}/seats/{seat}/retire', [GameSeatController::class, 'retire'])->name('games.seats.retire');
+            Route::put('games/{game}/seats/{seat}/reactivate', [GameSeatController::class, 'reactivate'])->name('games.seats.reactivate');
+        });
 
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::put('users/{user}/role', [UserController::class, 'updateRole'])->name('users.role.update');
