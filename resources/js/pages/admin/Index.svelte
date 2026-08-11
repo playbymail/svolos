@@ -15,10 +15,14 @@
     import { Link } from '@inertiajs/svelte';
     import ChevronRight from 'lucide-svelte/icons/chevron-right';
     import MailPlus from 'lucide-svelte/icons/mail-plus';
+    import MonitorSmartphone from 'lucide-svelte/icons/monitor-smartphone';
+    import Users from 'lucide-svelte/icons/users';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';
     import { toUrl } from '@/lib/utils';
     import { index as invitationsIndex } from '@/routes/admin/invitations';
+    import { index as sessionsIndex } from '@/routes/admin/sessions';
+    import { index as usersIndex } from '@/routes/admin/users';
 </script>
 
 <AppHead title="Administration" />
@@ -47,6 +51,51 @@
                 <p class="text-sm text-muted-foreground">
                     Invite people, choose their role, and revoke links that
                     should no longer work.
+                </p>
+            </div>
+            <ChevronRight
+                class="ms-auto h-4 w-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+            />
+        </Link>
+
+        <Link
+            href={toUrl(usersIndex())}
+            class="flex items-center gap-4 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
+        >
+            <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted"
+                aria-hidden="true"
+            >
+                <Users class="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div class="space-y-0.5">
+                <p class="font-medium tracking-tight">Accounts</p>
+                <p class="text-sm text-muted-foreground">
+                    See every account, change the role one holds, and delete
+                    accounts that should no longer exist.
+                </p>
+            </div>
+            <ChevronRight
+                class="ms-auto h-4 w-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+            />
+        </Link>
+
+        <Link
+            href={toUrl(sessionsIndex())}
+            class="flex items-center gap-4 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
+        >
+            <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted"
+                aria-hidden="true"
+            >
+                <MonitorSmartphone class="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div class="space-y-0.5">
+                <p class="font-medium tracking-tight">Sessions</p>
+                <p class="text-sm text-muted-foreground">
+                    See which browsers are signed in, and sign any of them out.
                 </p>
             </div>
             <ChevronRight
