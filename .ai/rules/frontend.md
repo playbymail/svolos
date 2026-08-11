@@ -11,9 +11,15 @@ Inertia app, solve it idiomatically for Svelte rather than emulating the React s
 layout components:
 
 - `Welcome`, `Docs` → `PublicLayout` (the signed-out marketing chrome: header, `Log in`, footer)
-- `auth/*` → `AuthLayout`
+- `auth/*`, `invitations/*` → `AuthLayout`
 - `settings/*` → `[AppLayout, SettingsLayout]` (nested, outermost first)
 - everything else → `AppLayout`
+
+`invitations/*` shares `AuthLayout` because those screens are signed-out and single-purpose — one form
+to fill in, or one explanation of why a link is dead — which is exactly what `AuthLayout` is. They are
+kept out of `pages/auth/` because that directory is the Fortify surface and registration is absent from
+it (see [auth.md](auth.md)); sharing a layout is not joining that surface. See
+[invitations.md](invitations.md).
 
 A new page therefore gets its layout from where it lives. Put it under the right prefix instead of
 importing a layout inside the page, and if a page needs a genuinely new layout, add a case to that
@@ -34,6 +40,23 @@ Per-page layout data (breadcrumbs and the like) is exported from the page's `<sc
 This is the Svelte analogue of React's static `Dashboard.layout` property — the module-level export is
 read at page resolution time and spread into the layout component as props. See
 `resources/js/pages/Dashboard.svelte`. Apply it consistently on every page that needs breadcrumbs.
+
+When the value has to come from the server, export a **function** instead of an object: the adapter
+calls it with the page props and spreads the result, keeping the layout from `app.ts`.
+`pages/invitations/Invalid.svelte` uses this so the server decides the heading and description the
+layout renders:
+
+```svelte
+<script module lang="ts">
+    export const layout = (props: { title: string; description: string }) => ({
+        title: props.title,
+        description: props.description,
+    });
+</script>
+```
+
+Do not reach for `setLayoutProps()` for this. It exists for values that change *after* render; a page
+whose layout data is fixed for the life of the page should stay declarative, in one mechanism.
 
 ## The public pages must not link to a sign-up
 
