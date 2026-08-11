@@ -6,6 +6,15 @@
  */
 export type UserRole = 'admin' | 'member';
 
+/**
+ * A selectable role, labelled on the server by `App\Enums\UserRole::label()` so the frontend never
+ * maps raw case values to human strings.
+ */
+export type UserRoleOption = {
+    value: UserRole;
+    label: string;
+};
+
 export type User = {
     id: number;
     name: string;

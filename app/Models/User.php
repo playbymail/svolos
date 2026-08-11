@@ -7,7 +7,9 @@ use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -37,6 +39,8 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read int|null $sessions_count
+ * @property-read Collection<int, Session> $sessions
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -64,6 +68,22 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function isAdmin(): bool
     {
         return $this->role === UserRole::Admin;
+    }
+
+    /**
+     * Get the signed-in browsers this account currently has.
+     *
+     * `sessions.user_id` carries **no** foreign key (see `App\Models\Session`), so this relation is
+     * matched on the column alone and nothing cascades: deleting an account leaves its session rows
+     * behind unless they are deleted explicitly, which
+     * `App\Http\Controllers\Admin\UserController::destroy()` does. Passkeys are the contrast — that
+     * table does have `cascadeOnDelete`, so they need no help.
+     *
+     * @return HasMany<Session, $this>
+     */
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(Session::class);
     }
 
     /**

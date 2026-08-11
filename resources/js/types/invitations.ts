@@ -1,4 +1,4 @@
-import type { UserRole } from '@/types/auth';
+import type { UserRole, UserRoleOption } from '@/types/auth';
 
 /**
  * Mirrors the `App\Enums\InvitationStatus` backed enum, which serialises to its value.
@@ -39,7 +39,4 @@ export type Invitation = {
 /**
  * A selectable role in the invitation form, labelled by `App\Enums\UserRole::label()`.
  */
-export type InvitationRoleOption = {
-    value: UserRole;
-    label: string;
-};
+export type InvitationRoleOption = UserRoleOption;

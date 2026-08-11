@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin\InvitationController;
+use App\Http\Controllers\Admin\SessionController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use Illuminate\Support\Facades\Route;
 
@@ -45,6 +47,21 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::post('invitations', [InvitationController::class, 'store'])->name('invitations.store');
         Route::post('invitations/{invitation}/resend', [InvitationController::class, 'resend'])->name('invitations.resend');
         Route::delete('invitations/{invitation}', [InvitationController::class, 'destroy'])->name('invitations.destroy');
+
+        Route::get('users', [UserController::class, 'index'])->name('users.index');
+        Route::put('users/{user}/role', [UserController::class, 'updateRole'])->name('users.role.update');
+        Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+
+        /*
+         * Sessions are **not** addressed by a route parameter. A `sessions.id` is the live value in
+         * that browser's session cookie, so a URL carrying one would put a working impersonation
+         * credential into browser history, server logs and referrer headers. The sign-out endpoint
+         * therefore takes a sha256 `digest` in the request body and resolves it with
+         * `Session::findByDigest()`. See `.ai/rules/sessions.md`.
+         */
+        Route::get('sessions', [SessionController::class, 'index'])->name('sessions.index');
+        Route::delete('sessions/others', [SessionController::class, 'destroyOthers'])->name('sessions.destroy-others');
+        Route::delete('sessions', [SessionController::class, 'destroy'])->name('sessions.destroy');
     });
 
 require __DIR__.'/settings.php';

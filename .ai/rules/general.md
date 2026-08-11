@@ -65,5 +65,8 @@ and env), so it is a separate piece of work rather than a follow-on to this one.
 
 SQLite everywhere: `DB_CONNECTION=sqlite` locally, `:memory:` in `phpunit.xml`. Sessions use the
 `database` driver in `.env.example` and `array` in tests. The `sessions` table is created inside
-`database/migrations/0001_01_01_000000_create_users_table.php` (not a separate migration) — a later
-feature reads that table directly, so leave it where it is.
+`database/migrations/0001_01_01_000000_create_users_table.php` (not a separate migration) — the
+sessions administration screen reads that table directly through `App\Models\Session`, so leave it
+where it is. `sessions.user_id` deliberately has **no** foreign key, and the `array` driver in tests
+means there is no session row for the current request unless one is made; both matter, and both are
+in [sessions.md](sessions.md).

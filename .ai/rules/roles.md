@@ -44,7 +44,9 @@ because a test that only posts to the endpoint still passes when `role` becomes 
 therefore guard nothing. The endpoint test asserts both layers for the same reason.
 
 Anything that legitimately needs to set the role assigns it explicitly:
-`$user->role = UserRole::Admin`. Today that is only `app:create-admin`.
+`$user->role = UserRole::Admin`. That is `app:create-admin`, invitation acceptance
+([invitations.md](invitations.md)), and `Admin\UserController::updateRole()` — the accounts screen,
+which is the only place a role changes *after* an account exists ([sessions.md](sessions.md)).
 
 The default lives in two places on purpose: the column default in
 `..._add_role_to_users_table.php`, and `User::$attributes` so an unsaved `new User` already reads
