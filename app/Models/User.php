@@ -41,6 +41,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $updated_at
  * @property-read int|null $sessions_count
  * @property-read Collection<int, Session> $sessions
+ * @property-read Collection<int, GameSeat> $gameSeats
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
@@ -84,6 +85,27 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function sessions(): HasMany
     {
         return $this->hasMany(Session::class);
+    }
+
+    /**
+     * Get every seat this account holds at a game, retired ones included.
+     *
+     * Named `gameSeats` rather than `seats` on purpose: a bare `seats` on an account reads as
+     * furniture rather than as places at games, and this side of the relation is the member-facing
+     * one — `App\Http\Controllers\DashboardController` is what it exists for.
+     *
+     * It stays **unfiltered** for the same reason `Game::seats()` does: a retired seat is still the
+     * row that occupies this account's place in the unique index on `(game_id, user_id)`, so a
+     * caller asking "has this account ever had a seat here?" must be able to see it. Callers that
+     * want the live roster filter on `is_active` themselves — the dashboard does.
+     *
+     * `game_seats.user_id` cascades on delete, so deleting an account takes these rows with it.
+     *
+     * @return HasMany<GameSeat, $this>
+     */
+    public function gameSeats(): HasMany
+    {
+        return $this->hasMany(GameSeat::class);
     }
 
     /**

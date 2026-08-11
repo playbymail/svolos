@@ -6,7 +6,10 @@ Globs: `app/Enums/GameStatus.php`, `app/Enums/GameRole.php`, `app/Models/Game.ph
 `app/Concerns/GameValidationRules.php`, `database/factories/GameFactory.php`,
 `database/factories/GameSeatFactory.php`, `resources/js/pages/admin/games/**`,
 `resources/js/components/GameSeatRoleForm.svelte`, `resources/js/types/games.ts`,
-`tests/Feature/Admin/Game*.php`, `tests/Feature/GameModelTest.php`
+`tests/Feature/Admin/Game*.php`, `tests/Feature/GameModelTest.php`,
+`app/Http/Controllers/DashboardController.php`, `resources/js/pages/Dashboard.svelte`,
+`resources/js/components/DashboardGameSection.svelte`, `resources/js/types/dashboard.ts`,
+`tests/Feature/DashboardTest.php`
 
 A **game** is one run of the thing this application exists to run. A **seat** joins one account to one
 game and carries the game role it holds *there*. Administration lives at `/admin/games`.
@@ -113,6 +116,44 @@ Two consequences for the code: `Game $game` must stay **first** in every seat co
 because the scoped binding resolves the child against the parameter before it; and `Game::seats()` must
 stay **unfiltered**, or a retired seat would stop being reachable through its game's URL and could never
 be reactivated. `activeSeats()` is the filtered one.
+
+## The member dashboard: `User::gameSeats()`, and two states that are not one state
+
+`DashboardController` is the member-facing counterpart to `/admin/games`: the games the signed-in
+account holds an **active** seat in, split into a gamemaster section and a player section, each
+ordered by short name. It reads seats through `User::gameSeats()` — named that rather than `seats`,
+which on an account reads as furniture — and that relation is **unfiltered**, like `Game::seats()`,
+because a retired seat is still the row occupying the account's place in the unique index. The
+dashboard is what filters on `is_active`; the relation is not.
+
+The screen is deliberately role-blind in the application sense: an administrator gets exactly what a
+member gets, because holding `UserRole::Admin` grants no seat anywhere, and because this is where
+`ImpersonationController::store()` lands a session that has just become somebody else. Do not add
+role branching to it.
+
+Two decisions are the ones a later change will want to undo:
+
+- **Archived games ship in the payload, flagged `is_archived`, rather than behind a query
+  parameter, a partial reload or a deferred prop.** The toggle is per-section `$state` in
+  `DashboardGameSection.svelte`, so revealing an archived game is a filter over rows already on the
+  client and costs no round trip. They are also **interleaved** in the one short-name ordering
+  rather than segregated to the end, so the toggle reveals rows in place. This is the opposite
+  choice from `Game::unarchived()`, and deliberately: the scope answers "which games are still in
+  play", while this screen answers "which games am I in", and a game you are still seated at does
+  not stop being yours because it was put away.
+- **"Section absent" and "section present but entirely archived" are different states.** A section
+  with no seats is **missing from the props entirely** (`missing('playerGames')`), so the page has
+  nothing to decide: a key that is there is a heading to render. A section whose every game is
+  archived is present — the account really is in those games — keeps its heading and its toggle, and
+  says so in words instead of rendering an empty list. Collapsing the two, by defaulting either prop
+  to `[]` or by filtering archived games out on the server, turns "you are in two archived games"
+  into "you are in no games". `tests/Feature/DashboardTest.php` asserts `missing()` for the first
+  and `has()` for the second, next to each other, for exactly that reason.
+
+One query for the seats and one for their games (`with('game')`), whatever the roster size; the
+short-name ordering is done on the loaded collection rather than in SQL, because ordering a
+`game_seats` query by `games.short_name` would need a join purely to sort a handful of rows. No seat
+counts are presented here — who else sits at a game is the administrator's screen.
 
 ## Smaller decisions worth not re-litigating
 

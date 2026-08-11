@@ -133,6 +133,26 @@ test('a seat belongs to its game and its account', function () {
     expect($seat->user->is($user))->toBeTrue();
 });
 
+test('an account reaches its seats through gameSeats, retired ones included', function () {
+    /*
+     * The user side of the relation is `gameSeats`, not `seats`: a bare `seats` on an account reads as
+     * furniture rather than as places at games. It stays unfiltered for the same reason `Game::seats()`
+     * does — a retired seat is still the row occupying that account's place in the unique index — so the
+     * member dashboard is what filters on `is_active`, not this.
+     */
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+
+    $active = GameSeat::factory()->for($user)->create();
+    $retired = GameSeat::factory()->retired()->for($user)->create();
+    $theirs = GameSeat::factory()->for($other)->create();
+
+    $mine = $user->gameSeats()->pluck('id');
+
+    expect($mine->all())->toEqualCanonicalizing([$active->id, $retired->id]);
+    expect($mine->contains($theirs->id))->toBeFalse();
+});
+
 test('the database refuses a second seat row for the same account at the same game', function () {
     /*
      * The unique index, exercised directly rather than through validation, so the guarantee is pinned even
