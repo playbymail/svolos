@@ -9,6 +9,7 @@ not undo it.
 | `**` | [general.md](general.md) — verification gate, env parsing, tooling levels |
 | `app/**` | [php.md](php.md) — PHP and Laravel conventions |
 | `config/fortify.php`, `app/Providers/FortifyServiceProvider.php`, `app/Actions/Fortify/**`, `app/Concerns/*ValidationRules.php`, `resources/js/pages/auth/**`, `tests/Feature/Auth/**` | [auth.md](auth.md) — Fortify surface; **registration is deliberately absent** |
+| `app/Enums/UserRole.php`, `app/Models/User.php`, `app/Http/Middleware/EnsureUserIsAdmin.php`, `app/Console/Commands/CreateAdmin.php`, `routes/web.php`, `resources/js/pages/admin/**` | [roles.md](roles.md) — `UserRole` vs game roles (**never unify them**), the non-fillable `role` column, the `/admin` boundary, `app:create-admin` |
 | `resources/js/**`, `resources/views/app.blade.php` | [frontend.md](frontend.md) — Inertia + Svelte 5 patterns, the app shell, theme and toasts, Wayfinder |
 | `database/seeders/**` | [seeders.md](seeders.md) — seeding conventions |
 
