@@ -1,6 +1,8 @@
 <script lang="ts">
     import KeyRound from 'lucide-svelte/icons/key-round';
+    import Pencil from 'lucide-svelte/icons/pencil';
     import Trash2 from 'lucide-svelte/icons/trash-2';
+    import InputError from '@/components/InputError.svelte';
     import { Button } from '@/components/ui/button';
     import {
         Dialog,
@@ -11,22 +13,64 @@
         DialogTitle,
         DialogTrigger,
     } from '@/components/ui/dialog';
+    import { Input } from '@/components/ui/input';
+    import { Label } from '@/components/ui/label';
     import type { Passkey } from '@/types/auth';
 
     let {
         passkey,
         onDelete,
+        onRename,
     }: {
         passkey: Passkey;
         onDelete?: (id: number, onError: () => void) => void;
+        onRename?: (
+            id: number,
+            name: string,
+            callbacks: {
+                onSuccess: () => void;
+                onError: (message?: string) => void;
+            },
+        ) => void;
     } = $props();
 
     let isDeleting = $state(false);
+    let isRenaming = $state(false);
+    let isRenameOpen = $state(false);
+    let renameError = $state('');
+
+    /* Seeded from the current passkey name each time the dialog opens, not at init. */
+    let name = $state('');
 
     const handleDelete = () => {
         isDeleting = true;
         onDelete?.(passkey.id, () => {
             isDeleting = false;
+        });
+    };
+
+    const handleRenameOpenChange = (open: boolean) => {
+        name = open ? passkey.name : '';
+        renameError = '';
+    };
+
+    const handleRename = () => {
+        if (!name.trim()) {
+            return;
+        }
+
+        isRenaming = true;
+        renameError = '';
+
+        onRename?.(passkey.id, name.trim(), {
+            onSuccess: () => {
+                isRenaming = false;
+                isRenameOpen = false;
+            },
+            onError: (message) => {
+                isRenaming = false;
+                renameError = message ?? 'Could not rename this passkey.';
+            },
         });
     };
 </script>
@@ -59,43 +103,91 @@
         </div>
     </div>
 
-    <Dialog>
-        <DialogTrigger asChild>
-            {#snippet children(props)}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    class="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onclick={props.onClick}
-                >
-                    <Trash2 class="h-4 w-4" />
-                    <span class="sr-only">Remove</span>
-                </Button>
-            {/snippet}
-        </DialogTrigger>
+    <div class="flex items-center gap-1">
+        <Dialog bind:open={isRenameOpen} onOpenChange={handleRenameOpenChange}>
+            <DialogTrigger asChild>
+                {#snippet children(props)}
+                    <Button variant="ghost" size="sm" onclick={props.onClick}>
+                        <Pencil class="h-4 w-4" />
+                        <span class="sr-only">Rename</span>
+                    </Button>
+                {/snippet}
+            </DialogTrigger>
 
-        <DialogContent>
-            <DialogTitle>Remove passkey</DialogTitle>
-            <DialogDescription>
-                Are you sure you want to remove the "{passkey.name}" passkey?
-                You will no longer be able to use it to sign in.
-            </DialogDescription>
-            <DialogFooter>
-                <DialogClose asChild>
-                    {#snippet children(props)}
-                        <Button variant="secondary" onclick={props.onClick}>
-                            Cancel
-                        </Button>
-                    {/snippet}
-                </DialogClose>
-                <Button
-                    variant="destructive"
-                    disabled={isDeleting}
-                    onclick={handleDelete}
-                >
-                    {isDeleting ? 'Removing...' : 'Remove passkey'}
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
+            <DialogContent>
+                <DialogTitle>Rename passkey</DialogTitle>
+                <DialogDescription>
+                    Give this passkey a name that helps you recognise the device
+                    it lives on.
+                </DialogDescription>
+
+                <div class="grid gap-2">
+                    <Label for="passkey-name-{passkey.id}">Passkey name</Label>
+                    <Input
+                        id="passkey-name-{passkey.id}"
+                        type="text"
+                        bind:value={name}
+                        placeholder="e.g., MacBook Pro, iPhone"
+                    />
+                    <InputError message={renameError} />
+                </div>
+
+                <DialogFooter>
+                    <DialogClose asChild>
+                        {#snippet children(props)}
+                            <Button variant="secondary" onclick={props.onClick}>
+                                Cancel
+                            </Button>
+                        {/snippet}
+                    </DialogClose>
+                    <Button
+                        disabled={isRenaming || !name.trim()}
+                        onclick={handleRename}
+                    >
+                        {isRenaming ? 'Saving...' : 'Save name'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog>
+            <DialogTrigger asChild>
+                {#snippet children(props)}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onclick={props.onClick}
+                    >
+                        <Trash2 class="h-4 w-4" />
+                        <span class="sr-only">Remove</span>
+                    </Button>
+                {/snippet}
+            </DialogTrigger>
+
+            <DialogContent>
+                <DialogTitle>Remove passkey</DialogTitle>
+                <DialogDescription>
+                    Are you sure you want to remove the "{passkey.name}"
+                    passkey? You will no longer be able to use it to sign in.
+                </DialogDescription>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        {#snippet children(props)}
+                            <Button variant="secondary" onclick={props.onClick}>
+                                Cancel
+                            </Button>
+                        {/snippet}
+                    </DialogClose>
+                    <Button
+                        variant="destructive"
+                        disabled={isDeleting}
+                        onclick={handleDelete}
+                    >
+                        {isDeleting ? 'Removing...' : 'Remove passkey'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    </div>
 </div>

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Auth\PasskeyController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use Illuminate\Auth\Middleware\RequirePassword;
@@ -25,6 +26,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::inertia('settings/appearance', 'settings/Appearance')->name('appearance.edit');
 });
+
+/*
+ * Fortify registers passkey registration, listing and deletion but not renaming, so the
+ * rename endpoint is added here alongside Fortify's own /user/passkeys routes and with the
+ * same auth + password confirmation middleware.
+ */
+Route::put('user/passkeys/{passkey}', [PasskeyController::class, 'update'])
+    ->middleware(['auth', RequirePassword::class, 'throttle:10,1'])
+    ->name('passkey.update');
 
 Route::get('.well-known/passkey-endpoints', function () {
     return response()->json([

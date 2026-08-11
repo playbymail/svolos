@@ -5,6 +5,7 @@
     import Heading from '@/components/Heading.svelte';
     import PasskeyItem from '@/components/PasskeyItem.svelte';
     import PasskeyRegister from '@/components/PasskeyRegister.svelte';
+    import { update } from '@/routes/passkey';
     import type { Passkey } from '@/types/auth';
 
     export type Props = {
@@ -19,6 +20,25 @@
             preserveScroll: true,
             onError,
         });
+    };
+
+    const handleRename = (
+        id: number,
+        name: string,
+        callbacks: {
+            onSuccess: () => void;
+            onError: (message?: string) => void;
+        },
+    ) => {
+        router.put(
+            update.url(id),
+            { name },
+            {
+                preserveScroll: true,
+                onSuccess: callbacks.onSuccess,
+                onError: (errors) => callbacks.onError(errors.name),
+            },
+        );
     };
 
     const handleRegisterSuccess = () => {
@@ -37,7 +57,11 @@
         <div class="overflow-hidden rounded-lg border border-border">
             {#if passkeys.length > 0}
                 {#each passkeys as passkey (passkey.id)}
-                    <PasskeyItem {passkey} onDelete={handleDelete} />
+                    <PasskeyItem
+                        {passkey}
+                        onDelete={handleDelete}
+                        onRename={handleRename}
+                    />
                 {/each}
             {:else}
                 <div class="p-8 text-center">
