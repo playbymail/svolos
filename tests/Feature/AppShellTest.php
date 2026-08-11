@@ -82,6 +82,36 @@ test('a controller flashing a toast makes it available where the frontend reads 
         );
 });
 
+test('the sidebar links documentation at this application docs page, not the starter kit', function () {
+    /*
+     * The sidebar nav is built client-side, so there is no prop or HTTP surface to assert against and
+     * this reads the component source instead. It is deliberately narrow — it pins the decision (our
+     * own /docs, reached without leaving the app) rather than any markup, so restyling the sidebar
+     * cannot break it while reintroducing a starter-kit link will.
+     */
+    $sidebar = file_get_contents(resource_path('js/components/AppSidebar.svelte'));
+
+    expect($sidebar)
+        ->toContain('docs()')
+        ->not->toContain('laravel.com')
+        ->not->toContain('github.com/laravel/svelte-starter-kit');
+
+    // And the helper it imports resolves to a route this application actually serves.
+    expect(route('docs', absolute: false))->toBe('/docs');
+});
+
+test('the sidebar footer can render an internal link without forcing a new tab', function () {
+    /*
+     * NavFooter used to hardcode target="_blank" on every item, which would have opened /docs in a new
+     * tab and bypassed Inertia entirely. Opening a new tab is now opt-in per item via NavItem.external.
+     */
+    $navFooter = file_get_contents(resource_path('js/components/NavFooter.svelte'));
+
+    expect($navFooter)
+        ->toContain('{#if item.external}')
+        ->toContain("import { Link } from '@inertiajs/svelte';");
+});
+
 test('a page with nothing flashed carries no toast', function () {
     $user = User::factory()->create();
 

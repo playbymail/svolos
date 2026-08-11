@@ -15,4 +15,9 @@ export type NavItem = {
     href: NonNullable<LinkComponentBaseProps['href']>;
     icon?: NavIcon;
     isActive?: boolean;
+    /**
+     * Leaves the application. Rendered as a plain anchor opening a new tab rather than an Inertia
+     * `Link`, which would try to visit the URL as an Inertia page. Defaults to an internal link.
+     */
+    external?: boolean;
 };

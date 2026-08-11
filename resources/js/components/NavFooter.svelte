@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { Link } from '@inertiajs/svelte';
     import {
         SidebarGroup,
         SidebarGroupContent,
@@ -28,18 +29,31 @@
                         asChild
                     >
                         {#snippet children(props)}
-                            <a
-                                {...props}
-                                href={toUrl(item.href)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class={props.class}
-                            >
-                                {#if item.icon}
-                                    <item.icon class="size-4 shrink-0" />
-                                {/if}
-                                <span>{item.title}</span>
-                            </a>
+                            {#if item.external}
+                                <a
+                                    {...props}
+                                    href={toUrl(item.href)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class={props.class}
+                                >
+                                    {#if item.icon}
+                                        <item.icon class="size-4 shrink-0" />
+                                    {/if}
+                                    <span>{item.title}</span>
+                                </a>
+                            {:else}
+                                <Link
+                                    {...props}
+                                    href={toUrl(item.href)}
+                                    class={props.class}
+                                >
+                                    {#if item.icon}
+                                        <item.icon class="size-4 shrink-0" />
+                                    {/if}
+                                    <span>{item.title}</span>
+                                </Link>
+                            {/if}
                         {/snippet}
                     </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -25,6 +25,15 @@ clone or CI runner has no manifest until the build runs. `.github/workflows/test
 `composer test` is not weaker than the gate. `ci:check` calls `artisan test` directly instead of
 `@test` so nothing runs twice. Do not drop a step to make the gate green.
 
+## Run `php artisan view:clear` when verifying a Blade edit locally
+
+`tests/Feature/AppearanceTest.php` asserts on the raw HTML of `resources/views/app.blade.php`, and
+compiled Blade views are cached in `storage/framework/views`. Editing the template and immediately
+re-running those tests can be served the previously compiled version, so a change appears to have had
+no effect — or worse, a mutation you made to check that a test really fails appears to be caught when
+it was not exercised at all. Clear the cache between the edit and the run. CI is unaffected because
+`storage/framework/views` starts empty there.
+
 ## `.env` values containing spaces must be quoted
 
 `APP_NAME="Epimethean Challenge"` — with the quotes. An unquoted value containing a space makes the

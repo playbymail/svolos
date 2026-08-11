@@ -71,6 +71,15 @@ is a second source of truth the server cannot see: the cookie has a 365-day expi
 lost and the theme visibly flipped after hydration. There is deliberately no `localStorage` any more.
 `initializeTheme()` writes the cookie back on every visit to refresh its expiry.
 
+## `NavFooter` links are internal by default; `NavItem.external` opts into a new tab
+
+`NavFooter` used to hardcode `target="_blank"` on every item, which suited the starter kit's outbound
+links but would have opened this application's own `/docs` in a new tab and bypassed Inertia. It now
+renders an Inertia `Link` unless the item sets `external: true`, in which case it renders a plain
+anchor with `target="_blank" rel="noopener noreferrer"`. The starter kit's "Repository" item is gone
+rather than repointed — there is no repository URL for this application to link to, and a link to
+`laravel/svelte-starter-kit` in a branded app is wrong either way.
+
 ## Sidebar open state: server prop for first paint, cookie for persistence
 
 `HandleInertiaRequests` shares `sidebarOpen` from the `sidebar_state` cookie; `AppShell.svelte` feeds
