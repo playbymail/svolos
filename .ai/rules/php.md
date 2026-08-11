@@ -20,6 +20,28 @@ Globs: `app/**`
 - Prefer named routes and `route()` over hardcoded URLs.
 - Run `vendor/bin/pint --dirty` before finishing. Never weaken `pint.json` to make a file pass.
 
+## Reading the authenticated user: `authenticatedUser()` or `?->`, never a blind call
+
+PHPStan runs at level 8 (see [general.md](general.md)), and `Request::user()` is typed `?User` — it
+cannot know a route is behind `auth` — so `$request->user()->anything()` is an error. There are
+exactly two sanctioned ways to read it, and which one to use is decided by what a null would mean:
+
+- **You need the model itself** (fill, save, delete, a relation, an update): take it from
+  `App\Http\Controllers\Controller::authenticatedUser($request)`, which narrows with `instanceof` and
+  throws `AuthenticationException` otherwise. That is not an assertion dressed up as a fix: the
+  exception is real behaviour, and a guard that somehow resolved nothing leaves through the ordinary
+  unauthenticated redirect instead of a type error mid-action. Assign it to a local once at the top of
+  the method and use the local — don't call it repeatedly.
+- **A null propagates to a correct outcome on its own**: use `$request->user()?->…`. An ownership
+  comparison is already false against `null`, so `abort_unless($passkey->user_id === $request->user()?->getKey(), 403)`
+  fails closed (`PasskeyController`). `ProfileUpdateRequest` passes `$this->user()?->id` into
+  `profileRules(?int $userId)`, whose null branch is the *stricter* rule set — the uniqueness check
+  simply stops ignoring the current row. Form Requests have no `authenticatedUser()` and don't need
+  one for this reason.
+
+Never reach level 8 with a suppression: no baseline, no `ignoreErrors`, no `@phpstan-ignore`, no
+inline `@var`, no `assert()`, and no widening a parameter or return type to make an error go away.
+
 ## Testing
 
 - Every change is programmatically tested. Pest feature tests by default; unit tests only where

@@ -101,4 +101,33 @@ test('correct password must be provided to update password', function () {
     $response
         ->assertSessionHasErrors('current_password')
         ->assertRedirect(route('security.edit'));
+
+    expect(Hash::check('password', $user->refresh()->password))->toBeTrue();
+});
+
+test('password updates are throttled after six attempts a minute', function () {
+    /*
+     * throttle:6,1 is what stops the current-password field being used as an oracle to guess the
+     * password of an already-hijacked session. Wrong credentials are used for all seven attempts so
+     * each one is identical: the only thing that changes between the sixth and the seventh is the
+     * rate limiter.
+     */
+    $user = User::factory()->create();
+
+    $attempt = fn () => $this
+        ->actingAs($user)
+        ->from(route('security.edit'))
+        ->put(route('user-password.update'), [
+            'current_password' => 'wrong-password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ]);
+
+    foreach (range(1, 6) as $ignored) {
+        $attempt()->assertRedirect(route('security.edit'));
+    }
+
+    $attempt()->assertStatus(429);
+
+    expect(Hash::check('password', $user->refresh()->password))->toBeTrue();
 });

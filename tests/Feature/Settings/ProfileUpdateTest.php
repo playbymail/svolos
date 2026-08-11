@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('profile page is displayed', function () {
     $user = User::factory()->create();
@@ -10,6 +11,12 @@ test('profile page is displayed', function () {
         ->get(route('profile.edit'));
 
     $response->assertOk();
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('settings/Profile')
+        ->where('mustVerifyEmail', true)
+        ->where('auth.user.email', $user->email),
+    );
 });
 
 test('profile information can be updated', function () {
@@ -64,6 +71,13 @@ test('user can delete their account', function () {
         ->assertRedirect(route('home'));
 
     $this->assertGuest();
+
+    /*
+     * destroy() logs the user out before deleting the model it captured beforehand, so assert the
+     * row itself is gone rather than trusting the redirect: a logout that reset the captured
+     * instance would still redirect exactly like this.
+     */
+    $this->assertDatabaseMissing('users', ['id' => $user->id]);
     expect($user->fresh())->toBeNull();
 });
 
@@ -81,5 +95,6 @@ test('correct password must be provided to delete account', function () {
         ->assertSessionHasErrors('password')
         ->assertRedirect(route('profile.edit'));
 
-    expect($user->fresh())->not->toBeNull();
+    $this->assertDatabaseHas('users', ['id' => $user->id, 'email' => $user->email]);
+    $this->assertAuthenticatedAs($user);
 });

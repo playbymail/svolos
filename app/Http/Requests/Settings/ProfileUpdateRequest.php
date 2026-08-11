@@ -17,6 +17,11 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
-        return $this->profileRules($this->user()->id);
+        /*
+         * A null user cannot reach here — the route is behind `auth` — and if one ever did,
+         * `profileRules(null)` is the stricter rule set: the uniqueness check stops ignoring
+         * the current row instead of letting an unidentified request through.
+         */
+        return $this->profileRules($this->user()?->id);
     }
 }

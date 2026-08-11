@@ -34,9 +34,18 @@ test('an unverified user is blocked from every verified-only route', function (s
 })->with([
     'dashboard' => ['GET', fn () => route('dashboard')],
     'security settings' => ['GET', fn () => route('security.edit')],
-    'appearance settings' => ['GET', fn () => route('appearance.edit')],
+    'password update' => ['PUT', fn () => route('user-password.update')],
     'profile deletion' => ['DELETE', fn () => route('profile.destroy')],
 ]);
+
+/*
+ * Appearance was in the dataset above until this list was reconciled with the intended policy:
+ * only destructive and security-sensitive routes require `verified`, and a theme picker is
+ * neither, so locking an unverified user out of it served no purpose. The profile screen was
+ * already `auth`-only for the same reason — an unverified user has to be able to correct the
+ * address the verification link went to. Both are asserted reachable, positively, in
+ * tests/Feature/Settings/SettingsRouteTest.php.
+ */
 
 test('a verified user reaches the dashboard', function () {
     $this->actingAs(User::factory()->create())
