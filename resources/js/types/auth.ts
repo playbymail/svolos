@@ -28,8 +28,22 @@ export type User = {
     [key: string]: unknown;
 };
 
+/**
+ * The administrator behind an impersonated session, as shaped by
+ * `App\Http\Middleware\HandleInertiaRequests::presentImpersonator()`.
+ *
+ * Null on every ordinary session. When it is not null, `auth.user` is somebody *else* — the account
+ * being impersonated — which is the one situation where those two props disagree about who is using
+ * the application, and the only reason this prop exists.
+ */
+export type Impersonator = {
+    name: string;
+    email: string;
+};
+
 export type Auth = {
     user: User;
+    impersonator: Impersonator | null;
 };
 
 /* @chisel-passkeys */

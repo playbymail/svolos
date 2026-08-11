@@ -126,6 +126,9 @@ class UserController extends Controller
      *
      * `is_self` is presentation only — it lets the screen leave out controls that would 403.
      * `abortWhenTargetingSelf()` is the boundary; do not turn a hidden button into the check.
+     * `can_impersonate` is the same kind of flag for the same kind of reason: the rule it mirrors
+     * lives in `App\Http\Controllers\ImpersonationController::store()`, which refuses the requester
+     * and any administrator whether or not this screen offered a button.
      *
      * @return array{
      *     id: int,
@@ -139,6 +142,7 @@ class UserController extends Controller
      *     created_at: string,
      *     created_at_diff: string|null,
      *     is_self: bool,
+     *     can_impersonate: bool,
      * }
      */
     private function present(User $user, User $currentUser): array
@@ -155,6 +159,7 @@ class UserController extends Controller
             'created_at' => $user->created_at?->toDayDateTimeString() ?? '',
             'created_at_diff' => $user->created_at?->diffForHumans(),
             'is_self' => $user->is($currentUser),
+            'can_impersonate' => ! $user->is($currentUser) && ! $user->isAdmin(),
         ];
     }
 }

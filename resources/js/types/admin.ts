@@ -11,6 +11,10 @@ import type { UserRole } from '@/types/auth';
  *
  * `sessions_count` is how many rows the account has in the `sessions` table, which is what the
  * application treats as a signed-in browser.
+ *
+ * `can_impersonate` is the same kind of presentation-only flag as `is_self`: false for the
+ * administrator's own row and for every other administrator, because
+ * `App\Http\Controllers\ImpersonationController::store()` refuses both. The server is the boundary.
  */
 export type AdminUser = {
     id: number;
@@ -24,6 +28,7 @@ export type AdminUser = {
     created_at: string;
     created_at_diff: string | null;
     is_self: boolean;
+    can_impersonate: boolean;
 };
 
 /**

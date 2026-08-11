@@ -82,6 +82,11 @@ Every route in the area belongs to the group in `routes/web.php`, with the `admi
 `tests/Feature/AdminAccessTest.php` sweeps the route collection and fails if any route named
 `admin.*` is missing one of the three, so new admin screens are covered without anyone adding a case.
 
+`EnsureUserIsAdmin` also refuses any **impersonated** session, whatever role it holds, so that an
+account promoted while somebody is inside it cannot turn a borrowed session into an administrator
+one. That check is not redundant with the role check and must not be removed as such — see
+[impersonation.md](impersonation.md).
+
 The sidebar hides the administration link from members (`AppSidebar.svelte` reads
 `page.props.auth.user.role`). That is presentation only — the server is the boundary. Do not turn a
 hidden link into the check.
