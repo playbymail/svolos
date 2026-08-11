@@ -14,6 +14,7 @@
 # Overrides:
 #   BRANCH=hotfix/urgent scripts/deploy.sh    # deploy something other than main
 #   SKIP_NPM=1 scripts/deploy.sh              # backend-only change, skips the vite build
+#   FPM_SERVICE=php8.5-fpm scripts/deploy.sh  # pin the service instead of deriving it
 set -Eeuo pipefail
 
 APP_DIR=/srv/svolos
@@ -21,9 +22,27 @@ DATA_DIR=/srv/svolos-data
 BRANCH="${BRANCH:-main}"
 SKIP_NPM="${SKIP_NPM:-0}"
 KEEP_BACKUPS=10
-FPM_SERVICE=php8.4-fpm
+
+# Derived from the running CLI PHP rather than hardcoded, because the version moves with
+# the distribution — Ubuntu 26.04 ships 8.5, and a literal `php8.4-fpm` here fails at the
+# very last step of an otherwise successful deploy with "Unit not found", leaving the new
+# code live but opcache still holding the previous build. The CLI and the FPM pool are the
+# same series in this setup (both come from the same apt packages), so this is the version
+# to follow.
+FPM_SERVICE="${FPM_SERVICE:-php$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')-fpm}"
 
 cd "$APP_DIR"
+
+# Checked up front, before maintenance mode and before anything is migrated. Reloading is
+# the last step, so a wrong service name would otherwise only surface after the risky part
+# of the deploy had already run.
+if ! systemctl list-unit-files --no-legend "$FPM_SERVICE.service" | grep -q .; then
+    echo "no such service: $FPM_SERVICE" >&2
+    echo "installed PHP-FPM units:" >&2
+    systemctl list-unit-files --no-legend 'php*-fpm.service' >&2
+    echo "set FPM_SERVICE=<unit> and re-run, and update /etc/sudoers.d/deploy-svolos to match" >&2
+    exit 1
+fi
 
 trap 'echo "deploy failed — bringing the application back up" >&2; php artisan up || true' ERR
 
