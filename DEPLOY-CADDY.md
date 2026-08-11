@@ -23,16 +23,29 @@ Assumptions:
 | Domain | `svolos.pbbgaming.com` |
 | OS | Ubuntu 26.04 |
 | Deploy user | `deploy` (already created, has `sudo`) |
-| PHP | 8.4 with PHP-FPM |
+| PHP | 8.5 with PHP-FPM |
 | Web server | Caddy (already installed) |
 | App directory | `/srv/svolos` |
 | Data directory | `/srv/svolos-data` |
 
-`composer.json` requires `php: ^8.4`, so PHP 8.5 also satisfies it. If this box already
-runs the React build's 8.5 pool, use 8.5 and substitute the version everywhere below —
-the socket path, the pool file, the apt packages and the `systemctl reload` target all
-carry it. Pick one and be consistent; a pool built for 8.4 and a reload aimed at 8.5 is
-a 502 that looks like a code problem.
+**Ubuntu 26.04 ships PHP 8.5**, which is what `apt install php-fpm` gets you and what this
+guide uses throughout. `composer.json` requires `php: ^8.4`, so 8.5 satisfies it — 8.4 is
+only relevant if you are deliberately pinning to an older series from a PPA.
+
+The version appears in five places that must all agree: the apt package names (section
+2.2), the pool file path and its socket (section 3), the sudoers rule (section 3.1), the
+`php_fastcgi` socket in the Caddyfile (section 9), and the service the deploy script
+reloads (section 10). Confirm what the box actually has before you start:
+
+```bash
+php -v
+systemctl list-units --type=service 'php*-fpm.service'
+```
+
+A mismatch fails in two characteristic ways. A pool and a Caddyfile pointing at different
+sockets is a 502 that looks like a code problem. A `systemctl reload` naming a service
+that does not exist is `Unit php8.4-fpm.service not found` at the very end of an otherwise
+successful deploy — the code is live but opcache still holds the previous build.
 
 Everything in sections 1–10 is done **once**. After that, deploying is section 11.
 
@@ -112,25 +125,25 @@ sudo apt install -y \
     curl \
     unzip \
     sqlite3 \
-    php8.4-cli \
-    php8.4-fpm \
-    php8.4-sqlite3 \
-    php8.4-mbstring \
-    php8.4-xml \
-    php8.4-curl \
-    php8.4-zip \
-    php8.4-bcmath \
-    php8.4-intl
+    php8.5-cli \
+    php8.5-fpm \
+    php8.5-sqlite3 \
+    php8.5-mbstring \
+    php8.5-xml \
+    php8.5-curl \
+    php8.5-zip \
+    php8.5-bcmath \
+    php8.5-intl
 ```
 
 Three of those are load-bearing for features this app actually ships, so do not trim the
 list:
 
-- **`php8.4-curl`** — Mailgun sends through `symfony/http-client`. Without it, every
+- **`php8.5-curl`** — Mailgun sends through `symfony/http-client`. Without it, every
   invitation fails to send, and invitations are the only way to create an account.
-- **`php8.4-xml`** — mail rendering inlines CSS through `tijsverkoyen/css-to-inline-styles`,
+- **`php8.5-xml`** — mail rendering inlines CSS through `tijsverkoyen/css-to-inline-styles`,
   which needs `dom` and `libxml`.
-- **`php8.4-mbstring`** — the QR code for two-factor enrolment comes from
+- **`php8.5-mbstring`** — the QR code for two-factor enrolment comes from
   `bacon/bacon-qr-code`, which wants `iconv`/`mbstring`.
 
 `openssl` (WebAuthn/passkeys), `fileinfo`, `ctype`, `hash`, `session` and `tokenizer` are
@@ -178,12 +191,12 @@ This is the step that removes all the permission complexity. Give the app its ow
 pool that runs as `deploy`, listening on a socket the `caddy` user can reach.
 
 ```bash
-sudo tee /etc/php/8.4/fpm/pool.d/svolos.conf > /dev/null <<'EOF'
+sudo tee /etc/php/8.5/fpm/pool.d/svolos.conf > /dev/null <<'EOF'
 [svolos]
 user = deploy
 group = deploy
 
-listen = /run/php/php8.4-fpm-svolos.sock
+listen = /run/php/php8.5-fpm-svolos.sock
 listen.owner = deploy
 listen.group = caddy
 listen.mode = 0660
@@ -196,7 +209,7 @@ pm.max_spare_servers = 3
 pm.max_requests = 500
 
 php_admin_flag[log_errors] = on
-php_admin_value[error_log] = /var/log/php8.4-fpm-svolos.log
+php_admin_value[error_log] = /var/log/php8.5-fpm-svolos.log
 php_admin_value[memory_limit] = 256M
 EOF
 ```
@@ -207,26 +220,26 @@ a droplet with the React build without either one's pool shadowing the other's.
 If nothing else on this box uses the default pool, disable it:
 
 ```bash
-sudo mv /etc/php/8.4/fpm/pool.d/www.conf /etc/php/8.4/fpm/pool.d/www.conf.disabled
+sudo mv /etc/php/8.5/fpm/pool.d/www.conf /etc/php/8.5/fpm/pool.d/www.conf.disabled
 ```
 
 Test the configuration and restart:
 
 ```bash
-sudo php-fpm8.4 -t
-sudo systemctl restart php8.4-fpm
+sudo php-fpm8.5 -t
+sudo systemctl restart php8.5-fpm
 ```
 
 Confirm the socket:
 
 ```bash
-ls -l /run/php/php8.4-fpm-svolos.sock
+ls -l /run/php/php8.5-fpm-svolos.sock
 ```
 
 It should read approximately:
 
 ```text
-srw-rw---- 1 deploy caddy 0 ... /run/php/php8.4-fpm-svolos.sock
+srw-rw---- 1 deploy caddy 0 ... /run/php/php8.5-fpm-svolos.sock
 ```
 
 Because PHP runs as `deploy` and the entire working copy is owned by `deploy`,
@@ -238,7 +251,7 @@ The deploy script reloads PHP-FPM at the end. Allow that without a password prom
 
 ```bash
 sudo tee /etc/sudoers.d/deploy-svolos > /dev/null <<'EOF'
-deploy ALL=(root) NOPASSWD: /usr/bin/systemctl reload php8.4-fpm, /usr/bin/systemctl reload caddy
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl reload php8.5-fpm, /usr/bin/systemctl reload caddy
 EOF
 
 sudo chmod 0440 /etc/sudoers.d/deploy-svolos
@@ -447,7 +460,7 @@ svolos.pbbgaming.com {
 
 	encode zstd gzip
 
-	php_fastcgi unix//run/php/php8.4-fpm-svolos.sock
+	php_fastcgi unix//run/php/php8.5-fpm-svolos.sock
 
 	file_server
 
@@ -492,10 +505,10 @@ this server and ports 80 and 443 are open.
 
 ```bash
 systemctl status caddy
-systemctl status php8.4-fpm
+systemctl status php8.5-fpm
 
 sudo -u caddy test -r /srv/svolos/public/index.php && echo "caddy can read index.php"
-sudo -u caddy test -w /run/php/php8.4-fpm-svolos.sock && echo "caddy can reach php-fpm"
+sudo -u caddy test -w /run/php/php8.5-fpm-svolos.sock && echo "caddy can reach php-fpm"
 
 curl -i https://svolos.pbbgaming.com/up
 curl -s https://svolos.pbbgaming.com/.well-known/passkey-endpoints
@@ -529,19 +542,37 @@ restore it once:
 chmod +x /srv/svolos/scripts/deploy.sh
 ```
 
-Read it before the first run. Two constants at the top must match this server, and both
-are wrong if you deviated from the paths and PHP version in this guide:
+Read it before the first run. Two constants at the top must match this server:
 
 ```bash
 APP_DIR=/srv/svolos
 DATA_DIR=/srv/svolos-data
-FPM_SERVICE=php8.4-fpm
 ```
 
-`FPM_SERVICE` is the one to check if you chose PHP 8.5 in section 3. The script reloads
-it through `sudo`, which is what the sudoers rule in section 3.1 permits — the rule names
-the service explicitly, so the two have to agree or the deploy fails at the last step
-with a password prompt it cannot answer.
+The PHP-FPM service is **not** a constant — it is derived from the running CLI PHP, so it
+follows the distribution rather than being pinned to whatever was current when this guide
+was written:
+
+```bash
+FPM_SERVICE="${FPM_SERVICE:-php$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')-fpm}"
+```
+
+The script checks that unit exists **before** entering maintenance mode, and refuses to
+start if it does not, listing the PHP-FPM units that are actually installed. That ordering
+is the point: the reload is the last step of the deploy, so a wrong service name would
+otherwise only surface after the migration had already run.
+
+Two situations need the override. If the CLI PHP and the FPM pool are different series —
+unusual, but possible with a PPA — or if the unit is named something other than
+`phpX.Y-fpm`, pin it explicitly:
+
+```bash
+FPM_SERVICE=php8.5-fpm /srv/svolos/scripts/deploy.sh
+```
+
+Whatever it resolves to, the sudoers rule from section 3.1 must name the **same** unit.
+The rule matches the command literally, so a mismatch means the reload falls through to a
+password prompt the script cannot answer.
 
 ---
 
@@ -564,7 +595,7 @@ That script does the whole thing:
 6. `npm ci && npm run build`
 7. `php artisan migrate --force`
 8. `php artisan optimize`
-9. `sudo systemctl reload php8.4-fpm`
+9. `sudo systemctl reload php8.5-fpm`
 10. `php artisan up`
 
 Read the error, fix it, run the script again.
@@ -638,7 +669,7 @@ composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 php artisan optimize:clear
 npm ci && npm run build
 php artisan optimize
-sudo systemctl reload php8.4-fpm
+sudo systemctl reload php8.5-fpm
 php artisan up
 ```
 
@@ -671,16 +702,32 @@ invitation accepted in between. Decide that is acceptable before running it.
 **502 from Caddy.** PHP-FPM is down or the socket path is wrong.
 
 ```bash
-ls -l /run/php/php8.4-fpm-svolos.sock
-sudo journalctl -u php8.4-fpm -n 100 --no-pager
+ls -l /run/php/php8.5-fpm-svolos.sock
+sudo journalctl -u php8.5-fpm -n 100 --no-pager
 ```
+
+**`Unit php8.4-fpm.service not found` at the end of a deploy.** The PHP series on the box
+is not the one being reloaded — Ubuntu 26.04 ships **8.5**. Everything before the reload
+succeeded, so the new code is pulled, migrated and cached and the trap brought the
+application back up; only the opcache flush is missing. Finish it by hand:
+
+```bash
+systemctl list-unit-files --no-legend 'php*-fpm.service'
+sudo systemctl reload php8.5-fpm
+```
+
+If that prompts for a password, the sudoers rule still names the old service. Rewrite it
+with the correct one (section 3.1) and re-run. Current versions of `scripts/deploy.sh`
+derive the service from the running PHP and refuse to start when the unit does not exist,
+so this only bites a working copy that predates that change — deploy once more to pick it
+up.
 
 **500 with a blank page.** Check the application log — `APP_DEBUG` is `false`, so the
 browser will not show you anything.
 
 ```bash
 tail -50 /srv/svolos/storage/logs/laravel.log
-tail -50 /var/log/php8.4-fpm-svolos.log
+tail -50 /var/log/php8.5-fpm-svolos.log
 ```
 
 **"Unable to locate file in Vite manifest".** The build did not run or did not finish.
@@ -778,10 +825,10 @@ sudo journalctl -u caddy -n 100 --no-pager
 ## 15. What the server has
 
 ```text
-git          php8.4-cli / php8.4-fpm     composer
-curl         php8.4-sqlite3              node 24 / npm
-unzip        php8.4-mbstring             caddy
-sqlite3      php8.4-xml, curl, zip, bcmath, intl
+git          php8.5-cli / php8.5-fpm     composer
+curl         php8.5-sqlite3              node 24 / npm
+unzip        php8.5-mbstring             caddy
+sqlite3      php8.5-xml, curl, zip, bcmath, intl
 ```
 
 There are **no queue workers and no scheduler entry**, and that is correct for this
