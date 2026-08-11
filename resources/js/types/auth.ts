@@ -1,8 +1,17 @@
+/**
+ * Mirrors the `App\Enums\UserRole` backed enum, which serialises to its value.
+ *
+ * This is the application role that gates `/admin`. It is unrelated to any role a user holds
+ * inside a game.
+ */
+export type UserRole = 'admin' | 'member';
+
 export type User = {
     id: number;
     name: string;
     email: string;
     avatar?: string;
+    role: UserRole;
     two_factor_enabled?: boolean;
     email_verified_at: string | null;
     created_at: string;
