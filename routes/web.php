@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\GameSeatController;
 use App\Http\Controllers\Admin\InvitationController;
 use App\Http\Controllers\Admin\SessionController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use Illuminate\Support\Facades\Route;
@@ -30,8 +31,13 @@ Route::middleware('guest')->group(function () {
         ->name('invitations.store');
 });
 
+/*
+ * The member-facing home. It is a real controller rather than `Route::inertia()` because it reads the
+ * signed-in account's seats, and it stays named `dashboard` because several redirects point at it —
+ * including the one that lands an administrator inside an impersonated session.
+ */
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    Route::get('dashboard', DashboardController::class)->name('dashboard');
 });
 
 /*
