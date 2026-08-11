@@ -600,11 +600,24 @@ That script does the whole thing:
 
 Read the error, fix it, run the script again.
 
+### A change to the deploy script itself takes effect on the *next* run
+
+Step 3 pulls the new `scripts/deploy.sh`, but the run doing the pulling is still executing
+the old one — `git pull` replaces the file and the already-running shell keeps the old
+file open. So a deploy that fixes a bug in the deploy script still fails on that bug, once,
+and the working copy afterwards contains the fix that was not used.
+
+That is confusing in exactly the wrong way: `grep` shows the corrected file while the run
+that just failed clearly used the old one. When a deploy fails and the pull succeeded,
+check whether the fix was to the script, and if it was, simply run it again before
+debugging anything else.
+
 Useful overrides:
 
 ```bash
 BRANCH=hotfix/urgent /srv/svolos/scripts/deploy.sh
 SKIP_NPM=1 /srv/svolos/scripts/deploy.sh    # backend-only change, skips the vite build
+FPM_SERVICE=php8.5-fpm /srv/svolos/scripts/deploy.sh
 ```
 
 Caddy does not need reloading for a deploy. Its config never changes.
@@ -717,10 +730,13 @@ sudo systemctl reload php8.5-fpm
 ```
 
 If that prompts for a password, the sudoers rule still names the old service. Rewrite it
-with the correct one (section 3.1) and re-run. Current versions of `scripts/deploy.sh`
-derive the service from the running PHP and refuse to start when the unit does not exist,
-so this only bites a working copy that predates that change — deploy once more to pick it
-up.
+with the correct one (section 3.1) and re-run.
+
+Current versions of `scripts/deploy.sh` derive the service from the running PHP and refuse
+to start when the unit does not exist, so this only bites a working copy that predates that
+change. Note that the deploy which *pulls* that fix still fails on it — see "a change to
+the deploy script itself takes effect on the next run" in section 11 — so run the script a
+second time before concluding the fix did not work.
 
 **500 with a blank page.** Check the application log — `APP_DEBUG` is `false`, so the
 browser will not show you anything.
