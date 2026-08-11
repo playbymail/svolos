@@ -23,6 +23,14 @@ BRANCH="${BRANCH:-main}"
 SKIP_NPM="${SKIP_NPM:-0}"
 KEEP_BACKUPS=10
 
+# Resolved to an absolute path before the `cd` below, so the self-check after the pull can
+# still find this file however the script was invoked.
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+
+self_digest() {
+    sha256sum "$SELF" | cut -d' ' -f1
+}
+
 # Derived from the running CLI PHP rather than hardcoded, because the version moves with
 # the distribution — Ubuntu 26.04 ships 8.5, and a literal `php8.4-fpm` here fails at the
 # very last step of an otherwise successful deploy with "Unit not found", leaving the new
@@ -55,9 +63,41 @@ stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 sqlite3 "$DATA_DIR/database.sqlite" ".backup '$DATA_DIR/backups/database-$stamp.sqlite'"
 ls -1t "$DATA_DIR"/backups/database-*.sqlite | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r rm --
 
+digest_before="$(self_digest)"
+
 git fetch --prune origin
 git switch "$BRANCH"
 git pull --ff-only origin "$BRANCH"
+
+# A deploy that updates this script is still running the *old* copy of it: git replaces the
+# file, but bash already has the previous one open, so the rest of this run would execute
+# instructions the commit being deployed has just superseded. That is a genuinely nasty
+# footgun — the failure looks like the fix did not work, because `grep` afterwards shows
+# the corrected file while the run that failed plainly did not use it.
+#
+# So compare the digest across the pull and stop if it moved. Nothing has been installed,
+# migrated or re-cached at this point, and the application is deliberately left **down**:
+# the working copy is now new code against the previous vendor/ and public/build, which is
+# not a state to serve. Re-running finishes the deploy with the new script, and its own
+# check passes because the file no longer changes.
+if [ "$digest_before" != "$(self_digest)" ]; then
+    cat >&2 <<MSG
+
+the pull updated this script
+
+  $SELF
+
+This run is still executing the version that started, so it stops here rather than
+deploying with instructions the new commit has already replaced. Nothing was installed,
+migrated or re-cached, and the application is intentionally still in maintenance mode.
+
+Run it again to finish the deploy with the new script:
+
+  $SELF
+
+MSG
+    exit 1
+fi
 
 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 

@@ -562,6 +562,10 @@ start if it does not, listing the PHP-FPM units that are actually installed. Tha
 is the point: the reload is the last step of the deploy, so a wrong service name would
 otherwise only surface after the migration had already run.
 
+It also checksums itself either side of the `git pull` and stops if the pull changed it,
+because the run would otherwise continue executing the version it started with — see
+section 11.
+
 Two situations need the override. If the CLI PHP and the FPM pool are different series —
 unusual, but possible with a PPA — or if the unit is named something other than
 `phpX.Y-fpm`, pin it explicitly:
@@ -600,17 +604,37 @@ That script does the whole thing:
 
 Read the error, fix it, run the script again.
 
-### A change to the deploy script itself takes effect on the *next* run
+### A change to the deploy script itself stops the run
 
 Step 3 pulls the new `scripts/deploy.sh`, but the run doing the pulling is still executing
-the old one — `git pull` replaces the file and the already-running shell keeps the old
-file open. So a deploy that fixes a bug in the deploy script still fails on that bug, once,
-and the working copy afterwards contains the fix that was not used.
+the old one — `git pull` replaces the file and the already-running shell keeps the old file
+open. Left alone that is a nasty footgun: a deploy that *fixes* the deploy script still
+fails on the bug it fixes, and `grep` afterwards shows the corrected file, so it reads as
+the fix not having worked.
 
-That is confusing in exactly the wrong way: `grep` shows the corrected file while the run
-that just failed clearly used the old one. When a deploy fails and the pull succeeded,
-check whether the fix was to the script, and if it was, simply run it again before
-debugging anything else.
+The script therefore checksums itself either side of the pull and stops if it moved:
+
+```text
+the pull updated this script
+
+  /srv/svolos/scripts/deploy.sh
+
+This run is still executing the version that started, so it stops here rather than
+deploying with instructions the new commit has already replaced. Nothing was installed,
+migrated or re-cached, and the application is intentionally still in maintenance mode.
+
+Run it again to finish the deploy with the new script:
+
+  /srv/svolos/scripts/deploy.sh
+```
+
+Do exactly that. The second run's own check passes, because the file no longer changes.
+
+The application is deliberately left **down** rather than brought back up: the pull has
+already replaced the application code, so the working copy is new code against the previous
+`vendor/` and `public/build`, which is not a state worth serving for the few seconds it
+takes to re-run. Nothing has been installed, migrated or re-cached, so the re-run is a
+normal deploy and not a recovery.
 
 Useful overrides:
 
@@ -734,9 +758,10 @@ with the correct one (section 3.1) and re-run.
 
 Current versions of `scripts/deploy.sh` derive the service from the running PHP and refuse
 to start when the unit does not exist, so this only bites a working copy that predates that
-change. Note that the deploy which *pulls* that fix still fails on it — see "a change to
-the deploy script itself takes effect on the next run" in section 11 — so run the script a
-second time before concluding the fix did not work.
+change. Such a working copy also predates the self-check described in section 11, so the
+deploy that *pulls* the fix fails on the very bug it fixes — run the script a second time
+before concluding the fix did not work. From then on the self-check makes that explicit
+instead of leaving you to work it out.
 
 **500 with a blank page.** Check the application log — `APP_DEBUG` is `false`, so the
 browser will not show you anything.
