@@ -7,6 +7,7 @@ not undo it.
 | Globs | Rule file |
 | --- | --- |
 | `**` | [general.md](general.md) — verification gate, env parsing, tooling levels |
+| `.ai/rules/**` | [rules.md](rules.md) — **`record-rule` destroys this index**; write rule files and their index rows by hand |
 | `app/**` | [php.md](php.md) — PHP and Laravel conventions |
 | `config/**` | [config.md](config.md) — a blank value in `.env.example` is `''`, **not null**, so a `toBeNull()` test passes locally and fails on a fresh clone; how to reproduce a CI-only failure |
 | `config/fortify.php`, `app/Providers/FortifyServiceProvider.php`, `app/Actions/Fortify/**`, `app/Concerns/*ValidationRules.php`, `resources/js/pages/auth/**`, `tests/Feature/Auth/**` | [auth.md](auth.md) — Fortify surface; **registration is deliberately absent** |
@@ -22,5 +23,8 @@ Boost also ships framework/package guidance in `.ai/rules/boost/` when that dire
 Beyond a glob match, run `grep -rin '<keyword>' .ai/rules` — a path match alone misses
 cross-cutting rules.
 
-Record new durable rules here (or via Boost `record-rule`) rather than in personal/session memory:
-only `.ai/rules` is shared with the team and survives in the repo.
+Record new durable rules here rather than in personal/session memory: only `.ai/rules` is shared
+with the team and survives in the repo. Add the file **and** its row above by hand — Boost's
+`record-rule` tool rewrites this index down to a single row and drops everything else, which
+[rules.md](rules.md) explains. `CLAUDE.md` still recommends that tool; this table is the exception
+to it.
