@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\GenerationStage;
 use App\Models\Game;
 use App\Models\GameSeat;
+use App\Models\GenerationRun;
 use App\Models\Invitation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -99,6 +101,27 @@ function gamemasterOf(Game $game, array $attributes = []): User
     GameSeat::factory()->for($game)->for($gamemaster)->gamemaster()->create();
 
     return $gamemaster;
+}
+
+/**
+ * Give a game an accepted run for every generation stage, so it counts as fully generated.
+ *
+ * A game cannot become `Active` until its world exists (see `GameValidationRules::gameStatusRules()`),
+ * which makes this the setup for every test about a game that is *being played* rather than being
+ * built. The runs are made by factory rather than by running the generators: what is being asserted is
+ * the gate, and generating a hundred locations to satisfy it would make dozens of tests slower for
+ * nothing. Tests about the generators themselves run the real thing.
+ *
+ * Lives here rather than in a test file because both areas' tests need it, and a helper declared in a
+ * test file is only loaded when that file is — which a `--filter` run need not do.
+ */
+function withCompletedGeneration(Game $game): Game
+{
+    foreach (GenerationStage::cases() as $stage) {
+        GenerationRun::factory()->for($game)->stage($stage)->accepted()->create();
+    }
+
+    return $game->load('generationRuns');
 }
 
 /**

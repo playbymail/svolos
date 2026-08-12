@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Gamemaster;
 
+use App\Concerns\PresentsGeneration;
 use App\Enums\GameRole;
 use App\Enums\GameStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Gamemaster\GameSeedUpdateRequest;
 use App\Http\Requests\Gamemaster\GameStatusUpdateRequest;
 use App\Models\Game;
 use App\Models\GameSeat;
@@ -35,9 +37,16 @@ use Inertia\Response;
  *
  * The last two are re-stated in the payload as `can_retire` and `can_change_role` so the screen does
  * not render controls that would 403, but the server is the boundary — the flags are presentation.
+ *
+ * The game's **seed** is not a fourth exception: a gamemaster may see it and may set it, on exactly
+ * the same terms an administrator can — while the game is still in `GameStatus::Setup`. That limit is
+ * about the game, not about who is asking, so it is a validation rule shared by both areas rather than
+ * a refusal that belongs to this one. See `updateSeed()` below.
  */
 class GameController extends Controller
 {
+    use PresentsGeneration;
+
     /**
      * Show the game and its roster.
      *
@@ -66,6 +75,13 @@ class GameController extends Controller
 
         return Inertia::render('gamemaster/games/Show', [
             'game' => $this->present($game),
+            'generation' => $this->presentGeneration($game, withSuggestions: true),
+            /*
+             * The whole cluster ships with the page: a hundred locations of four small numbers each is
+             * a smaller payload than the request that would fetch them, and reviewing a cluster means
+             * looking at all of it. It is empty until a cluster run exists.
+             */
+            'locations' => $this->presentLocations($game),
             'seats' => $seats,
             'assignableAccounts' => $this->assignableAccounts($game),
             'roles' => array_map(
@@ -105,6 +121,34 @@ class GameController extends Controller
     }
 
     /**
+     * Change the number this game's randomness is drawn from.
+     *
+     * A gamemaster may do this and it is **not** a fourth exception to the rules above: a game in
+     * `GameStatus::Setup` has not been played yet, so there is no run for a new seed to rewrite. The
+     * condition is about the game rather than about who is asking, which is why it is a rejected field
+     * rather than a 403 and why `Gamemaster\GameSeedUpdateRequest` shares its rule with the
+     * administrator's copy through `App\Concerns\GameValidationRules`. Once the game leaves setup, this
+     * endpoint refuses an administrator exactly as it refuses a gamemaster.
+     *
+     * Assigned explicitly rather than filled, because `seed` is out of `Game`'s `#[Fillable]`.
+     */
+    public function updateSeed(GameSeedUpdateRequest $request, Game $game): RedirectResponse
+    {
+        $game->seed = (int) $request->validated('seed');
+        $game->save();
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __(':name is now seeded with :seed.', [
+                'name' => $game->name,
+                'seed' => $game->seed,
+            ]),
+        ]);
+
+        return to_route('gamemaster.games.show', ['game' => $game]);
+    }
+
+    /**
      * List the accounts that could still be given a seat at this game.
      *
      * Identical to the administrator's list, and excluding every account that already holds a seat —
@@ -137,12 +181,16 @@ class GameController extends Controller
      * Shape the game for its gamemaster's screen.
      *
      * `name` and `short_name` are here to be **displayed**, not edited — the screen renders them as
-     * text rather than as inputs, and `update()` cannot write them whatever the screen does.
+     * text rather than as inputs, and `update()` cannot write them whatever the screen does. The seed
+     * is the opposite case and worth not confusing with them: a gamemaster sees it *and* may set it,
+     * for as long as the game is in setup, which is what `can_change_seed` says.
      *
      * @return array{
      *     id: int,
      *     name: string,
      *     short_name: string,
+     *     seed: int,
+     *     can_change_seed: bool,
      *     status: string,
      *     status_label: string,
      *     seats_count: int,
@@ -157,6 +205,8 @@ class GameController extends Controller
             'id' => $game->id,
             'name' => $game->name,
             'short_name' => $game->short_name,
+            'seed' => $game->seed,
+            'can_change_seed' => $game->status === GameStatus::Setup && ! $game->hasGenerationRuns(),
             'status' => $game->status->value,
             'status_label' => $game->status->label(),
             'seats_count' => $game->seats_count ?? 0,

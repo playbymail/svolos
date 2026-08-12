@@ -216,19 +216,23 @@ test('each seat says what this gamemaster may do to it', function () {
 });
 
 test('a gamemaster can move the game to another status', function () {
+    /*
+     * Paused rather than active, because becoming *active* is the one transition with a condition on
+     * it — the game's world has to exist first, which the tests further down cover on their own.
+     */
     $game = Game::factory()->create(['name' => 'Alpha Run', 'status' => GameStatus::Setup]);
     $gamemaster = gamemasterOf($game);
 
     $response = $this->actingAs($gamemaster)
-        ->put(route('gamemaster.games.update', ['game' => $game]), ['status' => GameStatus::Active->value]);
+        ->put(route('gamemaster.games.update', ['game' => $game]), ['status' => GameStatus::Paused->value]);
 
     $response->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
     $response->assertInertiaFlash('toast', [
         'type' => 'success',
-        'message' => 'Alpha Run is now active.',
+        'message' => 'Alpha Run is now paused.',
     ]);
 
-    expect($game->fresh()?->status)->toBe(GameStatus::Active);
+    expect($game->fresh()?->status)->toBe(GameStatus::Paused);
 });
 
 test('an archived game can be restored by its gamemaster', function () {
@@ -237,10 +241,10 @@ test('an archived game can be restored by its gamemaster', function () {
     $gamemaster = gamemasterOf($game);
 
     $this->actingAs($gamemaster)
-        ->put(route('gamemaster.games.update', ['game' => $game]), ['status' => GameStatus::Active->value])
+        ->put(route('gamemaster.games.update', ['game' => $game]), ['status' => GameStatus::Paused->value])
         ->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
 
-    expect($game->fresh()?->status)->toBe(GameStatus::Active);
+    expect($game->fresh()?->status)->toBe(GameStatus::Paused);
 });
 
 test('an unknown status is rejected and changes nothing', function () {
@@ -276,7 +280,7 @@ test('a posted name and short name are IGNORED while the status still saves', fu
         ->put(route('gamemaster.games.update', ['game' => $game]), [
             'name' => 'Renamed By A Gamemaster',
             'short_name' => 'STOLEN',
-            'status' => GameStatus::Active->value,
+            'status' => GameStatus::Paused->value,
         ])
         ->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
 
@@ -284,7 +288,139 @@ test('a posted name and short name are IGNORED while the status still saves', fu
 
     expect($fresh?->name)->toBe('Alpha Run');
     expect($fresh?->short_name)->toBe('ALPHA');
-    expect($fresh?->status)->toBe(GameStatus::Active);
+    expect($fresh?->status)->toBe(GameStatus::Paused);
+});
+
+test('a gamemaster can see the seed and change it while the game is in setup', function () {
+    /*
+     * **Not a fourth exception to the rules above.** A gamemaster may set a seed on exactly the terms
+     * an administrator can, because a game in setup has not been played yet and there is no run for a
+     * new seed to rewrite. The limit is about the game rather than about who is asking, which is why
+     * the two areas share one rule in `App\Concerns\GameValidationRules` instead of this screen
+     * carrying a refusal of its own.
+     */
+    $game = Game::factory()->create(['name' => 'Alpha Run', 'seed' => 111]);
+    $gamemaster = gamemasterOf($game);
+
+    $this->actingAs($gamemaster)
+        ->get(route('gamemaster.games.show', ['game' => $game]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('game.seed', 111)
+            ->where('game.can_change_seed', true)
+            ->etc(),
+        );
+
+    $response = $this->actingAs($gamemaster)
+        ->put(route('gamemaster.games.seed.update', ['game' => $game]), ['seed' => 4242]);
+
+    $response->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
+    $response->assertInertiaFlash('toast', [
+        'type' => 'success',
+        'message' => 'Alpha Run is now seeded with 4242.',
+    ]);
+
+    expect($game->fresh()?->seed)->toBe(4242);
+});
+
+test('a gamemaster cannot change the seed once the game has left setup', function () {
+    /*
+     * The same rejection an administrator gets, with the same message: it is the game that is in the
+     * wrong state, not the requester who overstepped, so it is a validation failure rather than one
+     * of this area's 403s.
+     */
+    $game = Game::factory()->active()->create(['seed' => 111]);
+    $gamemaster = gamemasterOf($game);
+
+    $this->actingAs($gamemaster)
+        ->get(route('gamemaster.games.show', ['game' => $game]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('game.can_change_seed', false)->etc());
+
+    $this->actingAs($gamemaster)
+        ->put(route('gamemaster.games.seed.update', ['game' => $game]), ['seed' => 222])
+        ->assertSessionHasErrors([
+            'seed' => 'The seed can only be changed while the game is in setup.',
+        ]);
+
+    expect($game->fresh()?->seed)->toBe(111);
+});
+
+test('a seed outside the engine range is rejected here too', function () {
+    $game = Game::factory()->create(['seed' => 111]);
+    $gamemaster = gamemasterOf($game);
+
+    $this->actingAs($gamemaster)
+        ->put(route('gamemaster.games.seed.update', ['game' => $game]), ['seed' => Game::SEED_MAX + 1])
+        ->assertSessionHasErrors('seed');
+
+    expect($game->fresh()?->seed)->toBe(111);
+});
+
+test('the seed form cannot rename the game either', function () {
+    /*
+     * The seed endpoint validates the seed alone, so it cannot become a second way in for the fields
+     * `GameStatusUpdateRequest` deliberately leaves out. The seed is asserted to have moved as well,
+     * so this cannot pass merely because the whole request was rejected.
+     */
+    $game = Game::factory()->create(['name' => 'Alpha Run', 'short_name' => 'ALPHA', 'seed' => 111]);
+    $gamemaster = gamemasterOf($game);
+
+    $this->actingAs($gamemaster)
+        ->put(route('gamemaster.games.seed.update', ['game' => $game]), [
+            'seed' => 222,
+            'name' => 'Renamed By A Gamemaster',
+            'short_name' => 'STOLEN',
+            'status' => GameStatus::Archived->value,
+        ])
+        ->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
+
+    $fresh = $game->fresh();
+
+    expect($fresh?->seed)->toBe(222);
+    expect($fresh?->name)->toBe('Alpha Run');
+    expect($fresh?->short_name)->toBe('ALPHA');
+    expect($fresh?->status)->toBe(GameStatus::Setup);
+});
+
+test('the status form cannot write a seed', function () {
+    /*
+     * The mirror of the test above, and the reason the seed has its own endpoint: `seed` is out of
+     * `Game`'s `#[Fillable]` and `GameStatusUpdateRequest` validates the status alone, so a seed
+     * posted alongside a status is dropped twice over.
+     */
+    $game = Game::factory()->create(['seed' => 111]);
+    $gamemaster = gamemasterOf($game);
+
+    $this->actingAs($gamemaster)
+        ->put(route('gamemaster.games.update', ['game' => $game]), [
+            'status' => GameStatus::Paused->value,
+            'seed' => 999,
+        ])
+        ->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
+
+    $fresh = $game->fresh();
+
+    expect($fresh?->status)->toBe(GameStatus::Paused);
+    expect($fresh?->seed)->toBe(111);
+});
+
+test('a player at the game cannot reach the seed endpoint', function () {
+    /*
+     * The seed is one more thing the gate stands in front of: a seat at the game is not enough, the
+     * role has to be right. The route is covered by the middleware sweep below as well; this asserts
+     * the write itself never happens.
+     */
+    $game = Game::factory()->create(['seed' => 111]);
+    $player = User::factory()->create();
+
+    GameSeat::factory()->for($game)->for($player)->create();
+
+    $this->actingAs($player)
+        ->put(route('gamemaster.games.seed.update', ['game' => $game]), ['seed' => 222])
+        ->assertForbidden();
+
+    expect($game->fresh()?->seed)->toBe(111);
 });
 
 test('the gamemaster area has no route that creates, deletes or lists games', function () {
@@ -302,6 +438,10 @@ test('the gamemaster area has no route that creates, deletes or lists games', fu
     expect($names->all())->toEqualCanonicalizing([
         'gamemaster.games.show',
         'gamemaster.games.update',
+        'gamemaster.games.seed.update',
+        'gamemaster.games.generation.store',
+        'gamemaster.games.generation.accept',
+        'gamemaster.games.generation.restart',
         'gamemaster.games.seats.store',
         'gamemaster.games.seats.role.update',
         'gamemaster.games.seats.retire',

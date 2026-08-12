@@ -3,11 +3,9 @@
 namespace App\Http\Requests\Admin;
 
 use App\Concerns\GameValidationRules;
-use App\Enums\GameStatus;
 use App\Models\Game;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class GameUpdateRequest extends FormRequest
 {
@@ -21,20 +19,23 @@ class GameUpdateRequest extends FormRequest
      * the rules fall back to the stricter form that ignores nothing (see
      * `GameValidationRules::uniqueGameRule()`).
      *
-     * Any status may be chosen. The enum's order is the order a game normally travels through, but
-     * nothing forces a game forward — a completed game can be reopened, and an archived one restored.
+     * Any status may be chosen, with the one exception `gameStatusRules()` states: a game cannot become
+     * `Active` until its generation is finished. Otherwise nothing forces a game forward — a completed
+     * game can be reopened, and an archived one restored — even though the enum's order is the order a
+     * game normally travels through.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         $game = $this->route('game');
-        $gameId = $game instanceof Game ? $game->id : null;
+        $game = $game instanceof Game ? $game : null;
+        $gameId = $game?->id;
 
         return [
             'name' => $this->gameNameRules($gameId),
             'short_name' => $this->gameShortNameRules($gameId),
-            'status' => ['required', Rule::enum(GameStatus::class)],
+            'status' => $this->gameStatusRules($game),
         ];
     }
 

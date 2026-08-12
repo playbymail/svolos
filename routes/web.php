@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Gamemaster\GameController as GamemasterGameController;
 use App\Http\Controllers\Gamemaster\GameSeatController as GamemasterGameSeatController;
+use App\Http\Controllers\Gamemaster\GenerationController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use Illuminate\Support\Facades\Route;
@@ -75,6 +76,29 @@ Route::middleware(['auth', 'verified', 'gamemaster'])
         Route::put('games/{game}', [GamemasterGameController::class, 'update'])->name('games.update');
 
         /*
+         * The seed is its own endpoint rather than another field on the update above, because it
+         * answers to the game's status: it may only be set while the game is in setup, and folding
+         * it into the status form would attach that condition to a field nobody touched. A
+         * gamemaster may set it on the same terms an administrator can — see
+         * `Gamemaster\GameController::updateSeed()`.
+         */
+        Route::put('games/{game}/seed', [GamemasterGameController::class, 'updateSeed'])->name('games.seed.update');
+
+        /*
+         * Building the game's world. `{stage}` binds to the `App\Enums\GenerationStage` backed enum,
+         * so an unknown stage 404s without a line of code and the planets stage will add no routes
+         * at all — the stages differ in what they generate, not in how they are driven.
+         *
+         * `restart` is a POST rather than a DELETE even though it destroys everything generated, for
+         * the same reason nothing else in this area accepts DELETE: the sweep in
+         * `tests/Feature/Gamemaster/GameManagementTest.php` asserts that, and the seat rule it exists
+         * for is worth more than the verb.
+         */
+        Route::post('games/{game}/generation/restart', [GenerationController::class, 'restart'])->name('games.generation.restart');
+        Route::post('games/{game}/generation/{stage}', [GenerationController::class, 'store'])->name('games.generation.store');
+        Route::post('games/{game}/generation/{stage}/accept', [GenerationController::class, 'accept'])->name('games.generation.accept');
+
+        /*
          * Scoped exactly as the admin seat routes are, and for the same reason: `{seat}` resolves
          * through `Game::seats()`, so a seat id from another game 404s rather than being edited
          * through this game's URL. Without it both ids bind independently and the mismatch is
@@ -110,6 +134,13 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::get('games/{game}', [GameController::class, 'show'])->name('games.show');
         Route::put('games/{game}', [GameController::class, 'update'])->name('games.update');
         Route::delete('games/{game}', [GameController::class, 'destroy'])->name('games.destroy');
+
+        /*
+         * The seed a game's randomness is drawn from. Assigned at creation and changeable only while
+         * the game is in setup, which is why it is not a field on `games.update`: the metadata form
+         * saves a name and a status long after that, and would carry a prohibited field with it.
+         */
+        Route::put('games/{game}/seed', [GameController::class, 'updateSeed'])->name('games.seed.update');
 
         /*
          * Seat routes are nested under their game and **scoped** to it. `scopeBindings()` makes `{seat}`

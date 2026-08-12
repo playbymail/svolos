@@ -2,10 +2,10 @@
 
 namespace App\Http\Requests\Gamemaster;
 
-use App\Enums\GameStatus;
+use App\Concerns\GameValidationRules;
+use App\Models\Game;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * The gamemaster's half of `Admin\GameUpdateRequest`: the status, and nothing else.
@@ -24,19 +24,23 @@ use Illuminate\Validation\Rule;
  */
 class GameStatusUpdateRequest extends FormRequest
 {
+    use GameValidationRules;
+
     /**
      * Get the validation rules that apply to the request.
      *
-     * Any status may be chosen, exactly as an administrator may choose any: the enum's order is the
-     * order a game normally travels through, but nothing forces a game forward — a completed game can
-     * be reopened, and an archived one restored.
+     * The status rules are shared with the administrator's request, so both areas refuse an `Active`
+     * game whose generation is unfinished with the same message. Everything else is open: nothing
+     * forces a game forward, so a completed game can be reopened and an archived one restored.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
+        $game = $this->route('game');
+
         return [
-            'status' => ['required', Rule::enum(GameStatus::class)],
+            'status' => $this->gameStatusRules($game instanceof Game ? $game : null),
         ];
     }
 }

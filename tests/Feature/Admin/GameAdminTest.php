@@ -42,6 +42,7 @@ function gameAdminRoutes(): array
         'store' => ['post', fn (): string => route('admin.games.store')],
         'show' => ['get', fn (Game $game): string => route('admin.games.show', ['game' => $game])],
         'update' => ['put', fn (Game $game): string => route('admin.games.update', ['game' => $game])],
+        'seed.update' => ['put', fn (Game $game): string => route('admin.games.seed.update', ['game' => $game])],
         'destroy' => ['delete', fn (Game $game): string => route('admin.games.destroy', ['game' => $game])],
     ];
 }
@@ -57,7 +58,11 @@ function gamePayload(array $overrides = []): array
     return [
         'name' => 'The Long Retreat',
         'short_name' => 'RETREAT',
-        'status' => GameStatus::Active->value,
+        /* Paused, not active: a game cannot become active until its world has been generated, and a
+         * payload used as "one that would otherwise succeed" has to keep being exactly that. */
+        'status' => GameStatus::Paused->value,
+        /* Carried for the seed route in the sweeps above; the other routes validate no such field. */
+        'seed' => 1234,
         ...$overrides,
     ];
 }
@@ -371,11 +376,11 @@ test('a game can be saved without changing its own name or short name', function
         ->put(route('admin.games.update', ['game' => $game]), [
             'name' => 'Same Name',
             'short_name' => 'SAME',
-            'status' => GameStatus::Active->value,
+            'status' => GameStatus::Paused->value,
         ])
         ->assertSessionHasNoErrors();
 
-    expect($game->fresh()?->status)->toBe(GameStatus::Active);
+    expect($game->fresh()?->status)->toBe(GameStatus::Paused);
 });
 
 test('an update is rejected when it collides with another game or carries an unknown status', function () {
@@ -403,6 +408,221 @@ test('an update is rejected when it collides with another game or carries an unk
 
     expect($game->fresh()?->name)->toBe('Mine');
     expect($game->fresh()?->short_name)->toBe('MINE');
+});
+
+test('a new game is created with a seed of its own, drawn inside the engine range', function () {
+    /*
+     * Nobody chooses the seed at creation — `GameStoreRequest` accepts no such field, exactly as it
+     * accepts no status — so this is asserting that `Game::booted()` assigned one rather than that a
+     * posted value survived. The range is the engine's: `Game::SEED_MAX` is the width of PHP's
+     * Mersenne Twister seed, so every value in it names a different game.
+     */
+    $admin = User::factory()->admin()->create();
+
+    foreach (['ONE', 'TWO', 'THREE'] as $shortName) {
+        $this->actingAs($admin)
+            ->post(route('admin.games.store'), [
+                'name' => "Run {$shortName}",
+                'short_name' => $shortName,
+                /* Posted and ignored, like a posted status: a seed is assigned, never chosen here. */
+                'seed' => 7,
+            ])
+            ->assertSessionHasNoErrors();
+    }
+
+    $seeds = Game::query()->pluck('seed');
+
+    expect($seeds)->toHaveCount(3);
+
+    foreach ($seeds as $seed) {
+        expect($seed)->toBeInt()
+            ->toBeGreaterThanOrEqual(Game::SEED_MIN)
+            ->toBeLessThanOrEqual(Game::SEED_MAX);
+    }
+
+    /*
+     * Random, not fixed. Three draws from 4,294,967,296 values collide about once in a billion runs,
+     * which is the price of catching a hook that hands every game the same number — the failure mode
+     * a constant default or a single-statement backfill would produce.
+     */
+    expect($seeds->unique())->toHaveCount(3);
+    expect($seeds->contains(7))->toBeFalse();
+});
+
+test('an administrator can change the seed while the game is in setup', function () {
+    $admin = User::factory()->admin()->create();
+    $game = Game::factory()->create(['name' => 'Alpha Run', 'seed' => 111]);
+
+    $response = $this->actingAs($admin)
+        ->put(route('admin.games.seed.update', ['game' => $game]), ['seed' => 4242]);
+
+    $response->assertRedirect(route('admin.games.show', ['game' => $game]));
+    $response->assertInertiaFlash('toast', [
+        'type' => 'success',
+        'message' => 'Alpha Run is now seeded with 4242.',
+    ]);
+
+    expect($game->fresh()?->seed)->toBe(4242);
+});
+
+test('the ends of the range are both accepted', function () {
+    $admin = User::factory()->admin()->create();
+    $game = Game::factory()->create();
+
+    foreach ([Game::SEED_MIN, Game::SEED_MAX] as $seed) {
+        $this->actingAs($admin)
+            ->put(route('admin.games.seed.update', ['game' => $game]), ['seed' => $seed])
+            ->assertSessionHasNoErrors();
+
+        expect($game->fresh()?->seed)->toBe($seed);
+    }
+});
+
+test('the seed can no longer be changed once the game has left setup', function (string $state) {
+    /*
+     * The rule the seed exists to have. A seed is the number a run was drawn from, so re-seeding a
+     * game that is being played would describe a run that never happened — its turn reports would no
+     * longer follow from its seed.
+     *
+     * This is a **validation** failure rather than a 403: the value is fine and the requester may post
+     * it, the game is simply in the wrong state, and the same administrator may post the same number
+     * the moment it goes back to setup. The gamemaster area's four refusals are 403s for the opposite
+     * reason — see `.ai/rules/gamemaster.md`.
+     */
+    $admin = User::factory()->admin()->create();
+    $game = Game::factory()->{$state}()->create(['seed' => 111]);
+
+    $this->actingAs($admin)
+        ->put(route('admin.games.seed.update', ['game' => $game]), ['seed' => 222])
+        ->assertSessionHasErrors([
+            'seed' => 'The seed can only be changed while the game is in setup.',
+        ]);
+
+    expect($game->fresh()?->seed)->toBe(111);
+})->with(['active', 'paused', 'completed', 'archived']);
+
+test('a game put back into setup can be re-seeded again', function () {
+    /*
+     * The other half of the rule above: the refusal is about the game's state, so it lifts when the
+     * state does. A 403 would have been the wrong shape for something that comes back.
+     */
+    $admin = User::factory()->admin()->create();
+    $game = Game::factory()->active()->create(['seed' => 111]);
+
+    $this->actingAs($admin)
+        ->put(route('admin.games.seed.update', ['game' => $game]), ['seed' => 222])
+        ->assertSessionHasErrors('seed');
+
+    $this->actingAs($admin)
+        ->put(route('admin.games.update', ['game' => $game]), gamePayload([
+            'name' => $game->name,
+            'short_name' => $game->short_name,
+            'status' => GameStatus::Setup->value,
+        ]))
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs($admin)
+        ->put(route('admin.games.seed.update', ['game' => $game]), ['seed' => 222])
+        ->assertSessionHasNoErrors();
+
+    expect($game->fresh()?->seed)->toBe(222);
+});
+
+test('a seed outside the range or not a whole number is rejected', function (mixed $seed) {
+    $admin = User::factory()->admin()->create();
+    $game = Game::factory()->create(['seed' => 111]);
+
+    $this->actingAs($admin)
+        ->put(route('admin.games.seed.update', ['game' => $game]), ['seed' => $seed])
+        ->assertSessionHasErrors('seed');
+
+    expect($game->fresh()?->seed)->toBe(111);
+})->with([
+    'negative' => -1,
+    'past the 32-bit ceiling' => 4294967296,
+    'fractional' => 1.5,
+    'not a number' => 'lucky',
+    'empty' => '',
+]);
+
+test('the range the seed is validated against is the engine range', function () {
+    /*
+     * Named rather than assumed, because the bound is not arbitrary: `Random\Engine\Mt19937` takes a
+     * 32-bit unsigned seed, so this is exactly the set of values that produce distinct sequences. The
+     * migration's column is `unsignedInteger` for the same reason.
+     */
+    expect(Game::SEED_MIN)->toBe(0);
+    expect(Game::SEED_MAX)->toBe(4294967295);
+});
+
+test('the metadata form cannot write a seed, and the seed form cannot write anything else', function () {
+    /*
+     * `seed` is out of `Game`'s `#[Fillable]`, so the two seed endpoints are the only places it can
+     * change — a posted seed on the metadata form is dropped rather than written, exactly as
+     * `is_active` cannot ride along on a seat's role change. The mirror assertion is that the seed
+     * endpoint writes only the seed: its request validates one field, so a name posted with it is not
+     * in `validated()` at all.
+     */
+    $admin = User::factory()->admin()->create();
+    $game = Game::factory()->create(['name' => 'Before', 'short_name' => 'BEFORE', 'seed' => 111]);
+
+    $this->actingAs($admin)
+        ->put(route('admin.games.update', ['game' => $game]), gamePayload([
+            'name' => 'After',
+            'short_name' => 'AFTER',
+            'status' => GameStatus::Setup->value,
+            'seed' => 999,
+        ]))
+        ->assertSessionHasNoErrors();
+
+    $fresh = $game->fresh();
+
+    expect($fresh?->name)->toBe('After');
+    expect($fresh?->seed)->toBe(111);
+
+    $this->actingAs($admin)
+        ->put(route('admin.games.seed.update', ['game' => $game]), [
+            'seed' => 222,
+            'name' => 'Renamed By The Seed Form',
+            'short_name' => 'STOLEN',
+            'status' => GameStatus::Archived->value,
+        ])
+        ->assertSessionHasNoErrors();
+
+    $fresh = $game->fresh();
+
+    expect($fresh?->seed)->toBe(222);
+    expect($fresh?->name)->toBe('After');
+    expect($fresh?->short_name)->toBe('AFTER');
+    expect($fresh?->status)->toBe(GameStatus::Setup);
+});
+
+test('the list and the game screen both show the seed and whether it can still be changed', function () {
+    $admin = User::factory()->admin()->create();
+
+    $setup = Game::factory()->create(['name' => 'Alpha Run', 'seed' => 4242]);
+    $started = Game::factory()->active()->create(['name' => 'Beta Run', 'seed' => 99]);
+
+    $this->actingAs($admin)
+        ->get(route('admin.games.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('games.0.seed', 4242)
+            ->where('games.0.can_change_seed', true)
+            ->where('games.1.seed', 99)
+            /* Beta Run is active, so its seed is fixed and the screen renders it as text. */
+            ->where('games.1.can_change_seed', false)
+            ->etc(),
+        );
+
+    $this->actingAs($admin)
+        ->get(route('admin.games.show', ['game' => $started]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('game.seed', 99)
+            ->where('game.can_change_seed', false)
+            ->etc(),
+        );
 });
 
 test('deleting a game deletes its seats through the cascade', function () {
@@ -461,6 +681,28 @@ test('the unique index on game seats spans game and user and ignores is_active',
 
     expect($index)->not->toBeNull();
     expect($index['columns'])->toBe(['game_id', 'user_id']);
+});
+
+test('the seed column is not nullable, and the games table kept its indexes through the change', function () {
+    /*
+     * Adding the seed takes three steps — add nullable, backfill, close to nulls — and the last of
+     * them rebuilds the table on SQLite. Both halves are asserted because both are easy to lose
+     * quietly: a nullable seed would let a game be played with no recorded randomness, and a rebuild
+     * that dropped the unique indexes would leave two games able to share a short name, which is the
+     * identifier that goes into turn reports and generated file names.
+     */
+    $seed = collect(Schema::getColumns('games'))->firstWhere('name', 'seed');
+
+    expect($seed)->not->toBeNull();
+    expect($seed['nullable'])->toBeFalse();
+
+    $indexed = collect(Schema::getIndexes('games'))
+        ->filter(fn (array $index): bool => $index['unique'] === true)
+        ->pluck('columns')
+        ->flatten();
+
+    expect($indexed)->toContain('name');
+    expect($indexed)->toContain('short_name');
 });
 
 test('the games table has no soft deletes to hide a game behind', function () {

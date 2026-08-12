@@ -84,7 +84,11 @@ function gameAreaPayload(User $candidate): array
     return [
         'name' => 'Escalated Game',
         'short_name' => 'ESCALATE',
-        'status' => 'active',
+        /* Paused rather than active: an active game needs a generated world, and this payload has to
+         * be one an administrator could really post, so that every 403 below is the gate refusing a
+         * valid request rather than validation refusing an invalid one. */
+        'status' => 'paused',
+        'seed' => 1234,
         'user_id' => $candidate->id,
         'role' => GameRole::Gamemaster->value,
     ];
@@ -102,6 +106,7 @@ test('the sweep found every game admin route', function () {
         'admin.games.store',
         'admin.games.show',
         'admin.games.update',
+        'admin.games.seed.update',
         'admin.games.destroy',
         'admin.games.seats.store',
         'admin.games.seats.role.update',
@@ -135,6 +140,8 @@ test('a member holding a GAMEMASTER seat is forbidden from every game admin rout
     /* Nothing was created, changed or removed on the way to those 403s. */
     expect(Game::query()->count())->toBe(1);
     expect($game->fresh()?->name)->toBe('Their Own Game');
+    /* Including the seed, which the payload also posted: this game is in setup, so only the 403 stopped it. */
+    expect($game->fresh()?->seed)->toBe($game->seed);
     expect($game->seats()->count())->toBe(1);
     expect($seat->fresh()?->role)->toBe(GameRole::Gamemaster);
     expect($seat->fresh()?->is_active)->toBeTrue();
