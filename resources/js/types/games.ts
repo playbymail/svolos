@@ -71,6 +71,57 @@ export type AdminGameSeat = {
 };
 
 /**
+ * The fields `GameSeatRoleForm.svelte` needs of a seat.
+ *
+ * Named separately so the one picker serves both rosters: the administrator's rows are `AdminGameSeat`
+ * and the gamemaster's are `GamemasterGameSeat`, and neither needs to know about the other. The form
+ * action itself is passed in, which is what keeps the component from importing one area's controller.
+ */
+export type GameSeatRoleTarget = Pick<
+    AdminGameSeat,
+    'id' | 'role' | 'user_name'
+>;
+
+/**
+ * One game as its **gamemaster** sees it, shaped by
+ * `App\Http\Controllers\Gamemaster\GameController::present()`.
+ *
+ * The same fields as `AdminGame`, but `name` and `short_name` arrive here to be *displayed*: a
+ * gamemaster may move a game between statuses and may not rename it, and the server enforces that by
+ * validating nothing else — see `App\Http\Requests\Gamemaster\GameStatusUpdateRequest`.
+ */
+export type GamemasterGame = {
+    id: number;
+    name: string;
+    short_name: string;
+    status: GameStatus;
+    status_label: string;
+    seats_count: number;
+    active_seats_count: number;
+    created_at: string;
+    created_at_diff: string | null;
+};
+
+/**
+ * One seat on a roster as its game's gamemaster sees it, shaped by
+ * `App\Http\Controllers\Gamemaster\GameController::presentSeat()`.
+ *
+ * The three extra flags are what a gamemaster may do to this row, and they are **presentation only** —
+ * `Gamemaster\GameSeatController` refuses the same things with a 403 whatever the screen renders:
+ *
+ * - `is_self` — the viewer's own seat, labelled as such rather than silently missing its controls;
+ * - `can_retire` — false for their own seat (a gamemaster does not retire themselves) and for a seat
+ *   that is already retired;
+ * - `can_demote` — false for a seat that already holds `gamemaster`. Promoting a player is allowed;
+ *   only an administrator can take the role back off.
+ */
+export type GamemasterGameSeat = AdminGameSeat & {
+    is_self: boolean;
+    can_retire: boolean;
+    can_demote: boolean;
+};
+
+/**
  * An account that can still be given a seat at the game being shown.
  *
  * The server excludes every account that already holds a seat, **retired ones included**: a retired seat

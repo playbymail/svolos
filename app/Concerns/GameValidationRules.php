@@ -2,7 +2,10 @@
 
 namespace App\Concerns;
 
+use App\Enums\GameRole;
 use App\Models\Game;
+use App\Models\GameSeat;
+use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
@@ -43,6 +46,76 @@ trait GameValidationRules
             'max:'.Game::SHORT_NAME_MAX_LENGTH,
             'regex:/^[A-Z0-9-]+$/',
             $this->uniqueGameRule('short_name', $gameId),
+        ];
+    }
+
+    /**
+     * Get the validation rules used to validate the account being given a seat at a game.
+     *
+     * ## The uniqueness rule counts retired seats, and that is the point of it
+     *
+     * `Rule::unique(GameSeat::class, 'user_id')->where('game_id', …)` deliberately carries **no**
+     * `is_active` condition. Seats are retired, never deleted (see `App\Models\GameSeat`), so an account
+     * that has left the game still owns a row — and the way back in is to *reactivate* that row, not to
+     * create a second one. Adding `->where('is_active', true)` here would let a second row be attempted,
+     * which the unique index on `(game_id, user_id)` would then refuse with a database error instead of a
+     * validation message.
+     *
+     * The screens agree with this rule rather than restating it: the assignable-accounts list on both
+     * `admin/games/Show` and `gamemaster/games/Show` excludes every account that already holds a seat,
+     * active or retired, so a retired holder is not offered in the first place. This rule is what makes a
+     * hand-made post behave the same way.
+     *
+     * A null `$gameId` is the *stricter* branch, exactly as `uniqueGameRule()` is: the rule stays unique
+     * across every game, so a request that arrived without a game to seat somebody at is refused rather
+     * than allowed to create an unscoped seat.
+     *
+     * @return array<int, ValidationRule|array<mixed>|string>
+     */
+    protected function gameSeatUserRules(?int $gameId = null): array
+    {
+        $unique = Rule::unique(GameSeat::class, 'user_id');
+
+        if ($gameId !== null) {
+            $unique->where('game_id', $gameId);
+        }
+
+        return ['required', 'integer', Rule::exists(User::class, 'id'), $unique];
+    }
+
+    /**
+     * Get the validation rules used to validate the game role a seat holds.
+     *
+     * Only the role is ever accepted alongside this. `is_active` is not validated anywhere and never
+     * will be — a seat is retired and reactivated through its own two endpoints, so a change of role can
+     * never move a seat in or out of the game as a side effect. `GameSeat`'s `#[Fillable]` list leaves
+     * `is_active` out for the same reason.
+     *
+     * Which roles a particular *requester* may hand out is not a validation question: a gamemaster may
+     * not demote another gamemaster, and that is an authorisation rule enforced with a 403 in
+     * `App\Http\Controllers\Gamemaster\GameSeatController`, not a rejected value.
+     *
+     * @return array<int, ValidationRule|array<mixed>|string>
+     */
+    protected function gameSeatRoleRules(): array
+    {
+        return ['required', Rule::enum(GameRole::class)];
+    }
+
+    /**
+     * Get the error messages for the fields of a seat.
+     *
+     * The duplicate message names the situation rather than the constraint: somebody who picked an
+     * account that has quietly been retired from this game needs to be told to reactivate the seat, not
+     * that a unique index rejected them.
+     *
+     * @return array<string, string>
+     */
+    protected function gameSeatMessages(): array
+    {
+        return [
+            'user_id.unique' => __('That account already has a seat in this game.'),
+            'user_id.exists' => __('That account no longer exists.'),
         ];
     }
 

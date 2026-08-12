@@ -1,9 +1,12 @@
 <script lang="ts">
+    import { Link } from '@inertiajs/svelte';
     import Eye from 'lucide-svelte/icons/eye';
     import EyeOff from 'lucide-svelte/icons/eye-off';
     import Heading from '@/components/Heading.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
+    import { toUrl } from '@/lib/utils';
+    import { show as gamemasterGameShow } from '@/routes/gamemaster/games';
     import type { DashboardGame, GameStatus } from '@/types';
 
     let {
@@ -11,12 +14,22 @@
         description,
         games,
         slug,
+        manageable = false,
     }: {
         title: string;
         description: string;
         games: DashboardGame[];
         /** Distinguishes this section's test hooks and heading id from the other one's. */
         slug: string;
+        /**
+         * Whether each row links to the screen for running that game.
+         *
+         * A prop rather than something read off the page, because this component is handed one
+         * section at a time and the caller already knows which one it is passing. It is the
+         * gamemaster section that gets the link — the server refuses `gamemaster.games.show` to
+         * anyone without an active gamemaster seat, so this is a link that would 403, not the check.
+         */
+        manageable?: boolean;
     } = $props();
 
     /*
@@ -114,6 +127,16 @@
                     <Badge variant={statusVariants[game.status]}>
                         {game.status_label}
                     </Badge>
+                    {#if manageable}
+                        <Link
+                            href={toUrl(gamemasterGameShow(game.id))}
+                            class="text-sm underline-offset-4 hover:underline"
+                            data-test="manage-game-{game.id}"
+                        >
+                            Manage
+                            <span class="sr-only">{game.name}</span>
+                        </Link>
+                    {/if}
                 </li>
             {/each}
         </ul>

@@ -1,28 +1,21 @@
 <script module lang="ts">
-    import { index as adminIndex } from '@/routes/admin';
-    import {
-        index as gamesIndex,
-        show as gameShow,
-    } from '@/routes/admin/games';
-    import type { AdminGame, BreadcrumbItem } from '@/types';
+    import { dashboard } from '@/routes';
+    import { show as gameShow } from '@/routes/gamemaster/games';
+    import type { BreadcrumbItem, GamemasterGame } from '@/types';
 
     /**
      * The last crumb is the game's own name, which only the server knows, so the layout export is a
      * *function*: the Svelte adapter calls it with the page props and spreads the result into the
-     * layout chosen in `app.ts`. The alternative — importing a layout here — would take this page out
-     * of the central resolution the rest of the application uses.
+     * layout chosen in `app.ts`. The first crumb is the dashboard rather than an index of games —
+     * there is no gamemaster games list, because the dashboard already is one.
      */
     export const layout = (props: {
-        game: AdminGame;
+        game: GamemasterGame;
     }): { breadcrumbs: BreadcrumbItem[] } => ({
         breadcrumbs: [
             {
-                title: 'Administration',
-                href: adminIndex(),
-            },
-            {
-                title: 'Games',
-                href: gamesIndex(),
+                title: 'Dashboard',
+                href: dashboard(),
             },
             {
                 title: props.game.name,
@@ -38,15 +31,14 @@
     import Save from 'lucide-svelte/icons/save';
     import UserMinus from 'lucide-svelte/icons/user-minus';
     import UserPlus from 'lucide-svelte/icons/user-plus';
-    import GameController from '@/actions/App/Http/Controllers/Admin/GameController';
-    import GameSeatController from '@/actions/App/Http/Controllers/Admin/GameSeatController';
+    import GameController from '@/actions/App/Http/Controllers/Gamemaster/GameController';
+    import GameSeatController from '@/actions/App/Http/Controllers/Gamemaster/GameSeatController';
     import AppHead from '@/components/AppHead.svelte';
     import GameSeatRoleForm from '@/components/GameSeatRoleForm.svelte';
     import Heading from '@/components/Heading.svelte';
     import InputError from '@/components/InputError.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
-    import { Input } from '@/components/ui/input';
     import { Label } from '@/components/ui/label';
     import {
         Select,
@@ -56,14 +48,14 @@
     } from '@/components/ui/select';
     import { Spinner } from '@/components/ui/spinner';
     /*
-     * `AdminGame` is deliberately not re-imported here: the two `<script>` blocks share one module
-     * scope, so the import in `<script module>` above is already visible and a second one is a
+     * `GamemasterGame` is deliberately not re-imported here: the two `<script>` blocks share one
+     * module scope, so the import in `<script module>` above is already visible and a second one is a
      * duplicate-identifier error under `svelte-check`.
      */
     import type {
-        AdminGameSeat,
         AssignableAccount,
         GameRole,
+        GamemasterGameSeat,
         GameRoleOption,
         GameStatusOption,
     } from '@/types';
@@ -75,16 +67,16 @@
         roles,
         statuses,
     }: {
-        game: AdminGame;
-        seats: AdminGameSeat[];
+        game: GamemasterGame;
+        seats: GamemasterGameSeat[];
         assignableAccounts: AssignableAccount[];
         roles: GameRoleOption[];
         statuses: GameStatusOption[];
     } = $props();
 
     /*
-     * The metadata form's status picker. A writable `$derived` off the server's value, so a refused
-     * save snaps the picker back rather than leaving it showing a status the game does not have.
+     * The status picker. A writable `$derived` off the server's value, so a refused save snaps the
+     * picker back rather than leaving it showing a status the game does not have.
      */
     let status = $derived<string>(game.status);
 
@@ -128,8 +120,8 @@
     <section class="space-y-4">
         <Heading
             variant="small"
-            title="Details"
-            description="The short name appears in turn reports and file names, so it is uppercased and limited to letters, numbers and hyphens."
+            title="Status"
+            description="Where the game is in its life. Nothing forces a game forward — a completed one can be reopened, and an archived one restored."
         />
 
         <Form
@@ -138,34 +130,6 @@
             class="grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-2"
         >
             {#snippet children({ errors, processing })}
-                <div class="grid gap-2">
-                    <Label for="name">Name</Label>
-                    <Input
-                        id="name"
-                        type="text"
-                        name="name"
-                        required
-                        autocomplete="off"
-                        value={game.name}
-                    />
-                    <InputError message={errors.name} />
-                </div>
-
-                <div class="grid gap-2">
-                    <Label for="short_name">Short name</Label>
-                    <Input
-                        id="short_name"
-                        type="text"
-                        name="short_name"
-                        required
-                        maxlength={16}
-                        autocapitalize="characters"
-                        autocomplete="off"
-                        value={game.short_name}
-                    />
-                    <InputError message={errors.short_name} />
-                </div>
-
                 <div class="grid gap-2">
                     <Label for="status">Status</Label>
                     <Select type="single" name="status" bind:value={status}>
@@ -198,6 +162,34 @@
                         Save changes
                     </Button>
                 </div>
+
+                <!--
+                    The name and short name are shown as text, never as inputs. A short name leaves
+                    the application in turn reports and generated file names, so renaming one
+                    relabels artefacts that already exist — it is the administrator's to change, and
+                    `Gamemaster\GameStatusUpdateRequest` validates neither field, so a hand-made post
+                    carrying them is dropped rather than written.
+                -->
+                <dl
+                    class="grid gap-4 border-t border-border pt-4 text-sm sm:col-span-2 sm:grid-cols-2"
+                    data-test="game-identity"
+                >
+                    <div>
+                        <dt class="text-muted-foreground">Name</dt>
+                        <dd class="font-medium">{game.name}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-muted-foreground">Short name</dt>
+                        <dd>
+                            <code class="rounded bg-muted px-1.5 py-0.5 text-xs"
+                                >{game.short_name}</code
+                            >
+                        </dd>
+                    </div>
+                    <p class="text-muted-foreground sm:col-span-2">
+                        Ask an administrator to change either of these.
+                    </p>
+                </dl>
             {/snippet}
         </Form>
     </section>
@@ -335,6 +327,14 @@
                                     <span class="font-medium">
                                         {seat.user_name}
                                     </span>
+                                    {#if seat.is_self}
+                                        <span
+                                            class="ml-1 text-muted-foreground"
+                                            data-test="seat-self-{seat.id}"
+                                        >
+                                            (you)
+                                        </span>
+                                    {/if}
                                     <p class="text-muted-foreground">
                                         {seat.user_email}
                                     </p>
@@ -353,19 +353,43 @@
                                     {seat.created_at_diff ?? '—'}
                                 </td>
                                 <td class="px-4 py-3">
-                                    <GameSeatRoleForm
-                                        action={GameSeatController.updateRole.form(
-                                            { game: game.id, seat: seat.id },
-                                        )}
-                                        {seat}
-                                        {roles}
-                                    />
+                                    <!--
+                                        A gamemaster's seat is shown as a label rather than a
+                                        picker. Handing the role out is allowed — that is the
+                                        picker on a player's row — but taking it back is the
+                                        administrator's, so there is nothing here to choose
+                                        between. `updateRole()` refuses the demotion regardless of
+                                        what this renders.
+                                    -->
+                                    {#if seat.can_demote}
+                                        <GameSeatRoleForm
+                                            action={GameSeatController.updateRole.form(
+                                                {
+                                                    game: game.id,
+                                                    seat: seat.id,
+                                                },
+                                            )}
+                                            {seat}
+                                            {roles}
+                                        />
+                                    {:else}
+                                        <span
+                                            class="font-medium"
+                                            data-test="seat-role-fixed-{seat.id}"
+                                        >
+                                            {seat.role_label}
+                                        </span>
+                                        <p class="text-muted-foreground">
+                                            Only an administrator can change
+                                            this.
+                                        </p>
+                                    {/if}
                                 </td>
                                 <td class="px-4 py-3">
                                     <div
                                         class="flex items-center justify-end gap-1"
                                     >
-                                        {#if seat.is_active}
+                                        {#if seat.can_retire}
                                             <Form
                                                 {...GameSeatController.retire.form(
                                                     {
@@ -398,6 +422,20 @@
                                                     </Button>
                                                 {/snippet}
                                             </Form>
+                                        {:else if seat.is_active}
+                                            <!--
+                                                The only active seat without a retire control is
+                                                your own: leaving a game you run is an
+                                                administrator's doing, not a button you can press by
+                                                accident.
+                                            -->
+                                            <span
+                                                class="text-muted-foreground"
+                                                data-test="cannot-retire-{seat.id}"
+                                            >
+                                                Ask an administrator to retire
+                                                you
+                                            </span>
                                         {:else}
                                             <Form
                                                 {...GameSeatController.reactivate.form(

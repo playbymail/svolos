@@ -413,8 +413,14 @@ test('every seat route really carries the scoped binding flag', function () {
      * The behavioural 404 tests above are the real proof; this one names the cause, so that removing
      * `scopeBindings()` fails with "the flag is gone" rather than only with four confusing 404s that
      * turned into 302s.
+     *
+     * Scoped to this area's own routes, and the count is the positive control that keeps the sweep
+     * from silently matching nothing. The gamemaster's roster has seat routes of its own, under the
+     * same rule and with the same pair of assertions in
+     * `tests/Feature/Gamemaster/GameManagementTest.php` — this file does not speak for them.
      */
     collect(Route::getRoutes()->getRoutes())
+        ->filter(fn (RoutingRoute $route): bool => str_starts_with((string) $route->getName(), 'admin.'))
         ->filter(fn (RoutingRoute $route): bool => in_array('seat', $route->parameterNames(), true))
         ->tap(fn ($routes) => expect($routes)->toHaveCount(3))
         ->each(function (RoutingRoute $route): void {

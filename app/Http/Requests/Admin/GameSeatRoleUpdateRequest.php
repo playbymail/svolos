@@ -2,32 +2,32 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Enums\GameRole;
+use App\Concerns\GameValidationRules;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class GameSeatRoleUpdateRequest extends FormRequest
 {
+    use GameValidationRules;
+
     /**
      * Get the validation rules that apply to the request.
      *
-     * Only the game role is accepted. `is_active` is not validated here and never will be — a seat is
-     * retired and reactivated through its own two endpoints, so a change of role can never move a seat
-     * in or out of the game as a side effect. `GameSeat`'s `#[Fillable]` list leaves `is_active` out for
-     * the same reason.
+     * Only the game role is accepted; see `GameValidationRules::gameSeatRoleRules()` for why
+     * `is_active` is not validated here and never will be.
      *
-     * `App\Enums\GameRole` carries no application permissions, so unlike
-     * `Admin\UserRoleUpdateRequest` — which guards the boundary between a member and an administrator —
-     * there is nothing being escalated here. The two role systems stay unrelated; see
-     * `.ai/rules/roles.md`.
+     * An administrator may set either role on any seat. `App\Enums\GameRole` carries no application
+     * permissions, so unlike `Admin\UserRoleUpdateRequest` — which guards the boundary between a member
+     * and an administrator — there is nothing being escalated here. The two role systems stay unrelated;
+     * see `.ai/rules/roles.md`. The *gamemaster's* copy of this screen is the one with a restriction, and
+     * it is a 403 in its controller rather than a rule here.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
-            'role' => ['required', Rule::enum(GameRole::class)],
+            'role' => $this->gameSeatRoleRules(),
         ];
     }
 }
