@@ -73,12 +73,14 @@
         GameRoleOption,
         GameStatusOption,
         GenerationSummary,
+        LocationDetail,
     } from '@/types';
 
     let {
         game,
         generation,
         locations,
+        locationDetail,
         seats,
         assignableAccounts,
         roles,
@@ -87,6 +89,8 @@
         game: GamemasterGame;
         generation: GenerationSummary;
         locations: ClusterLocation[];
+        /* Absent until a location has been expanded — it is an optional prop, fetched a row at a time. */
+        locationDetail?: LocationDetail | null;
         seats: GamemasterGameSeat[];
         assignableAccounts: AssignableAccount[];
         roles: GameRoleOption[];
@@ -266,7 +270,7 @@
         </div>
 
         {#if locations.length > 0}
-            <ClusterLocationsTable {locations} />
+            <ClusterLocationsTable {locations} detail={locationDetail} />
         {/if}
 
         {#if generation.can_start_over}

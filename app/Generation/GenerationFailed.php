@@ -26,4 +26,18 @@ class GenerationFailed extends RuntimeException
             .'The cluster is too crowded for the requested count and separation.'
         );
     }
+
+    /**
+     * A weighted choice rolled past the end of the table it was choosing from.
+     *
+     * Only reachable if a table's weights no longer sum to what was rolled against them, which means
+     * somebody edited one. See `PlanetGenerator::pick()`.
+     */
+    public static function weightsExhausted(int $roll, int $total): self
+    {
+        return new self(
+            "Rolled {$roll} against weights totalling {$total} and fell off the end of the table. "
+            .'A weight table has been edited into disagreeing with its own total.'
+        );
+    }
 }

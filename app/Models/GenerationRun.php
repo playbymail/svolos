@@ -26,9 +26,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * There is no status column: `accepted_at` and `superseded_at` say it all, and `status()` reads them
  * the way `Invitation::status()` reads its own timestamps. A **superseded** run is one that was
- * regenerated past; its row survives while the locations or stelliums it produced are gone, because
- * only one set of those can be the game's at a time. That asymmetry is the design — the attempt is
- * history, its output was never the game's.
+ * regenerated past; its row survives while whatever it produced — locations, stelliums or planets —
+ * is gone, because only one set of those can be the game's at a time. That asymmetry is the design —
+ * the attempt is history, its output was never the game's.
  *
  * @property int $id
  * @property int $game_id
@@ -43,6 +43,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Game $game
  * @property-read Collection<int, Location> $locations
  * @property-read Collection<int, Stellium> $stelliums
+ * @property-read Collection<int, Planet> $planets
  */
 class GenerationRun extends Model
 {
@@ -77,6 +78,16 @@ class GenerationRun extends Model
     public function stelliums(): HasMany
     {
         return $this->hasMany(Stellium::class);
+    }
+
+    /**
+     * Get the planets this run produced, if it was a planets run that is still standing.
+     *
+     * @return HasMany<Planet, $this>
+     */
+    public function planets(): HasMany
+    {
+        return $this->hasMany(Planet::class);
     }
 
     /**

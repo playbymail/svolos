@@ -7,6 +7,8 @@ use App\Enums\GenerationStage;
 use App\Models\Game;
 use App\Models\GenerationRun;
 use App\Models\Location;
+use App\Models\Planet;
+use App\Models\Star;
 
 /**
  * Shapes a game's generation for a screen.
@@ -89,11 +91,19 @@ trait PresentsGeneration
      * Shape the locations a game's cluster is made of, with their stelliums if it has any yet.
      *
      * Returns an empty list until a cluster run exists, so a screen with nothing to show is given
-     * nothing rather than a shape to interpret. `star_count` is null while the stelliums have not been
-     * generated, which is the difference between "no stars here" and "not decided yet".
+     * nothing rather than a shape to interpret.
+     *
+     * **The two counts are null for different reasons, which is why they are computed differently.**
+     * `star_count` is null exactly when there is no stellium row yet — the relation is missing, so the
+     * nullsafe read answers it. A stellium *exists* before its planets do, so `planets_count` comes
+     * back as a genuine `0` in the state that means "not decided yet", and reading that zero as null
+     * would only work by accident: it happens that every star gets at least one planet, so zero is
+     * unreachable afterwards. Gate it on the run instead, which is what actually distinguishes the two
+     * states. Both nulls mean "not decided yet"; neither means "empty".
      *
      * Two queries whatever the size of the cluster: the locations, and their stelliums with a count of
-     * stars each.
+     * stars and of planets each. The planets count goes through `Stellium::planets()`, which reaches
+     * them through the stars, so this does not walk 141 stelliums to add up their own.
      *
      * @return array<int, array{
      *     id: int,
@@ -103,12 +113,17 @@ trait PresentsGeneration
      *     z: int,
      *     radius: float,
      *     star_count: int|null,
+     *     planet_count: int|null,
      * }>
      */
     protected function presentLocations(Game $game): array
     {
+        $game->loadMissing('generationRuns');
+
+        $planetsGenerated = $game->generationRunFor(GenerationStage::Planets) !== null;
+
         return $game->locations()
-            ->with(['stellium' => fn ($query) => $query->withCount('stars')])
+            ->with(['stellium' => fn ($query) => $query->withCount(['stars', 'planets'])])
             ->get()
             ->map(fn (Location $location): array => [
                 'id' => $location->id,
@@ -118,9 +133,75 @@ trait PresentsGeneration
                 'z' => $location->z,
                 'radius' => round($location->radius(), 2),
                 'star_count' => $location->stellium?->stars_count,
+                'planet_count' => $planetsGenerated ? $location->stellium?->planets_count : null,
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Shape one location's stars and the planets around them, for the row the screen has expanded.
+     *
+     * This is the review surface for the planets stage. The cluster ships whole because a hundred rows
+     * of four small numbers are cheaper than the request that would fetch them; some 775 planets of
+     * eight fields are not, and reviewing a seed does not mean reading all of them — it means looking
+     * at a system or two. So this is asked for a location at a time, through an optional prop that only
+     * runs on a partial reload, rather than riding along on every render of the screen.
+     *
+     * Returns null when no location is asked for, and when the one asked for belongs to another game —
+     * the scoping is the same rule `Route::scopeBindings()` enforces on seat routes, done by hand here
+     * because the location arrives as a query parameter rather than as a route parameter.
+     *
+     * @return array{
+     *     id: int,
+     *     ordinal: int,
+     *     stars: array<int, array{
+     *         id: int,
+     *         label: string,
+     *         planets: array<int, array<string, mixed>>,
+     *     }>,
+     * }|null
+     */
+    protected function presentLocationDetail(Game $game, ?int $locationId): ?array
+    {
+        if ($locationId === null) {
+            return null;
+        }
+
+        $location = $game->locations()
+            ->whereKey($locationId)
+            ->with(['stellium.stars.planets'])
+            ->first();
+
+        if ($location?->stellium === null) {
+            return null;
+        }
+
+        return [
+            'id' => $location->id,
+            'ordinal' => $location->ordinal,
+            'stars' => $location->stellium->stars
+                ->map(fn (Star $star): array => [
+                    'id' => $star->id,
+                    /* A star is named by its place in the stellium: 1 is A, and there are never more than four. */
+                    'label' => chr(ord('A') + $star->ordinal - 1),
+                    'planets' => $star->planets
+                        ->map(fn (Planet $planet): array => [
+                            'id' => $planet->id,
+                            'ordinal' => $planet->ordinal,
+                            'type' => $planet->type->value,
+                            'type_label' => $planet->type->label(),
+                            'habitability' => $planet->habitability,
+                            'fuel' => $planet->fuel,
+                            'metals' => $planet->metals,
+                            'minerals' => $planet->minerals,
+                        ])
+                        ->values()
+                        ->all(),
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
     /**

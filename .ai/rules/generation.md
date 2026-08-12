@@ -1,19 +1,22 @@
 # Generating a game's world
 
 Globs: `app/Generation/**`, `app/Actions/Generation/**`, `app/Enums/Generation*.php`,
-`app/Models/GenerationRun.php`, `app/Models/Location.php`, `app/Models/Stellium.php`,
-`app/Models/Star.php`, `app/Http/Controllers/Gamemaster/GenerationController.php`,
+`app/Enums/PlanetType.php`, `app/Models/GenerationRun.php`, `app/Models/Location.php`,
+`app/Models/Stellium.php`, `app/Models/Star.php`, `app/Models/Planet.php`,
+`app/Http/Controllers/Gamemaster/GenerationController.php`,
 `app/Http/Requests/Gamemaster/GenerationRunRequest.php`, `app/Concerns/PresentsGeneration.php`,
-`database/factories/{GenerationRun,Location,Stellium,Star}Factory.php`,
+`database/factories/{GenerationRun,Location,Stellium,Star,Planet}Factory.php`,
 `resources/js/components/GenerationStageCard.svelte`,
-`resources/js/components/ClusterLocationsTable.svelte`, `resources/js/types/generation.ts`,
+`resources/js/components/ClusterLocationsTable.svelte`,
+`resources/js/components/LocationSystemPanel.svelte`, `resources/js/types/generation.ts`,
 `tests/Unit/*GeneratorTest.php`, `tests/Unit/GeneratorPurityTest.php`,
 `tests/Feature/Gamemaster/GenerationTest.php`, `tests/Feature/GenerationModelTest.php`
 
 A game's world is built in **stages**, by its gamemaster, while the game is in `Setup`: generate from
-a seed, review, then accept or try another seed. Accepting unlocks the next stage. Today there are
-two — `Cluster` (100 locations) and `Stelliums` (one star group per location) — and planets are next.
-Read [games.md](games.md) for the seed itself and [gamemaster.md](gamemaster.md) for the area's gate.
+a seed, review, then accept or try another seed. Accepting unlocks the next stage. There are three —
+`Cluster` (100 locations), `Stelliums` (one star group per location, 141 stars in all) and `Planets`
+(one to ten around every star). Read [games.md](games.md) for the seed itself and
+[gamemaster.md](gamemaster.md) for the area's gate.
 
 ## A generator draws from its seed and from **nothing** else
 
@@ -29,6 +32,21 @@ well-separated locations and passes every constraint test in the suite; it simpl
 `tests/Unit/GeneratorPurityTest.php` reads the generator sources with comments stripped, the way the
 role-separation tests read the middleware.
 
+Two things about that test are load-bearing:
+
+- **`random(` is on the forbidden list and is not redundant with `rand(`.** The letters `rand` in
+  `random(` are followed by an `o`, so the original list let `Arr::random()`, `Str::random()` and
+  `$collection->random()` straight through — and a weighted pick is exactly where somebody reaches for
+  `collect($weights)->random()`. It is written with the parenthesis so it does not also match
+  `$randomizer->`. `new Randomizer` is there for the same class of hole: a randomizer built with no
+  engine defaults to `Random\Engine\Secure`, unseeded. Never shorten it to `Randomizer`, which matches
+  `SeededRandomizer`.
+- **The dataset is split into `seededGenerators()` and `generationSources()`.** Only the first must
+  contain `SeededRandomizer::for`. A helper extracted out of a generator *receives* a randomizer, so it
+  would fail that assertion — and the tempting fix, calling `SeededRandomizer::for` inside the helper,
+  is a real bug: it restarts the stream on every call and makes every planet in a game identical. That
+  is why `PlanetGenerator` keeps `roll()` and `pick()` private rather than extracting them.
+
 `random_int()` keeps exactly one job, in `Game::randomSeed()`: **choosing** a seed wants
 unpredictability, **using** one wants repeatability. Mt19937 is the engine because its 32-bit seed is
 the `Game::SEED_MIN`/`SEED_MAX` range already stored, so every seed a gamemaster can type maps to one
@@ -42,9 +60,9 @@ loudly). `App\Actions\Generation\*` is the half that writes rows.
 
 `generation_runs` holds one row per invocation, **including rejected ones**, and its status is derived
 from `accepted_at`/`superseded_at` the way `InvitationStatus` is derived. Regenerating **supersedes**
-the pending run — the row and its seed survive, the locations or stelliums it wrote are deleted —
-because the seeds that were tried are the debugging record, while only one cluster can be the game's
-at a time. `attempt` counts superseded runs too, so "attempt 3" keeps meaning the third time somebody
+the pending run — the row and its seed survive, whatever it wrote (locations, stelliums or planets) is
+deleted — because the seeds that were tried are the debugging record, while only one cluster can be
+the game's at a time. `attempt` counts superseded runs too, so "attempt 3" keeps meaning the third time somebody
 asked.
 
 The game's generation state is derived from those runs by `Game::generationStateFor()`; there is **no
@@ -82,8 +100,9 @@ Two consequences worth not re-deriving:
 
 ## Starting over is all-or-nothing, on purpose
 
-`RestartGeneration` deletes every run for the game, and the cascade takes locations, stelliums and
-stars with it. There is deliberately no per-stage rewind: a cluster and the stelliums standing on it
+`RestartGeneration` deletes every run for the game, and the cascade takes locations, stelliums, stars
+and planets with it — four levels deep now, which is why `GenerationModelTest` asserts the chain
+reaches the end rather than stopping at the stars. There is deliberately no per-stage rewind: a cluster and the stelliums standing on it
 are one world, so re-opening the cluster while its stelliums survived would leave stars at locations
 that no longer exist, and a per-stage rewind would need a second copy of the stage ordering to know
 what to destroy. It is a `POST`, not a `DELETE`, because no route in the gamemaster area accepts
@@ -125,6 +144,59 @@ quota is built from the percentages by **largest remainder**, so it keeps summin
 if either the distribution or `LOCATION_COUNT` changes; at 100 every share is already whole, which is
 why the percentages read as the counts today.
 
+**Planets.** Each of the 141 stars gets 3d4 − 2 planets — one to ten, averaging 5.5, so **775.5
+expected planets a game** and 1,410 at the very most. They are numbered outward, and a planet's
+position in its system decides what kind of thing it is.
+
+*The zones come from our own solar system, and the arithmetic is integer.* Of nine bodies, orbits 1–4
+are rocky, 5 is the belt, 6–7 are gas giants, 8–9 are ice giants — so `ZONE_BOUNDARIES` is `[4, 5, 7]`
+out of `SOLAR_SYSTEM_ORBITS`, and a star with nine planets reproduces that arrangement exactly. A
+planet sits at the fraction `(2o − 1)/(2N)`, and `(2o − 1)/(2N) < k/9` is rearranged to `9(2o − 1) < 2kN`
+for the same reason `ClusterGenerator` compares squared distances: a boundary that has to fall one
+specific way must not be decided in floating point.
+
+*The zones are not equal, and small systems do not reach all four.* The belt is one ninth wide, so any
+star with fewer than nine planets skips a zone, and which one depends on how many it has. Two of the
+consequences read like bugs and are not — **a lone planet lands in the belt** (the midpoint of its
+system) and so is usually an asteroid field, about two stars a game; and a **three-planet system has no
+outer zone at all**, so gas giants are rare around those. `PlanetGeneratorTest` pins the whole table
+for N = 1…10 precisely so nobody re-derives it and "fixes" it.
+
+Weighting the zones by how many planets land in them across the whole 3d4 − 2 distribution gives
+**inner 45.2%, belt 9.7%, outer 22.4%, far 22.7%** — 159 / 34 / 79 / 80 slots out of 352 per 64 stars,
+not four quarters. `ZONE_WEIGHTS` is tuned against *those* shares, which is why the rows do not
+themselves look like the solar system's proportions even though what comes out of them does: measured
+over the test's seeds the mix lands at **44 / 11.2 / 22.8 / 22 against a target of 44.4 / 11.1 / 22.2 /
+22.2**. The boundaries do nearly all of that work; the weights only sharpen it.
+
+*A probability here, where the stelliums were a quota* — and the section above is exactly what will
+make somebody change it back. **A quota is incompatible with zoning:** the whole point is that where a
+planet sits decides what it is, and dealing out predetermined type counts would overrule that. It is
+safe here where it was not there because there are ~775 planets rather than 100 locations, so the mix's
+standard deviation is about a percentage point and nothing rare can vanish the way the lone quadruple
+stellium would.
+
+*Habitability is per type, and asteroids are zero dice.* Rocky is 5d6 − 5, which spans exactly the
+declared 0–25: the top of the scale belongs to the type that deserves it, and a dead rock stays
+possible — a table with a positive floor would quietly make every rocky world habitable. Icy is
+2d6 − 2, gas giants 1d6 − 1, and asteroids are `[0, 6, 0]`, so "an asteroid field is never habitable"
+is a row in the table rather than an `if` in the code. About ten worlds a game clear
+`PlanetProfile::HABITABLE_FROM`.
+
+*Asteroids reach 35 in metals and minerals where nothing else passes 24, and that is the trade.* They
+are the one type that can never be lived on, so they are reliably the richest thing to mine, with a
+floor of 10 rather than a chance of nothing. Habitability and extraction pull against each other on
+purpose: raising an asteroid field's habitability off zero and capping its deposits at everything
+else's ceiling are the same mistake from either end, and one test asserts both halves together for
+that reason.
+
+*The draw schedule is variable, and cannot not be.* Type is drawn first and the dice that follow belong
+to the type that came up — five for a rocky world's habitability, none for an asteroid field's. Still
+entirely determined by the seed, but it means retuning **any** weight shifts every draw after it, so a
+regenerated world differs everywhere rather than only where the change applies. `pick()` also walks a
+weight table in insertion order, so reordering the keys of a row changes the world a seed produces
+without changing the odds of anything.
+
 ## Smaller decisions worth not re-litigating
 
 - **One controller, three routes, stage as a route parameter.** `{stage}` binds to the enum, so an
@@ -143,10 +215,34 @@ why the percentages read as the counts today.
 - **Bulk inserts, so timestamps are set by hand.** A hundred model saves inside one request is a
   hundred round trips; a bulk insert does not run the model's timestamping, which is why `$now` is
   passed explicitly.
-- **The whole cluster ships with the page.** A hundred locations of four small numbers is smaller than
-  the request that would fetch them, and reviewing a cluster means looking at all of it. `star_count`
-  is null until the stelliums exist — which is not the same as zero, since every location gets at least
-  one star.
+- **The whole cluster ships with the page. The planets do not.** A hundred locations of four small
+  numbers is smaller than the request that would fetch them, and reviewing a cluster means looking at
+  all of it. That reasoning does not survive ~775 planets of eight fields, and reviewing a seed means
+  looking at a system or two rather than reading all of them — so `locationDetail` is an
+  `Inertia::optional()` prop that only runs on a partial reload, asked for a location at a time. **No
+  new route**: it is the same screen, asked a narrower question, and the location arrives as a query
+  parameter — which is why the presenter scopes it to the game by hand, since `Route::scopeBindings()`
+  only covers route parameters.
+- **`star_count` and `planet_count` are both null before their stage, for different reasons.**
+  `star_count` is null exactly when the stellium row is missing, so a nullsafe read answers it. A
+  stellium *exists* before its planets do, so `withCount` returns a genuine `0` in the state that means
+  "not decided yet" — reading that zero as null works only by the accident that every star gets at
+  least one planet. `planet_count` is therefore gated on the run existing. Neither null means "empty".
+- **The insert is chunked at 500 because of a binding ceiling, not a memory one.** SQLite's
+  `MAX_VARIABLE_NUMBER` is 32,766 and a planet binds ten columns, so one statement holds 3,276 rows.
+  Today's 775 fit and even the 1,410 maximum fits — but only while the constants stay put, and Laravel
+  does not chunk inserts for you. Two statements inside the transaction `RunGeneration` already owns is
+  the cheap way not to re-derive that.
+- **`planets` has no `game_id` and no `zone` column.** `locations` carries a `game_id` because its
+  unique keys are guarantees about the *game*; a planet's only uniqueness is `(star_id, ordinal)`, so
+  the column would be a pure duplicate of a path already walkable through the stars. Zone is a function
+  of `ordinal` and the star's planet count, so a column could only ever disagree with them — derived
+  where needed, like `Location::radius()`.
+- **`GenerationStageCard`'s `summaryEntries()` spreads any nested summary value generically**, and
+  names only `mix` as a special case. The star mix is keyed by bare numbers and would read as "1 342"
+  without the noun; a stage whose keys already say what they are — the planets stage's `types` — needs
+  no entry here. The `{#each}` is keyed by the summary's own path rather than by the label, because
+  Svelte throws on duplicate keys and a top-level `rocky` beside a nested `types.rocky` would collide.
 - **`suggested_seed` is a fresh draw on every render**, and only on the gamemaster's payload: the base
   seed for a first run, a new random number for a regeneration (which must differ from the pending
   one). The administrator's screen carries the same summary with no suggestions, because it has no

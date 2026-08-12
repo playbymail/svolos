@@ -20,6 +20,7 @@ class StageGenerationRegistry
     public function __construct(
         private readonly GenerateCluster $cluster,
         private readonly GenerateStelliums $stelliums,
+        private readonly GeneratePlanets $planets,
     ) {}
 
     /**
@@ -30,6 +31,7 @@ class StageGenerationRegistry
         return match ($stage) {
             GenerationStage::Cluster => $this->cluster,
             GenerationStage::Stelliums => $this->stelliums,
+            GenerationStage::Planets => $this->planets,
         };
     }
 }

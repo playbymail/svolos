@@ -6,6 +6,7 @@ use App\Enums\GenerationStageState;
 use App\Models\Game;
 use App\Models\GenerationRun;
 use App\Models\Location;
+use App\Models\Planet;
 use App\Models\Star;
 use App\Models\Stellium;
 use Illuminate\Support\Str;
@@ -102,9 +103,10 @@ test('a stage is locked until the stage before it has been accepted', function (
 
 test('generation is complete only when every stage has been accepted', function () {
     /*
-     * The check sweeps `GenerationStage::cases()` rather than naming the last stage, so adding the
-     * planets stage will make every unfinished game incomplete again — which is the intended
-     * behaviour, and the reason this asserts against the enum rather than against a number.
+     * The check sweeps `GenerationStage::cases()` rather than naming the last stage, so adding a stage
+     * makes every unfinished game incomplete again — which is the intended behaviour, and the reason
+     * this asserts against the enum rather than against a number. Adding the planets stage is what
+     * this comment used to predict; the next stage will need one more step below and nothing else.
      */
     $game = Game::factory()->create();
     $game->load('generationRuns');
@@ -119,6 +121,12 @@ test('generation is complete only when every stage has been accepted', function 
     expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::Stelliums);
 
     GenerationRun::factory()->for($game)->stage(GenerationStage::Stelliums)->accepted()->create();
+    $game->load('generationRuns');
+
+    expect($game->isGenerationComplete())->toBeFalse();
+    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::Planets);
+
+    GenerationRun::factory()->for($game)->stage(GenerationStage::Planets)->accepted()->create();
     $game->load('generationRuns');
 
     expect($game->isGenerationComplete())->toBeTrue();
@@ -156,25 +164,35 @@ test('a game with no runs says so, whether or not the relation is loaded', funct
     expect(Game::query()->with('generationRuns')->findOrFail($game->id)->hasGenerationRuns())->toBeTrue();
 });
 
-test('discarding a run deletes what it produced, all the way down to the stars', function () {
+test('discarding a run deletes what it produced, all the way down to the planets', function () {
     /*
-     * One cascade chain — run → locations → stelliums → stars — so nothing has to remember to clean up
-     * after a regeneration. Asserted at the database rather than through the actions, because the
-     * constraint is what makes the actions safe.
+     * One cascade chain — run → locations → stelliums → stars → planets — so nothing has to remember to
+     * clean up after a regeneration. Asserted at the database rather than through the actions, because
+     * the constraint is what makes the actions safe. Four levels now, and the last one is the one a
+     * hand-written cleanup would forget.
      */
     $game = Game::factory()->create();
     $run = GenerationRun::factory()->for($game)->create();
 
     $location = Location::factory()->for($game)->create(['generation_run_id' => $run->id]);
-    Stellium::factory()->for($location)->withStars(3)->create();
+    $stellium = Stellium::factory()->for($location)->withStars(3)->create();
+
+    Planet::factory()
+        ->for($stellium->stars->first())
+        ->for($run)
+        ->count(2)
+        ->sequence(fn ($sequence) => ['ordinal' => $sequence->index + 1])
+        ->create();
 
     expect(Star::query()->count())->toBe(3);
+    expect(Planet::query()->count())->toBe(2);
 
     $run->delete();
 
     expect(Location::query()->count())->toBe(0);
     expect(Stellium::query()->count())->toBe(0);
     expect(Star::query()->count())->toBe(0);
+    expect(Planet::query()->count())->toBe(0);
 });
 
 test('a location knows how far it is from the centre', function () {

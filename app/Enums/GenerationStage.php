@@ -19,6 +19,7 @@ enum GenerationStage: string
 {
     case Cluster = 'cluster';
     case Stelliums = 'stelliums';
+    case Planets = 'planets';
 
     /**
      * Get the human readable label for the stage.
@@ -28,6 +29,7 @@ enum GenerationStage: string
         return match ($this) {
             self::Cluster => 'Cluster',
             self::Stelliums => 'Stelliums',
+            self::Planets => 'Planets',
         };
     }
 
@@ -39,6 +41,7 @@ enum GenerationStage: string
         return match ($this) {
             self::Cluster => 'Scatters the locations that make up the cluster, each one a place a game can happen.',
             self::Stelliums => 'Puts a stellium — one to four stars bound by gravity — at every location.',
+            self::Planets => 'Gives every star one to ten planets, ordered outward, each with its habitability and its deposits.',
         };
     }
 

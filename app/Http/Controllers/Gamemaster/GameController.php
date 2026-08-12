@@ -82,6 +82,15 @@ class GameController extends Controller
              * looking at all of it. It is empty until a cluster run exists.
              */
             'locations' => $this->presentLocations($game),
+            /*
+             * The planets do not ride along. `Inertia::optional()` runs only on a partial reload, so
+             * expanding a location asks for that one system and the initial render pays nothing —
+             * which is the difference between a hundred locations and the several hundred planets
+             * standing on them. Still no new route: it is the same screen, asked a narrower question.
+             */
+            'locationDetail' => Inertia::optional(
+                fn (): ?array => $this->presentLocationDetail($game, $request->integer('location') ?: null)
+            ),
             'seats' => $seats,
             'assignableAccounts' => $this->assignableAccounts($game),
             'roles' => array_map(

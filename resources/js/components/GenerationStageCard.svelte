@@ -58,27 +58,42 @@
      * Flatten a generator's summary into label/value pairs.
      *
      * The summary is whatever that stage's generator recorded, so this renders what it finds rather
-     * than a fixed shape. The star mix is the one nested value: it arrives keyed by how many stars a
-     * stellium has, and reads as "70 × 1 star" rather than as an object.
+     * than a fixed shape. A nested value is spread into one entry per key, whatever the stage — the
+     * planets stage's type breakdown reads as "rocky 341" with no help at all.
+     *
+     * The star mix is the one nested value that needs any: it arrives keyed by how many stars a
+     * stellium has, so its keys are bare numbers and would read as "1 342" without the noun. That is
+     * why `mix` is named here and nothing else is — a stage whose keys already say what they are
+     * should not have to be added to this function.
      */
     function summaryEntries(
         summary: Record<string, unknown> | null,
-    ): { label: string; value: string }[] {
+    ): { key: string; label: string; value: string }[] {
         if (summary === null) {
             return [];
         }
 
         return Object.entries(summary).flatMap(([key, value]) => {
-            if (key === 'mix' && value !== null && typeof value === 'object') {
+            if (value !== null && typeof value === 'object') {
                 return Object.entries(value as Record<string, unknown>).map(
-                    ([stars, count]) => ({
-                        label: `${stars} star${stars === '1' ? '' : 's'}`,
+                    ([name, count]) => ({
+                        key: `${key}.${name}`,
+                        label:
+                            key === 'mix'
+                                ? `${name} star${name === '1' ? '' : 's'}`
+                                : name.replaceAll('_', ' '),
                         value: String(count),
                     }),
                 );
             }
 
-            return [{ label: key.replaceAll('_', ' '), value: String(value) }];
+            return [
+                {
+                    key,
+                    label: key.replaceAll('_', ' '),
+                    value: String(value),
+                },
+            ];
         });
     }
 
@@ -139,7 +154,12 @@
 
     {#if entries.length > 0}
         <ul class="flex flex-wrap gap-2 text-xs">
-            {#each entries as entry (entry.label)}
+            <!--
+                Keyed by the summary's own path rather than by the label: a stage carrying both a
+                top-level `rocky` and a nested `types.rocky` would otherwise collide, and Svelte
+                throws on duplicate keys rather than rendering one of them.
+            -->
+            {#each entries as entry (entry.key)}
                 <li class="rounded border border-border px-2 py-1">
                     <span class="text-muted-foreground">{entry.label}</span>
                     <span class="ml-1 font-medium">{entry.value}</span>

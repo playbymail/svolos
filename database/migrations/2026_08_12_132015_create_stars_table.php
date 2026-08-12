@@ -9,9 +9,10 @@ return new class extends Migration
     /**
      * Run the migrations.
      *
-     * One row per star, ordered within its stellium. There are no attributes yet — mass, class,
-     * luminosity and the rest arrive with the planets stage that hangs off these rows — but the stars
-     * are created now rather than being left as a count, because a count cannot own a planet.
+     * One row per star, ordered within its stellium. There are no attributes — no mass, class or
+     * luminosity — because nothing yet needs one; what these rows are *for* is the `planets` that hang
+     * off them, which is why the stars are created whole here rather than left as a count on the
+     * stellium, since a count cannot own a planet.
      *
      * `constrained('stelliums')` names the table on purpose: inference would derive it from the column
      * as `stellia`, since Laravel's inflector treats `stellium` like `medium`. Leave the argument in.

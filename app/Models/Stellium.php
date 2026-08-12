@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 /**
  * A group of one to four stars bound by gravity, at one location.
@@ -31,9 +32,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  * @property-read int|null $stars_count
+ * @property-read int|null $planets_count
  * @property-read Location $location
  * @property-read GenerationRun $generationRun
  * @property-read Collection<int, Star> $stars
+ * @property-read Collection<int, Planet> $planets
  */
 class Stellium extends Model
 {
@@ -75,5 +78,20 @@ class Stellium extends Model
     public function stars(): HasMany
     {
         return $this->hasMany(Star::class)->orderBy('ordinal');
+    }
+
+    /**
+     * Get every planet around every star of this stellium.
+     *
+     * Exists for `withCount('planets')` on the gamemaster's cluster table, which wants one number per
+     * location and must not walk 141 stelliums to get it. A relation rather than a `withSum` over the
+     * stars for the same reason `activeSeats()` is a relation: `$stellium->planets_count` is then
+     * backed by something real.
+     *
+     * @return HasManyThrough<Planet, Star, $this>
+     */
+    public function planets(): HasManyThrough
+    {
+        return $this->hasManyThrough(Planet::class, Star::class);
     }
 }

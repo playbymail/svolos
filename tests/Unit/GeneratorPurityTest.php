@@ -1,6 +1,7 @@
 <?php
 
 use App\Generation\ClusterGenerator;
+use App\Generation\PlanetGenerator;
 use App\Generation\SeededRandomizer;
 use App\Generation\StelliumGenerator;
 use App\Models\Game;
@@ -23,22 +24,57 @@ use App\Models\Game;
 */
 
 /**
- * Every class that is allowed to draw randomness while generating.
+ * Every class that owns a seed and must therefore open the stream itself.
  *
  * @return array<int, class-string>
  */
 function seededGenerators(): array
 {
-    return [ClusterGenerator::class, StelliumGenerator::class];
+    return [ClusterGenerator::class, StelliumGenerator::class, PlanetGenerator::class];
 }
 
-test('no generator reaches for an unseeded source of randomness', function (string $class) {
+/**
+ * Everything that runs while a world is being generated and must not reach for randomness of its own.
+ *
+ * A superset of `seededGenerators()`, and the two are separate for a reason worth knowing before
+ * merging them. A helper extracted out of a generator — a dice roller, a weighted table — *receives* a
+ * randomizer and so never calls `SeededRandomizer::for`, which would fail the containment test below;
+ * and the tempting fix, calling `SeededRandomizer::for` inside the helper, is a genuine bug, because it
+ * would restart the stream on every call and make every planet in a game identical. So a helper
+ * belongs on this list and not on that one. There is no such helper today — `PlanetGenerator` keeps
+ * its `roll()` and `pick()` private for exactly this reason — and the split is what makes adding one
+ * safe rather than a trap.
+ *
+ * @return array<int, class-string>
+ */
+function generationSources(): array
+{
+    return seededGenerators();
+}
+
+test('nothing in the generation subsystem reaches for an unseeded source of randomness', function (string $class) {
     $source = executableSourceOf($class);
 
-    foreach (['mt_rand', 'rand(', 'random_int', 'shuffle(', 'array_rand', 'str_shuffle', 'uniqid'] as $forbidden) {
-        expect($source)->not->toContain($forbidden);
+    /*
+     * `random(` is not redundant with `rand(`: the letters `rand` in `random(` are followed by an `o`,
+     * so the original list let `Arr::random()`, `Str::random()` and `$collection->random()` straight
+     * through — and a weighted pick is exactly where somebody reaches for `collect($weights)->random()`.
+     * It is written with the parenthesis on purpose, so it does not match `$randomizer->`.
+     *
+     * `new Randomizer` is here because a randomizer built with no engine defaults to `Random\Engine\Secure`,
+     * which is a CSPRNG that cannot be seeded — it would pass every other check on this list while
+     * quietly making the world unreproducible. Never shorten it to `Randomizer`, which matches
+     * `SeededRandomizer` and fails everything.
+     */
+    $forbidden = [
+        'mt_rand', 'rand(', 'random_int', 'random_bytes', 'random(', 'randomElement', 'randomDigit',
+        'shuffle(', 'array_rand', 'str_shuffle', 'uniqid', 'lcg_value', 'new Randomizer',
+    ];
+
+    foreach ($forbidden as $call) {
+        expect($source)->not->toContain($call);
     }
-})->with(seededGenerators());
+})->with(generationSources());
 
 test('every generator builds its randomness through the one seeded helper', function (string $class) {
     /* The positive control: the stripping left real code behind, and it is the right code. */

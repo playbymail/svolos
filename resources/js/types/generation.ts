@@ -5,7 +5,16 @@
  * been accepted. Nothing on the client re-implements that — `GenerationStageSummary.state` is the
  * server's answer.
  */
-export type GenerationStage = 'cluster' | 'stelliums';
+export type GenerationStage = 'cluster' | 'stelliums' | 'planets';
+
+/**
+ * Mirrors the `App\Enums\PlanetType` backed enum.
+ *
+ * Mostly flavour — every planet carries the same attributes whatever its type. What the type decides
+ * is the dice those were drawn from, which is why `asteroids` is always at habitability zero and is
+ * also the richest thing in the cluster to mine.
+ */
+export type PlanetType = 'rocky' | 'asteroids' | 'gas_giant' | 'icy';
 
 /**
  * Mirrors the `App\Enums\GenerationStageState` backed enum: where one stage of one game stands.
@@ -74,7 +83,9 @@ export type GenerationSummary = {
  *
  * `star_count` is null until the stelliums stage has run, which is **not** the same as zero: every
  * location gets a stellium of at least one star, so a null means "not decided yet" rather than "empty
- * sky here".
+ * sky here". `planet_count` means the same thing and is decided differently on the server — a stellium
+ * exists before its planets do, so its count really is zero at that point and the server has to look
+ * at the run rather than at the number. Nothing on the client re-derives either.
  */
 export type ClusterLocation = {
     id: number;
@@ -84,4 +95,42 @@ export type ClusterLocation = {
     z: number;
     radius: number;
     star_count: number | null;
+    planet_count: number | null;
+};
+
+/**
+ * One planet of an expanded location, as shaped by
+ * `App\Concerns\PresentsGeneration::presentLocationDetail()`.
+ *
+ * `ordinal` is the orbit, counting outward from 1, and together with the star it is the planet's whole
+ * name — there is nothing else to call it by.
+ */
+export type SystemPlanet = {
+    id: number;
+    ordinal: number;
+    type: PlanetType;
+    type_label: string;
+    habitability: number;
+    fuel: number;
+    metals: number;
+    minerals: number;
+};
+
+/**
+ * One location's stars and their planets, fetched a location at a time.
+ *
+ * This does **not** ride along with the page the way the cluster does. Several hundred planets of
+ * eight fields each is a real payload, and reviewing a seed means looking at a system or two rather
+ * than reading all of them — so it arrives through an optional prop on a partial reload, and is
+ * `undefined` until one has been asked for. `label` on a star is its place in the stellium: `A`
+ * through `D`.
+ */
+export type LocationDetail = {
+    id: number;
+    ordinal: number;
+    stars: {
+        id: number;
+        label: string;
+        planets: SystemPlanet[];
+    }[];
 };
