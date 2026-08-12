@@ -12,9 +12,9 @@ use Inertia\Testing\AssertableInertia as Assert;
 | The roster, as managed by a gamemaster
 |--------------------------------------------------------------------------
 |
-| A gamemaster gets the administrator's roster tools on their own game, minus **two refusals** that
-| are the reason this file exists. Both are 403s rather than validation errors: the value posted is
-| well formed, it is the requester who may not post it.
+| A gamemaster gets the administrator's roster tools on their own game, minus **three refusals** that
+| are the reason this file exists. All three are 403s rather than validation errors: the value posted
+| is well formed, it is the requester who may not post it.
 |
 | **You cannot retire yourself.** Leaving a game you run removes the last person able to reach the
 | screen if you are the only gamemaster, and is indistinguishable from an accident. An administrator
@@ -25,6 +25,11 @@ use Inertia\Testing\AssertableInertia as Assert;
 | ejecting another from the only screen that can undo it. The check is written as "the seat is a
 | gamemaster's and the new role is not", not "the new role is player", so a third game role added
 | later cannot be used as a way around it; there is a test for exactly that shape.
+|
+| **You cannot change the role on a retired seat.** The administrator's copy of the action allows it
+| on purpose, and the contrast is the point: correcting the historical record is theirs, while from
+| inside the game the seat is already off the roster and no live decision turns on its role. The way
+| through is to reactivate the seat first, which is what the screen says and what a test walks.
 |
 | Everything the administrator's roster guarantees still holds here and is asserted where it could
 | plausibly have been re-implemented differently: seats are retired rather than deleted, and the
@@ -267,11 +272,16 @@ test('a gamemaster can reactivate a retired seat and it keeps the role it had', 
     expect($seat->fresh()?->role)->toBe(GameRole::Gamemaster);
 });
 
-test('a role change never moves a seat in or out of the game', function () {
+test('a gamemaster CANNOT change the role on a RETIRED seat', function () {
     /*
-     * `is_active` is out of `GameSeat`'s `#[Fillable]` and is not validated by either role request,
-     * so a posted one is ignored. Asserted on the gamemaster's endpoint too, because it writes the
-     * role through a different controller than the administrator's does.
+     * **The third refusal.** The administrator's copy of this action allows it on purpose — the role
+     * is what the seat *was* in the game's history, and correcting a mistake should not require
+     * putting somebody back into a game they left. From inside the game it is the wrong power: the
+     * seat is already out of the roster, so no live decision turns on its role, and rewriting it only
+     * changes what the record says somebody was.
+     *
+     * A retired *player's* seat is the case that matters, because the demotion rule does not cover
+     * it — remove the `is_active` check and this promotion goes straight through.
      */
     $game = Game::factory()->create();
     $gamemaster = gamemasterOf($game);
@@ -282,12 +292,63 @@ test('a role change never moves a seat in or out of the game', function () {
     $this->actingAs($gamemaster)
         ->put(route('gamemaster.games.seats.role.update', ['game' => $game, 'seat' => $seat]), [
             'role' => GameRole::Gamemaster->value,
-            'is_active' => true,
+        ])
+        ->assertForbidden();
+
+    expect($seat->fresh()?->role)->toBe(GameRole::Player);
+    expect($seat->fresh()?->is_active)->toBeFalse();
+});
+
+test('a retired seat becomes changeable again once it is reactivated', function () {
+    /*
+     * The way through, and the reason the refusal above is not a dead end: bring the person back into
+     * the game and the seat is a live one like any other. Asserted end to end because "reactivate,
+     * then change" is the sentence the screen tells the gamemaster.
+     */
+    $game = Game::factory()->create();
+    $gamemaster = gamemasterOf($game);
+    $returning = User::factory()->create();
+
+    $seat = GameSeat::factory()->for($game)->for($returning)->retired()->create();
+
+    $this->actingAs($gamemaster)
+        ->put(route('gamemaster.games.seats.reactivate', ['game' => $game, 'seat' => $seat]))
+        ->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
+
+    $this->actingAs($gamemaster)
+        ->put(route('gamemaster.games.seats.role.update', ['game' => $game, 'seat' => $seat]), [
+            'role' => GameRole::Gamemaster->value,
         ])
         ->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
 
     expect($seat->fresh()?->role)->toBe(GameRole::Gamemaster);
-    expect($seat->fresh()?->is_active)->toBeFalse();
+    expect($seat->fresh()?->is_active)->toBeTrue();
+});
+
+test('a role change never moves a seat in or out of the game', function () {
+    /*
+     * `is_active` is out of `GameSeat`'s `#[Fillable]` and is not validated by either role request,
+     * so a posted one is ignored. Asserted on the gamemaster's endpoint too, because it writes the
+     * role through a different controller than the administrator's does.
+     *
+     * The seat has to be an **active** one now that a retired seat's role is out of reach here: a
+     * posted `is_active` that tried to *retire* a seat is the direction still available to test.
+     */
+    $game = Game::factory()->create();
+    $gamemaster = gamemasterOf($game);
+    $player = User::factory()->create();
+
+    $seat = GameSeat::factory()->for($game)->for($player)->create();
+
+    $this->actingAs($gamemaster)
+        ->put(route('gamemaster.games.seats.role.update', ['game' => $game, 'seat' => $seat]), [
+            'role' => GameRole::Gamemaster->value,
+            'is_active' => false,
+        ])
+        ->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
+
+    expect($seat->fresh()?->role)->toBe(GameRole::Gamemaster);
+    expect($seat->fresh()?->is_active)->toBeTrue();
 });
 
 test('a player at the game is forbidden from every seat route', function () {
@@ -364,7 +425,7 @@ test('the roster reflects a change made through the gamemaster screen', function
                 ->where('user_name', 'Grace Hopper')
                 ->where('role', 'gamemaster')
                 /* Newly a gamemaster, so the picker is gone and only retirement is left. */
-                ->where('can_demote', false)
+                ->where('can_change_role', false)
                 ->where('can_retire', true)
                 ->etc(),
             ),

@@ -33,11 +33,11 @@ The routes are named `gamemaster.*`, so the sweeps in `AdminAccessTest` and `Gam
 mirror sweeps — every route behind `['auth', 'verified', 'gamemaster']`, and the middleware source
 read with comments stripped to assert it names no application role.
 
-## The three things a gamemaster may not do, and where each is enforced
+## The four things a gamemaster may not do, and where each is enforced
 
 Each is enforced in exactly one place on the server. The screen also hides the corresponding control,
-via `can_retire` / `can_demote` / `is_self` in `Gamemaster\GameController::presentSeat()`, but **those
-flags are presentation** — do not turn a hidden control into the check.
+via `can_retire` / `can_change_role` / `is_self` in `Gamemaster\GameController::presentSeat()`, but
+**those flags are presentation** — do not turn a hidden control into the check.
 
 1. **Rename the game.** `Gamemaster\GameStatusUpdateRequest` validates `status` and nothing else, and
    `update()` fills from `validated()`, so a posted `name` or `short_name` is *ignored* rather than
@@ -56,9 +56,24 @@ flags are presentation** — do not turn a hidden control into the check.
    because behaviour cannot see it. Setting a gamemaster seat to gamemaster is a no-op and is allowed
    through — refusing a change that changes nothing would report a boundary to somebody who has not
    crossed it, and would make a resubmit error.
+4. **Change the role on a retired seat.** `updateRole()` opens with
+   `abort_unless($seat->is_active, 403)`. **The administrator's copy of the action deliberately allows
+   this** ([games.md](games.md): the role is what the seat *was*, and correcting it should not require
+   putting somebody back into a game they left) — the divergence is the decision, not an oversight.
+   Correcting the historical record is the administrator's; from inside the game the seat is already
+   off the roster, so no live decision turns on its role and rewriting it changes only what the record
+   says somebody was. The case that matters is a retired **player's** seat, because the demotion rule
+   above does not cover it — drop the `is_active` check and that promotion goes straight through. The
+   way forward is to reactivate the seat first, which the screen says and a test walks.
 
-All three are **403s, not validation errors**: the value posted is well formed, it is the requester
+All four are **403s, not validation errors**: the value posted is well formed, it is the requester
 who may not post it. Do not move them into a form request's `rules()`.
+
+`can_change_role` is deliberately **one** flag covering rules 3 and 4, because it answers one
+question — whether to render the picker — and two flags to be read together are two things to keep in
+step. The "why not" text beside a fixed role is keyed off the seat's **role**, not off `is_active`: a
+retired *gamemaster's* seat is refused on both counts, so telling somebody to reactivate it would send
+them round a loop ending in the same 403.
 
 ## Seat validation lives in `GameValidationRules`, shared with the admin area
 

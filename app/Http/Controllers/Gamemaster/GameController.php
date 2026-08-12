@@ -30,10 +30,11 @@ use Inertia\Response;
  *   no `name` or `short_name` to fill. The short name in particular leaves the application, in turn
  *   reports and generated file names, so it is the administrator's to set.
  * - **Retire themselves.** `Gamemaster\GameSeatController::retire()` refuses their own seat.
- * - **Demote a gamemaster to a player.** `Gamemaster\GameSeatController::updateRole()` refuses it.
+ * - **Demote a gamemaster to a player**, or **change the role on a retired seat.** Both are refused
+ *   by `Gamemaster\GameSeatController::updateRole()`.
  *
- * The last two are re-stated in the payload as `can_retire` and `can_demote` so the screen does not
- * render controls that would 403, but the server is the boundary — the flags are presentation.
+ * The last two are re-stated in the payload as `can_retire` and `can_change_role` so the screen does
+ * not render controls that would 403, but the server is the boundary — the flags are presentation.
  */
 class GameController extends Controller
 {
@@ -174,8 +175,11 @@ class GameController extends Controller
      *   omitting a button;
      * - `can_retire` is false for their own seat, which is the "no retiring yourself" rule, and false
      *   for an already-retired one, which is just the state;
-     * - `can_demote` is false for a seat that already holds `Gamemaster`. Promoting a player is
-     *   allowed; taking the role back is the administrator's.
+     * - `can_change_role` is false for a seat that already holds `Gamemaster`, because taking the role
+     *   back is the administrator's, and false for a **retired** seat, because that role is a fact
+     *   about the game's history rather than a live decision. It is one flag rather than two because
+     *   it answers one question — whether to render the picker — and two flags to be read together
+     *   are two things to keep in step.
      *
      * @return array{
      *     id: int,
@@ -187,7 +191,7 @@ class GameController extends Controller
      *     is_active: bool,
      *     is_self: bool,
      *     can_retire: bool,
-     *     can_demote: bool,
+     *     can_change_role: bool,
      *     created_at_diff: string|null,
      * }
      */
@@ -205,7 +209,7 @@ class GameController extends Controller
             'is_active' => $seat->is_active,
             'is_self' => $isSelf,
             'can_retire' => $seat->is_active && ! $isSelf,
-            'can_demote' => $seat->role !== GameRole::Gamemaster,
+            'can_change_role' => $seat->is_active && $seat->role !== GameRole::Gamemaster,
             'created_at_diff' => $seat->created_at?->diffForHumans(),
         ];
     }

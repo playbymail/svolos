@@ -182,7 +182,7 @@ test('each seat says what this gamemaster may do to it', function () {
                 ->where('is_self', true)
                 /* Your own seat: no retiring yourself, and no taking your own role off. */
                 ->where('can_retire', false)
-                ->where('can_demote', false)
+                ->where('can_change_role', false)
                 ->etc(),
             )
             ->has('seats.1', fn (Assert $seat) => $seat
@@ -190,21 +190,26 @@ test('each seat says what this gamemaster may do to it', function () {
                 ->where('is_self', false)
                 /* A peer may be retired but not demoted. */
                 ->where('can_retire', true)
-                ->where('can_demote', false)
+                ->where('can_change_role', false)
                 ->etc(),
             )
             ->has('seats.2', fn (Assert $seat) => $seat
                 ->where('user_name', 'Cleo Player')
+                /* An active player's seat is the only row with both controls. */
                 ->where('can_retire', true)
-                ->where('can_demote', true)
+                ->where('can_change_role', true)
                 ->etc(),
             )
             ->has('seats.3', fn (Assert $seat) => $seat
                 ->where('user_name', 'Dot Departed')
                 ->where('is_active', false)
-                /* Already out of the game; the control on this row is reactivate. */
+                /*
+                 * Already out of the game, so the only control on this row is reactivate. The role
+                 * is false despite the seat being a player's: a retired seat's role is a fact about
+                 * the game's history, and rewriting it is the administrator's.
+                 */
                 ->where('can_retire', false)
-                ->where('can_demote', true)
+                ->where('can_change_role', false)
                 ->etc(),
             ),
         );
