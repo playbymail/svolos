@@ -5,7 +5,8 @@ Globs: `app/Enums/GameStatus.php`, `app/Enums/GameRole.php`, `app/Models/Game.ph
 `app/Http/Controllers/Admin/GameSeatController.php`, `app/Http/Requests/Admin/Game*.php`,
 `app/Concerns/GameValidationRules.php`, `database/factories/GameFactory.php`,
 `database/factories/GameSeatFactory.php`, `resources/js/pages/admin/games/**`,
-`resources/js/components/GameSeatRoleForm.svelte`, `resources/js/types/games.ts`,
+`resources/js/components/GameSeatRoleForm.svelte`, `resources/js/components/GameSeedForm.svelte`,
+`resources/js/types/games.ts`,
 `tests/Feature/Admin/Game*.php`, `tests/Feature/GameModelTest.php`,
 `app/Http/Controllers/DashboardController.php`, `resources/js/pages/Dashboard.svelte`,
 `resources/js/components/DashboardGameSection.svelte`, `resources/js/types/dashboard.ts`,
@@ -87,6 +88,54 @@ can make. Uniqueness applies to the folded value, so `taken` collides with a sto
 The constant lives on `Game`, not in `GameValidationRules`: a trait constant cannot be read through the
 trait's own name (`GameValidationRules::SHORT_NAME_MAX_LENGTH` is a fatal error), and the rules and the
 tests need one place to agree on.
+
+## The seed is assigned at creation, and the setup-only limit is a **validation rule**, not a 403
+
+`games.seed` is the number every random decision in a game is drawn from, so a game with a recorded
+seed can be replayed. Four decisions hold it together, and each is a plausible thing to undo:
+
+- **It is assigned by the model, in `Game::booted()`, not by the controller.** Every path that
+  creates a game — the administrator's form, a factory, a seeder, a console command — has to produce
+  one, because the column is **not nullable**; assigning it in `GameController::store()` would leave
+  every other path failing with a database error instead of a message. The hook only fills a seed
+  that is absent (`getAttribute('seed') === null`, written that way because the declared
+  `@property int $seed` makes a null-coalesce read as dead code), so a test or a fixture pinning a
+  known seed survives creation — which is the whole point of storing one.
+- **The range is the engine's**: `Game::SEED_MIN`/`SEED_MAX` are `[0, 4294967295]`, the width of
+  PHP's Mt19937 seed, matching the `unsignedInteger` column. Widen it and two different numbers in
+  the column start meaning the same game. `randomSeed()` draws with `random_int()` — the CSPRNG needs
+  no seeding of its own and holds no global state, which is the idiom: a source that cannot be seeded
+  picks the seed for the engine that can. Not `mt_rand()`, and never `mt_srand()` at global scope.
+- **`seed` is out of `Game`'s `#[Fillable]`** and has **its own endpoint** in each area
+  (`admin.games.seed.update`, `gamemaster.games.seed.update`), so the two seed controllers are the
+  only writers and both assign explicitly rather than filling. It is not one more field on
+  `games.update` for a concrete reason: the seed may only be set during setup, so the metadata form —
+  which saves names and statuses long after that — would carry a prohibited field and be rejected for
+  something nobody touched.
+- **"Only while the game is in setup" is a rejected field, not a 403.** Both areas share
+  `GameValidationRules::gameSeedRules()`, whose `Rule::prohibitedIf` reads the *stored* status of the
+  route-bound game. This is deliberately the opposite shape from the gamemaster area's four refusals
+  ([gamemaster.md](gamemaster.md)): those are about who is asking, this is about what state the game
+  is in, and the same requester may post the same number again the moment the game goes back to
+  setup. A test walks exactly that round trip. `bail` before the `prohibitedIf` is load-bearing —
+  without it a prohibited seed also fails `required` and one mistake produces two messages.
+
+There is a **second** door on the same field, with a message of its own: the base seed also closes
+once anything has been generated for the game (`Game::hasGenerationRuns()`), because a number that has
+already been drawn from cannot be edited into meaning something else. Starting the generation over
+opens it again. See [generation.md](generation.md), which also covers the rule that a game cannot
+become `Active` until its world exists.
+
+`can_change_seed` on the payload is presentation, like the gamemaster screen's per-seat flags: it
+decides whether `GameSeedForm.svelte` renders an input or the number as text. The one component
+serves both screens, taking its endpoint as an `action` prop exactly as `GameSeatRoleForm.svelte`
+does, so the input and the sentence explaining why there is no input cannot drift apart.
+
+The migration adds the column in three steps — nullable, backfill, then closed to nulls — because a
+random value cannot be a column default. The backfill **loops over the rows**: a single
+`UPDATE ... SET seed = <random>` evaluates `random_int()` once in PHP and hands every existing game
+the same seed. The `->change()` rebuilds the table on SQLite, so a test asserts the column is
+non-nullable *and* that the two unique indexes survived the rebuild.
 
 ## Count with the `activeSeats()` relation, never a `withCount` closure alias
 

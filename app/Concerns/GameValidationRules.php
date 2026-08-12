@@ -3,9 +3,12 @@
 namespace App\Concerns;
 
 use App\Enums\GameRole;
+use App\Enums\GameStatus;
+use App\Enums\GenerationStage;
 use App\Models\Game;
 use App\Models\GameSeat;
 use App\Models\User;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
@@ -46,6 +49,129 @@ trait GameValidationRules
             'max:'.Game::SHORT_NAME_MAX_LENGTH,
             'regex:/^[A-Z0-9-]+$/',
             $this->uniqueGameRule('short_name', $gameId),
+        ];
+    }
+
+    /**
+     * Get the validation rules used to validate a game's seed.
+     *
+     * ## The setup-only rule is a validation rule, and the four gamemaster refusals are not
+     *
+     * Both areas share this, because both may change a seed and neither may change one after the game
+     * has started: a seed is the number the run was drawn from, so re-seeding a game that is already
+     * being played rewrites the run its turn reports describe. The refusals in
+     * `Gamemaster\GameSeatController` are 403s because the value posted is fine and the *requester* may
+     * not post it; this one is a rejected field because it is the *game* that is in the wrong state, and
+     * the same administrator will be allowed to post the same number the moment it goes back to setup.
+     * A message on the field is what says so.
+     *
+     * `bail` is load-bearing: without it a prohibited seed also fails `required` and the screen shows two
+     * messages for one mistake.
+     *
+     * A null `$game` is the stricter branch, as everywhere else in this trait — with no game to check the
+     * status of, the field is prohibited rather than accepted.
+     *
+     * @return array<int, Closure|ValidationRule|array<mixed>|string>
+     */
+    protected function gameSeedRules(?Game $game): array
+    {
+        return [
+            'bail',
+            Rule::prohibitedIf(fn (): bool => $game?->status !== GameStatus::Setup),
+            /*
+             * The second door on the same field, and it needs a message of its own rather than a
+             * second `prohibitedIf`: two prohibitions would share the one `seed.prohibited` key and
+             * whichever fired would report the other's reason. `bail` above means the first failure
+             * is the only one reported either way.
+             */
+            function (string $attribute, mixed $value, Closure $fail) use ($game): void {
+                if ($game?->hasGenerationRuns() === true) {
+                    $fail(__('This seed has already been generated from. Start the generation over to change it.'));
+                }
+            },
+            ...$this->seedValueRules(),
+        ];
+    }
+
+    /**
+     * Get the validation rules for a seed as a value, with nothing said about when it may be posted.
+     *
+     * The range lives here so the game's own seed and the seed handed to a generator cannot disagree
+     * about what a seed is. When they are posted differs — a game's seed is prohibited outside setup,
+     * a generator's seed is refused by the controller before validation ever runs — and that difference
+     * is the caller's to state.
+     *
+     * @return array<int, ValidationRule|array<mixed>|string>
+     */
+    protected function seedValueRules(): array
+    {
+        return ['required', 'integer', 'between:'.Game::SEED_MIN.','.Game::SEED_MAX];
+    }
+
+    /**
+     * Get the validation rules used to validate a game's status.
+     *
+     * Any status may be chosen with one exception: **a game cannot become `Active` until every
+     * generation stage has been accepted.** An active game is one being played, and a game whose
+     * cluster does not exist has nowhere for that to happen — so this is refused where a gamemaster or
+     * an administrator can see why, rather than discovered later as an empty universe.
+     *
+     * Only `Active` is gated. Archiving a half-built game is ordinary housekeeping, and pausing or
+     * completing one is somebody's business but not this rule's.
+     *
+     * The message names the stage that is missing, because "finish generating" is not an instruction —
+     * "the cluster stage has not been accepted yet" is. A null `$game` is the stricter branch, as
+     * everywhere else in this trait: with no game to inspect, the status is refused.
+     *
+     * The rule is a closure rather than a `Rule::prohibitedIf`, because it refuses one *value* of the
+     * field rather than the field itself — every other status stays perfectly postable.
+     *
+     * @return array<int, Closure|ValidationRule|array<mixed>|string>
+     */
+    protected function gameStatusRules(?Game $game): array
+    {
+        return [
+            'required',
+            Rule::enum(GameStatus::class),
+            function (string $attribute, mixed $value, Closure $fail) use ($game): void {
+                if ($value !== GameStatus::Active->value) {
+                    return;
+                }
+
+                $unfinished = $game?->firstUnfinishedGenerationStage();
+
+                if ($game !== null && $unfinished === null) {
+                    return;
+                }
+
+                $fail(__('The :stage stage has not been accepted yet, so this game cannot become active.', [
+                    'stage' => mb_strtolower(($unfinished ?? GenerationStage::cases()[0])->label()),
+                ]));
+            },
+        ];
+    }
+
+    /**
+     * Get the error messages for a game's seed.
+     *
+     * The range is spelled out rather than described, because a seed is copied from somewhere else as
+     * often as it is typed, and "between 0 and 4294967295" is what makes a rejected paste diagnosable.
+     * The bound is not arbitrary: it is the width of PHP's Mersenne Twister seed — see `Game::SEED_MAX`.
+     *
+     * @return array<string, string>
+     */
+    protected function gameSeedMessages(): array
+    {
+        return [
+            'seed.prohibited' => __('The seed can only be changed while the game is in setup.'),
+            'seed.between' => __('The seed must be a whole number between :min and :max.', [
+                'min' => Game::SEED_MIN,
+                'max' => Game::SEED_MAX,
+            ]),
+            'seed.integer' => __('The seed must be a whole number between :min and :max.', [
+                'min' => Game::SEED_MIN,
+                'max' => Game::SEED_MAX,
+            ]),
         ];
     }
 

@@ -3,7 +3,7 @@
 Globs: `app/Http/Middleware/EnsureUserIsGamemaster.php`,
 `app/Http/Controllers/Gamemaster/**`, `app/Http/Requests/Gamemaster/**`,
 `resources/js/pages/gamemaster/**`, `resources/js/components/GameSeatRoleForm.svelte`,
-`tests/Feature/Gamemaster/**`
+`resources/js/components/GameSeedForm.svelte`, `tests/Feature/Gamemaster/**`
 
 `/gamemaster/games/{game}` is where somebody who runs a game manages it: its status and its roster.
 It is the member-facing counterpart of `/admin/games/{game}` and carries the same roster tools minus
@@ -69,6 +69,15 @@ via `can_retire` / `can_change_role` / `is_self` in `Gamemaster\GameController::
 All four are **403s, not validation errors**: the value posted is well formed, it is the requester
 who may not post it. Do not move them into a form request's `rules()`.
 
+**The game's seed is not a fifth.** A gamemaster may see it and set it on exactly the terms an
+administrator can — while the game is still in `GameStatus::Setup`, because a game in setup has not
+been played and there is no run for a new seed to rewrite. That limit is about the game's state
+rather than about who is asking, which is why it is a rejected field rather than a 403 and why
+`Gamemaster\GameSeedUpdateRequest` differs from the administrator's copy by namespace alone, sharing
+one rule through `App\Concerns\GameValidationRules`. See [games.md](games.md) for the whole of it.
+Do not reimplement it here as a refusal: the day it becomes one, an administrator and a gamemaster
+stop agreeing about a number that has to mean the same thing to both.
+
 `can_change_role` is deliberately **one** flag covering rules 3 and 4, because it answers one
 question — whether to render the picker — and two flags to be read together are two things to keep in
 step. The "why not" text beside a fixed role is keyed off the seat's **role**, not off `is_active`: a
@@ -84,8 +93,15 @@ drifting apart ([games.md](games.md) explains why it carries no `is_active` cond
 `GameSeatStoreRequest` classes differ only by namespace.
 
 There is deliberately **no seat destroy route here either**, and no create, delete or index for
-games: a gamemaster runs a game they were given. A sweep asserts the area holds exactly six routes
-and that none accepts `DELETE`.
+games: a gamemaster runs a game they were given. A sweep asserts the area holds exactly ten routes —
+show, update, seed update, the three generation routes and the four seat routes — and that none
+accepts `DELETE`. That last part is why starting a generation over is a `POST` despite destroying
+everything it destroys; see [generation.md](generation.md).
+
+**Building the game's world is the gamemaster's**, and it lives only here: `/gamemaster/games/{game}/generation/*`
+has no `/admin` counterpart, and the administrator's screen shows the same summary read-only. Running
+the generators is part of running a game, and the seeds behind an accepted world are what an
+administrator needs in order to explain one — not a second set of controls.
 
 ## Smaller decisions worth not re-litigating
 

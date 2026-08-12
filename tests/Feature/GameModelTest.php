@@ -124,6 +124,72 @@ test('a game defaults to setup and a seat defaults to an active player before ei
     expect($game->fresh()?->status)->toBe(GameStatus::Setup);
 });
 
+test('every game is given a seed on creation, whatever created it', function () {
+    /*
+     * The hook is on the model rather than in the controller precisely so this holds for a factory, a
+     * seeder and a console command as well as for the administrator's form — the column is not
+     * nullable, so a path that missed it would fail with a database error instead of a message.
+     */
+    $factoryMade = Game::factory()->create();
+    $massAssigned = Game::query()->create(['name' => 'Defaulted', 'short_name' => 'DEF']);
+
+    foreach ([$factoryMade, $massAssigned] as $game) {
+        expect($game->seed)->toBeInt()
+            ->toBeGreaterThanOrEqual(Game::SEED_MIN)
+            ->toBeLessThanOrEqual(Game::SEED_MAX);
+    }
+
+    /* Read back from the database rather than from the instance, so the value really was written. */
+    expect($massAssigned->fresh()?->seed)->toBe($massAssigned->seed);
+});
+
+test('a seed supplied on purpose is kept rather than overwritten', function () {
+    /*
+     * The `??=` half of the hook. A test pinning a known seed — or a fixture reproducing a recorded
+     * run — must survive creation, or nothing could ever be replayed.
+     */
+    $game = Game::factory()->create(['seed' => 4242]);
+
+    expect($game->fresh()?->seed)->toBe(4242);
+
+    /* Including the lowest seed there is, which is a value and not an absence. */
+    expect(Game::factory()->create(['seed' => 0])->fresh()?->seed)->toBe(0);
+});
+
+test('a seed cannot be mass assigned onto an existing game', function () {
+    /*
+     * `seed` is out of `Game`'s `#[Fillable]` for the same reason `GameSeat::$is_active` is: it may
+     * only change through the two seed endpoints, never as a side effect of a save that was about a
+     * name or a status. Pinned at the model, because an endpoint test still passes when it becomes
+     * fillable.
+     */
+    $game = Game::factory()->create(['seed' => 111]);
+
+    $game->fill(['name' => 'Renamed', 'seed' => 999]);
+    $game->save();
+
+    expect($game->fresh()?->seed)->toBe(111);
+    expect($game->fresh()?->name)->toBe('Renamed');
+});
+
+test('randomSeed draws inside the engine range and does not repeat itself', function () {
+    /*
+     * `random_int()` rather than `rand()`/`mt_rand()`: it reads the platform's CSPRNG, which needs no
+     * seeding of its own and holds no global state a test could have set — a source that cannot be
+     * seeded is what picks the seed for the engine that can.
+     *
+     * Twenty draws from 4,294,967,296 values collide about once in twenty million runs; a constant or
+     * a badly bounded draw fails every time.
+     */
+    $seeds = collect(range(1, 20))->map(fn (): int => Game::randomSeed());
+
+    foreach ($seeds as $seed) {
+        expect($seed)->toBeGreaterThanOrEqual(Game::SEED_MIN)->toBeLessThanOrEqual(Game::SEED_MAX);
+    }
+
+    expect($seeds->unique()->count())->toBeGreaterThan(1);
+});
+
 test('a seat belongs to its game and its account', function () {
     $game = Game::factory()->create();
     $user = User::factory()->create();

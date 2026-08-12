@@ -42,6 +42,8 @@
     import GameSeatController from '@/actions/App/Http/Controllers/Admin/GameSeatController';
     import AppHead from '@/components/AppHead.svelte';
     import GameSeatRoleForm from '@/components/GameSeatRoleForm.svelte';
+    import GameSeedForm from '@/components/GameSeedForm.svelte';
+    import GenerationStageCard from '@/components/GenerationStageCard.svelte';
     import Heading from '@/components/Heading.svelte';
     import InputError from '@/components/InputError.svelte';
     import { Badge } from '@/components/ui/badge';
@@ -66,16 +68,19 @@
         GameRole,
         GameRoleOption,
         GameStatusOption,
+        GenerationSummary,
     } from '@/types';
 
     let {
         game,
+        generation,
         seats,
         assignableAccounts,
         roles,
         statuses,
     }: {
         game: AdminGame;
+        generation: GenerationSummary;
         seats: AdminGameSeat[];
         assignableAccounts: AssignableAccount[];
         roles: GameRoleOption[];
@@ -200,6 +205,35 @@
                 </div>
             {/snippet}
         </Form>
+    </section>
+
+    <section class="space-y-4">
+        <Heading
+            variant="small"
+            title="Seed"
+            description="The number this game's randomness is drawn from. It is assigned when the game is created, and it can only be changed while the game is in setup."
+        />
+
+        <GameSeedForm action={GameController.updateSeed.form(game.id)} {game} />
+    </section>
+
+    <section class="space-y-4">
+        <!--
+            Read-only on purpose. Running the generators belongs to the gamemaster's screen — there is
+            no admin route that does it — but which seed produced which world is exactly what an
+            administrator needs when a game has to be explained or reproduced.
+        -->
+        <Heading
+            variant="small"
+            title="Generation"
+            description="The world this game is played in, and the seeds it was built from. The gamemaster runs the generators from their own screen."
+        />
+
+        <div class="space-y-4" data-test="generation-summary">
+            {#each generation.stages as stage (stage.stage)}
+                <GenerationStageCard {stage} />
+            {/each}
+        </div>
     </section>
 
     <section class="space-y-4">

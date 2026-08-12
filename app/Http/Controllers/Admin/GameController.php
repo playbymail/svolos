@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Concerns\PresentsGeneration;
 use App\Enums\GameRole;
 use App\Enums\GameStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\GameSeedUpdateRequest;
 use App\Http\Requests\Admin\GameStoreRequest;
 use App\Http\Requests\Admin\GameUpdateRequest;
 use App\Models\Game;
@@ -24,6 +26,8 @@ use Inertia\Response;
  */
 class GameController extends Controller
 {
+    use PresentsGeneration;
+
     /**
      * List every game with its roster size and where it is in its life.
      *
@@ -40,6 +44,12 @@ class GameController extends Controller
     {
         $games = Game::query()
             ->withCount(['seats', 'activeSeats'])
+            /*
+             * Eager loaded because `present()` asks each game whether anything has been generated for
+             * it yet — the base seed closes once something has. One query for the whole list; asking
+             * per row would be a hundred.
+             */
+            ->with('generationRuns')
             ->orderBy('name')
             ->get()
             ->map(fn (Game $game): array => $this->present($game))
@@ -98,6 +108,13 @@ class GameController extends Controller
 
         return Inertia::render('admin/games/Show', [
             'game' => $this->present($game),
+            /*
+             * Read-only, and without the suggested seeds the gamemaster's screen carries: an
+             * administrator watching a game being built needs to see which seed produced what — that
+             * is what makes a generated world explicable — but running the generators is the
+             * gamemaster's, and there is no admin route that does it.
+             */
+            'generation' => $this->presentGeneration($game),
             'seats' => $seats,
             'assignableAccounts' => $this->assignableAccounts($game),
             'roles' => array_map(
@@ -125,6 +142,35 @@ class GameController extends Controller
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => __(':name was updated.', ['name' => $game->name]),
+        ]);
+
+        return to_route('admin.games.show', ['game' => $game]);
+    }
+
+    /**
+     * Change the number a game's randomness is drawn from.
+     *
+     * Its own endpoint rather than another field on `update()`, because it answers to a different
+     * question: the seed may only be set while the game is in `GameStatus::Setup`, and that condition
+     * belongs to the seed alone. `GameSeedUpdateRequest` is what enforces it, so a seed posted at an
+     * active game is rejected with a message rather than written — see
+     * `GameValidationRules::gameSeedRules()` for why that is a validation failure and not a 403.
+     *
+     * The write is an explicit assignment rather than `fill()`: `seed` is out of `Game`'s `#[Fillable]`
+     * so this endpoint and its gamemaster twin are the only two places it can change, and no future
+     * `fill($request->validated())` elsewhere can pick it up by accident.
+     */
+    public function updateSeed(GameSeedUpdateRequest $request, Game $game): RedirectResponse
+    {
+        $game->seed = (int) $request->validated('seed');
+        $game->save();
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __(':name is now seeded with :seed.', [
+                'name' => $game->name,
+                'seed' => $game->seed,
+            ]),
         ]);
 
         return to_route('admin.games.show', ['game' => $game]);
@@ -190,10 +236,17 @@ class GameController extends Controller
      * difference between them is how many people have left, which is a fact about the game an
      * administrator wants without opening it.
      *
+     * `can_change_seed` is presentation, like the gamemaster screen's per-seat flags: it decides whether
+     * the screen renders an input or the number as text, and `GameSeedUpdateRequest` refuses a seed
+     * posted after setup whatever was rendered. It is on the payload rather than derived on the client
+     * so both screens read one field instead of each restating "the status is setup" in TypeScript.
+     *
      * @return array{
      *     id: int,
      *     name: string,
      *     short_name: string,
+     *     seed: int,
+     *     can_change_seed: bool,
      *     status: string,
      *     status_label: string,
      *     seats_count: int,
@@ -208,6 +261,8 @@ class GameController extends Controller
             'id' => $game->id,
             'name' => $game->name,
             'short_name' => $game->short_name,
+            'seed' => $game->seed,
+            'can_change_seed' => $game->status === GameStatus::Setup && ! $game->hasGenerationRuns(),
             'status' => $game->status->value,
             'status_label' => $game->status->label(),
             'seats_count' => $game->seats_count ?? 0,

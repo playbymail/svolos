@@ -33,12 +33,25 @@
     import UserPlus from 'lucide-svelte/icons/user-plus';
     import GameController from '@/actions/App/Http/Controllers/Gamemaster/GameController';
     import GameSeatController from '@/actions/App/Http/Controllers/Gamemaster/GameSeatController';
+    import GenerationController from '@/actions/App/Http/Controllers/Gamemaster/GenerationController';
     import AppHead from '@/components/AppHead.svelte';
+    import ClusterLocationsTable from '@/components/ClusterLocationsTable.svelte';
     import GameSeatRoleForm from '@/components/GameSeatRoleForm.svelte';
+    import GameSeedForm from '@/components/GameSeedForm.svelte';
+    import GenerationStageCard from '@/components/GenerationStageCard.svelte';
     import Heading from '@/components/Heading.svelte';
     import InputError from '@/components/InputError.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
+    import {
+        Dialog,
+        DialogClose,
+        DialogContent,
+        DialogDescription,
+        DialogFooter,
+        DialogTitle,
+        DialogTrigger,
+    } from '@/components/ui/dialog';
     import { Label } from '@/components/ui/label';
     import {
         Select,
@@ -54,20 +67,26 @@
      */
     import type {
         AssignableAccount,
+        ClusterLocation,
         GameRole,
         GamemasterGameSeat,
         GameRoleOption,
         GameStatusOption,
+        GenerationSummary,
     } from '@/types';
 
     let {
         game,
+        generation,
+        locations,
         seats,
         assignableAccounts,
         roles,
         statuses,
     }: {
         game: GamemasterGame;
+        generation: GenerationSummary;
+        locations: ClusterLocation[];
         seats: GamemasterGameSeat[];
         assignableAccounts: AssignableAccount[];
         roles: GameRoleOption[];
@@ -192,6 +211,126 @@
                 </dl>
             {/snippet}
         </Form>
+    </section>
+
+    <section class="space-y-4">
+        <!--
+            The seed is not one of the things only an administrator may touch: a game in setup has not
+            been played yet, so there is no run for a new seed to rewrite, and the same limit applies
+            to an administrator on their own screen.
+        -->
+        <Heading
+            variant="small"
+            title="Seed"
+            description="The number this game's randomness is drawn from. It is assigned when the game is created, and it can only be changed while the game is in setup."
+        />
+
+        <GameSeedForm action={GameController.updateSeed.form(game.id)} {game} />
+    </section>
+
+    <section class="space-y-4">
+        <Heading
+            variant="small"
+            title="Generation"
+            description="Building the world the game happens in. Each stage is generated from a seed, reviewed, then accepted — and every stage is built on the one before it, so accepting is what unlocks the next."
+        />
+
+        {#if !generation.can_generate}
+            <!--
+                Generation happens while the game is in setup and nowhere else. The cards still
+                render, because what was generated is worth seeing for the life of the game.
+            -->
+            <p
+                class="text-sm text-muted-foreground"
+                data-test="generation-closed"
+            >
+                The game has left setup, so its world is fixed.
+            </p>
+        {/if}
+
+        <div class="space-y-4">
+            {#each generation.stages as stage (stage.stage)}
+                <GenerationStageCard
+                    {stage}
+                    generateAction={GenerationController.store.form({
+                        game: game.id,
+                        stage: stage.stage,
+                    })}
+                    acceptAction={GenerationController.accept.form({
+                        game: game.id,
+                        stage: stage.stage,
+                    })}
+                    canGenerate={generation.can_generate}
+                />
+            {/each}
+        </div>
+
+        {#if locations.length > 0}
+            <ClusterLocationsTable {locations} />
+        {/if}
+
+        {#if generation.can_start_over}
+            <!--
+                The only way past an accepted stage, and deliberately all-or-nothing: a cluster and
+                the stelliums standing on it are one world, so there is no rewinding a single step.
+            -->
+            <Dialog>
+                <DialogTrigger asChild>
+                    {#snippet children(props)}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onclick={props.onClick}
+                            data-test="start-generation-over"
+                        >
+                            <RotateCcw class="h-4 w-4" />
+                            Start generation over
+                        </Button>
+                    {/snippet}
+                </DialogTrigger>
+
+                <DialogContent>
+                    <Form
+                        {...GenerationController.restart.form(game.id)}
+                        class="space-y-6"
+                        options={{ preserveScroll: true }}
+                    >
+                        {#snippet children({ processing })}
+                            <DialogTitle>Start the generation over?</DialogTitle
+                            >
+                            <DialogDescription>
+                                Everything generated for {game.name} is deleted —
+                                the cluster, the stelliums and their stars, and the
+                                record of which seeds produced them. Nothing else
+                                about the game changes. This cannot be undone.
+                            </DialogDescription>
+
+                            <DialogFooter class="gap-2">
+                                <DialogClose asChild>
+                                    {#snippet children(props)}
+                                        <Button
+                                            variant="secondary"
+                                            onclick={props.onClick}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    {/snippet}
+                                </DialogClose>
+                                <Button
+                                    type="submit"
+                                    variant="destructive"
+                                    disabled={processing}
+                                    data-test="confirm-start-generation-over"
+                                >
+                                    Start over
+                                </Button>
+                            </DialogFooter>
+                        {/snippet}
+                    </Form>
+                </DialogContent>
+            </Dialog>
+        {/if}
     </section>
 
     <section class="space-y-4">

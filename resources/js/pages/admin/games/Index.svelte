@@ -185,6 +185,9 @@
                                 Short name
                             </th>
                             <th scope="col" class="px-4 py-3 font-medium">
+                                Seed
+                            </th>
+                            <th scope="col" class="px-4 py-3 font-medium">
                                 Status
                             </th>
                             <th scope="col" class="px-4 py-3 font-medium">
@@ -215,6 +218,19 @@
                                         class="rounded bg-muted px-1.5 py-0.5 text-xs"
                                     >
                                         {game.short_name}
+                                    </code>
+                                </td>
+                                <!--
+                                    Seeds are listed here as well as on each game's own screen: an
+                                    administrator comparing two runs wants to see both numbers at
+                                    once, and the seed is assigned before anybody opens the game.
+                                -->
+                                <td class="px-4 py-3">
+                                    <code
+                                        class="rounded bg-muted px-1.5 py-0.5 text-xs"
+                                        data-test="game-seed-{game.id}"
+                                    >
+                                        {game.seed}
                                     </code>
                                 </td>
                                 <td class="px-4 py-3">

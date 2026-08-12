@@ -38,11 +38,18 @@ export type GameRoleOption = {
  * `seats_count` and `active_seats_count` are separate numbers on purpose: the difference between them is
  * how many people have left the game, which is worth seeing without opening it. `active_seats_count`
  * comes from the dedicated `Game::activeSeats()` relation rather than a `withCount` closure alias.
+ *
+ * `seed` is the number the game's randomness is drawn from, assigned at creation. `can_change_seed` says
+ * whether it may still be set — it is true only while the game is in setup, because re-seeding a game
+ * that is being played would rewrite the run its turn reports describe. Like the gamemaster screen's
+ * per-seat flags it is **presentation**: the server refuses a late seed whatever the screen renders.
  */
 export type AdminGame = {
     id: number;
     name: string;
     short_name: string;
+    seed: number;
+    can_change_seed: boolean;
     status: GameStatus;
     status_label: string;
     seats_count: number;
@@ -83,17 +90,32 @@ export type GameSeatRoleTarget = Pick<
 >;
 
 /**
+ * The fields `GameSeedForm.svelte` needs of a game.
+ *
+ * Named separately for the same reason `GameSeatRoleTarget` is: the one form serves the administrator's
+ * screen and the gamemaster's, and neither row shape needs to know about the other. The form action is
+ * passed in, which is what keeps the component from importing one area's controller.
+ */
+export type GameSeedTarget = Pick<AdminGame, 'seed' | 'can_change_seed'>;
+
+/**
  * One game as its **gamemaster** sees it, shaped by
  * `App\Http\Controllers\Gamemaster\GameController::present()`.
  *
  * The same fields as `AdminGame`, but `name` and `short_name` arrive here to be *displayed*: a
  * gamemaster may move a game between statuses and may not rename it, and the server enforces that by
  * validating nothing else — see `App\Http\Requests\Gamemaster\GameStatusUpdateRequest`.
+ *
+ * The seed is the opposite case: a gamemaster may set it as well as see it, on exactly the same terms an
+ * administrator can, so `can_change_seed` here means what it means on `AdminGame` — the game is still in
+ * setup.
  */
 export type GamemasterGame = {
     id: number;
     name: string;
     short_name: string;
+    seed: number;
+    can_change_seed: boolean;
     status: GameStatus;
     status_label: string;
     seats_count: number;
