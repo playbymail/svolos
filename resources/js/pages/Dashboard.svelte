@@ -53,6 +53,7 @@
                 title="Running"
                 description="Games you are the gamemaster of."
                 games={gamemasterGames}
+                manageable
             />
         {/if}
 

@@ -6,6 +6,8 @@ use App\Http\Controllers\Admin\InvitationController;
 use App\Http\Controllers\Admin\SessionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Gamemaster\GameController as GamemasterGameController;
+use App\Http\Controllers\Gamemaster\GameSeatController as GamemasterGameSeatController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use Illuminate\Support\Facades\Route;
@@ -52,6 +54,39 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::delete('impersonate', [ImpersonationController::class, 'destroy'])
     ->middleware('auth')
     ->name('impersonation.stop');
+
+/*
+ * Running a game from the inside. These are **member** routes and must stay out of the admin group:
+ * a gamemaster is an ordinary account, and the thing that opens these is an active
+ * `GameRole::Gamemaster` seat at the game in the URL, which `EnsureUserIsGamemaster` is the only
+ * thing that reads. The gate comes after `auth` for the same reason `admin` does — a guest is
+ * redirected to the login page rather than shown a 403 that confirms the game exists — and an
+ * administrator holding no seat is refused here, because they have `/admin/games/{game}` instead and
+ * an authorisation check reads exactly one of the two role systems. See `.ai/rules/roles.md`.
+ *
+ * There is no index: which games you run is the dashboard, and no create, update-name or destroy —
+ * a gamemaster changes a game's status, never its name or short name.
+ */
+Route::middleware(['auth', 'verified', 'gamemaster'])
+    ->prefix('gamemaster')
+    ->name('gamemaster.')
+    ->group(function () {
+        Route::get('games/{game}', [GamemasterGameController::class, 'show'])->name('games.show');
+        Route::put('games/{game}', [GamemasterGameController::class, 'update'])->name('games.update');
+
+        /*
+         * Scoped exactly as the admin seat routes are, and for the same reason: `{seat}` resolves
+         * through `Game::seats()`, so a seat id from another game 404s rather than being edited
+         * through this game's URL. Without it both ids bind independently and the mismatch is
+         * written silently. There is deliberately no destroy route here either.
+         */
+        Route::scopeBindings()->group(function () {
+            Route::post('games/{game}/seats', [GamemasterGameSeatController::class, 'store'])->name('games.seats.store');
+            Route::put('games/{game}/seats/{seat}/role', [GamemasterGameSeatController::class, 'updateRole'])->name('games.seats.role.update');
+            Route::put('games/{game}/seats/{seat}/retire', [GamemasterGameSeatController::class, 'retire'])->name('games.seats.retire');
+            Route::put('games/{game}/seats/{seat}/reactivate', [GamemasterGameSeatController::class, 'reactivate'])->name('games.seats.reactivate');
+        });
+    });
 
 /*
  * The administration area. `admin` has to come after `auth` so a guest is redirected to the login

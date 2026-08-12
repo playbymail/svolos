@@ -1,26 +1,27 @@
 <?php
 
-namespace App\Http\Requests\Admin;
+namespace App\Http\Requests\Gamemaster;
 
 use App\Concerns\GameValidationRules;
 use App\Models\Game;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Seating an account, as done from the gamemaster's own roster screen.
+ *
+ * Identical in contract to `Admin\GameSeatStoreRequest` — same fields, same uniqueness that counts
+ * retired seats, same messages — because it is the same operation on the same table, and the rules
+ * live in `App\Concerns\GameValidationRules` so the two cannot drift. A gamemaster may seat somebody
+ * as a gamemaster: handing out the role is not the restricted operation. **Taking it away is**, and
+ * that lives in `Gamemaster\GameSeatController::updateRole()`.
+ */
 class GameSeatStoreRequest extends FormRequest
 {
     use GameValidationRules;
 
     /**
      * Get the validation rules that apply to the request.
-     *
-     * The rules themselves live in `App\Concerns\GameValidationRules` because the gamemaster's own
-     * roster screen seats accounts through the same contract, and the uniqueness rule that counts
-     * **retired** seats is exactly the kind that must not exist in two places drifting apart. Read
-     * `gameSeatUserRules()` for why it carries no `is_active` condition.
-     *
-     * The scoping `game_id` comes from the route binding; if it were ever missing, the trait falls back
-     * to the stricter form that is unique across every game.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */

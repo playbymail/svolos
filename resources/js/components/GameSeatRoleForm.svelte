@@ -1,6 +1,5 @@
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
-    import GameSeatController from '@/actions/App/Http/Controllers/Admin/GameSeatController';
     import { Button } from '@/components/ui/button';
     import {
         Select,
@@ -8,23 +7,29 @@
         SelectItem,
         SelectTrigger,
     } from '@/components/ui/select';
-    import type { AdminGame, AdminGameSeat, GameRoleOption } from '@/types';
+    import type { GameRoleOption, GameSeatRoleTarget } from '@/types';
+    import type { RouteFormDefinition } from '@/wayfinder';
 
+    /*
+     * The endpoint is a prop rather than an import, so the administrator's roster and the
+     * gamemaster's can share one picker while posting to their own controllers. `roles` is a prop for
+     * the same reason: a caller that may not hand out every role passes the subset it may.
+     */
     let {
-        game,
+        action,
         seat,
         roles,
     }: {
-        game: AdminGame;
-        seat: AdminGameSeat;
+        action: RouteFormDefinition<'post'>;
+        seat: GameSeatRoleTarget;
         roles: GameRoleOption[];
     } = $props();
 
     /*
      * A **writable** `$derived`, exactly as `UserRoleForm.svelte` does it: the picker assigns to it
-     * while the administrator is choosing, and it snaps back to the server's value whenever
-     * `seat.role` changes, so a refused or failed change cannot leave a picker showing a role the
-     * seat does not hold.
+     * while the choice is being made, and it snaps back to the server's value whenever `seat.role`
+     * changes, so a refused or failed change cannot leave a picker showing a role the seat does not
+     * hold.
      *
      * This is why the picker is its own component rather than inline on the roster: a map of
      * in-progress choices keyed by seat would have to be `$state` re-seeded from an `$effect` — a
@@ -41,7 +46,7 @@
 </script>
 
 <Form
-    {...GameSeatController.updateRole.form({ game: game.id, seat: seat.id })}
+    {...action}
     options={{ preserveScroll: true }}
     class="flex items-center gap-2"
 >

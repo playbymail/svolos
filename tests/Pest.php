@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\Game;
+use App\Models\GameSeat;
 use App\Models\Invitation;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Support\Facades\Mail;
@@ -50,6 +53,52 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Read a class's source with every comment and doc block removed.
+ *
+ * The role-separation rules are about what the *code* consults, not about what the prose explains — and
+ * the prose has to be free to name both systems in order to say they are unrelated. Tokenising is what
+ * keeps a documentation comment from reading as a violation, and vice versa: a real reference cannot hide
+ * in a comment either.
+ *
+ * It lives here rather than in one test file because both sides of the boundary assert it — the admin
+ * middleware must mention no seat (`tests/Feature/Admin/GameRoleSeparationTest.php`) and the gamemaster
+ * middleware must mention no application role (`tests/Feature/Gamemaster/GameManagementTest.php`) — and a
+ * helper declared in a test file is only loaded when that file is, which a `--filter` run need not do.
+ *
+ * @param  class-string  $class
+ */
+function executableSourceOf(string $class): string
+{
+    $file = (new ReflectionClass($class))->getFileName();
+
+    expect($file)->toBeString();
+
+    return collect(token_get_all((string) file_get_contents((string) $file)))
+        ->reject(fn (array|string $token): bool => is_array($token)
+            && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true))
+        ->map(fn (array|string $token): string => is_array($token) ? $token[1] : $token)
+        ->implode('');
+}
+
+/**
+ * Create a member holding an **active** gamemaster seat at the given game.
+ *
+ * The one thing that opens `/gamemaster/games/{game}`, and the setup of nearly every test in
+ * `tests/Feature/Gamemaster`. A plain member on purpose: a helper that quietly made every gamemaster
+ * an administrator would make the whole area's authorisation tests pass for the wrong reason.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function gamemasterOf(Game $game, array $attributes = []): User
+{
+    $gamemaster = User::factory()->create($attributes);
+
+    GameSeat::factory()->for($game)->for($gamemaster)->gamemaster()->create();
+
+    return $gamemaster;
 }
 
 /**

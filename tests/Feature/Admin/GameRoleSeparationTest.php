@@ -33,28 +33,11 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-/**
- * Read a class's source with every comment and doc block removed.
- *
- * The separation rules are about what the *code* consults, not about what the prose explains — and the
- * prose has to be free to name both systems in order to say they are unrelated. Tokenising is what keeps
- * a documentation comment from reading as a violation, and vice versa: a real reference cannot hide in a
- * comment either.
- *
- * @param  class-string  $class
+/*
+ * `executableSourceOf()` — a class's source with comments stripped — lives in `tests/Pest.php`, because
+ * the gamemaster side of this boundary asserts the mirror image of these rules and a helper declared in a
+ * test file is only loaded when that file is.
  */
-function executableSourceOf(string $class): string
-{
-    $file = (new ReflectionClass($class))->getFileName();
-
-    expect($file)->toBeString();
-
-    return collect(token_get_all((string) file_get_contents((string) $file)))
-        ->reject(fn (array|string $token): bool => is_array($token)
-            && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true))
-        ->map(fn (array|string $token): string => is_array($token) ? $token[1] : $token)
-        ->implode('');
-}
 
 /**
  * Every route in the games area, as [method, url] pairs against a real game and seat.
