@@ -14,9 +14,16 @@ return [
     |
     */
 
+    /*
+     * `?: null` rather than a bare `env()`: `.env.example` ships `MAILGUN_DOMAIN=` and
+     * `MAILGUN_SECRET=` with no value, and a fresh clone copies that file to `.env`, so dotenv
+     * hands back the empty string rather than null. Blank means unconfigured — coercing here keeps
+     * "no credentials" a single value, and stops an empty domain from building a transport that
+     * only fails later against Mailgun.
+     */
     'mailgun' => [
-        'domain' => env('MAILGUN_DOMAIN'),
-        'secret' => env('MAILGUN_SECRET'),
+        'domain' => env('MAILGUN_DOMAIN') ?: null,
+        'secret' => env('MAILGUN_SECRET') ?: null,
         'endpoint' => env('MAILGUN_ENDPOINT', 'api.mailgun.net'),
         'scheme' => 'https',
     ],

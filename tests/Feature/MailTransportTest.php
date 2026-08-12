@@ -58,3 +58,33 @@ test('the default mailer falls back to log and no mail credentials are committed
         ->toContain("\nMAILGUN_DOMAIN=\n")
         ->toContain("\nMAILGUN_SECRET=\n");
 });
+
+/*
+ * The assertion above is only meaningful when the credentials really are absent from the
+ * environment, which is how a developer's own `.env` usually looks — the MAILGUN_* keys are simply
+ * not in it, so `env()` returns null whatever `config/services.php` does. A fresh clone is the
+ * opposite case: `composer setup` copies `.env.example`, whose `MAILGUN_DOMAIN=` is parsed as the
+ * empty string. This pins the coercion that makes both spellings of "unconfigured" agree, so the
+ * suite cannot pass locally while failing on a clean checkout.
+ */
+test('a blank mailgun credential in the environment reads back as unconfigured', function () {
+    $restore = array_intersect_key($_ENV + $_SERVER, ['MAILGUN_DOMAIN' => null, 'MAILGUN_SECRET' => null]);
+
+    $_ENV['MAILGUN_DOMAIN'] = $_SERVER['MAILGUN_DOMAIN'] = '';
+    $_ENV['MAILGUN_SECRET'] = $_SERVER['MAILGUN_SECRET'] = '';
+
+    try {
+        $services = require config_path('services.php');
+
+        expect($services['mailgun']['domain'])->toBeNull()
+            ->and($services['mailgun']['secret'])->toBeNull();
+    } finally {
+        foreach (['MAILGUN_DOMAIN', 'MAILGUN_SECRET'] as $key) {
+            unset($_ENV[$key], $_SERVER[$key]);
+
+            if (array_key_exists($key, $restore)) {
+                $_ENV[$key] = $_SERVER[$key] = $restore[$key];
+            }
+        }
+    }
+});
