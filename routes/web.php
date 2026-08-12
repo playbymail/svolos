@@ -184,3 +184,15 @@ Route::middleware(['auth', 'verified', 'admin'])
     });
 
 require __DIR__.'/settings.php';
+
+/*
+ * Workstation conveniences, and the first of the two gates in front of them: outside `local` this
+ * file is never read, so the routes in it do not exist and their URLs are ordinary 404s. The
+ * controller behind each one checks the environment again for itself — see `routes/dev.php`.
+ *
+ * The check is written here, at the point of inclusion, rather than inside the file it guards, so
+ * that reading `web.php` is enough to know these routes are not in production.
+ */
+if (app()->environment('local')) {
+    require __DIR__.'/dev.php';
+}

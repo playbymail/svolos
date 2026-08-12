@@ -87,10 +87,14 @@
             class="rounded bg-muted px-1.5 py-0.5 font-medium"
             data-test="game-seed">{game.seed}</code
         >
-        <p class="mt-2 text-muted-foreground">
-            The game has left setup, so its seed is fixed. Everything it has
-            generated was drawn from this number, and changing it now would
-            describe a run that never happened.
+        <!--
+            The reason comes from the server, because there are two of them and they are different
+            sentences: a game that has left setup, and a game still in setup whose world has already
+            been generated from this number. Inferring it from the status here told somebody "the game
+            has left setup" about a game that plainly had not.
+        -->
+        <p class="mt-2 text-muted-foreground" data-test="game-seed-lock-reason">
+            {game.seed_lock_reason}
         </p>
     </div>
 {/if}

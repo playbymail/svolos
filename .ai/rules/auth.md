@@ -1,7 +1,8 @@
 # Authentication rules
 
 Globs: `config/fortify.php`, `app/Providers/FortifyServiceProvider.php`, `app/Actions/Fortify/**`,
-`app/Concerns/*ValidationRules.php`, `resources/js/pages/auth/**`, `tests/Feature/Auth/**`
+`app/Concerns/*ValidationRules.php`, `resources/js/pages/auth/**`, `tests/Feature/Auth/**`,
+`routes/dev.php`, `app/Http/Controllers/Dev/**`, `tests/Feature/Dev/**`
 
 Authentication is Laravel Fortify, headless, with Svelte pages for every screen. Enabled features:
 `resetPasswords`, `emailVerification`, `twoFactorAuthentication(['confirm' => true, 'confirmPassword'
@@ -56,6 +57,38 @@ Fortify/laravel-passkeys ship registration, listing and deletion only. Renaming 
 `routes/settings.php` with the same `auth` + `RequirePassword` middleware Fortify puts on its own
 passkey management routes, plus the ownership check the package's `destroy` performs. If a future
 package version adds a rename route, delete ours rather than keeping both.
+
+## `/__dev/log-me-in/{email}` is a password-free sign-in, and it is **local only**
+
+`GET /__dev/log-me-in/{email}?returnTo=/some/path` puts the session on that account and lands on that
+path. It exists so the application can be driven in a real browser without a password — by hand, and
+by an agent that is not permitted to type credentials into a login form.
+
+It is an authentication bypass, so it has **two independent gates and both must stay**:
+
+1. `routes/dev.php` is only required at all when `app()->environment('local')`, from the bottom of
+   `routes/web.php`. Outside local the route does not exist and the URL is an ordinary 404.
+2. `Dev\AgentLoginController` checks the environment **again** on every request. This is not the same
+   check twice: `php artisan route:cache` on a workstation bakes the route into a file, and a deploy
+   that shipped that file would otherwise carry a working bypass into production.
+
+Neither gate is a config flag, deliberately — a flag is something somebody can switch on in the wrong
+place, while `APP_ENV=local` already means "this installation is a workstation". Do not add one, and
+do not "simplify" by dropping the controller's own check.
+
+Three smaller rules it keeps:
+
+- **It signs accounts in; it never creates one.** Accounts come from invitations, and this does not
+  become a second door into that.
+- **`returnTo` must be a path on this application.** `//host` and `/\host` are protocol-relative URLs
+  wearing a leading slash, and both fall back to the dashboard. An open redirect is not worth having
+  anywhere, least of all in a URL that ends up in shell history and agent transcripts.
+- **It clears the impersonation marker**, because a fresh sign-in as somebody else must not inherit a
+  banner offering to return to an administrator this session never was.
+
+`tests/Feature/Dev/AgentLoginTest.php` tests both gates separately — the route's absence in the
+suite's own environment, and the controller refusing when the route is registered by hand anyway,
+which is the shipped-route-cache case.
 
 ## Testing auth
 

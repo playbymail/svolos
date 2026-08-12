@@ -419,9 +419,20 @@ test('the base seed closes once anything has been generated, and opens again aft
 
     generateStage($gamemaster, $game, GenerationStage::Cluster, 4242);
 
+    /*
+     * The reason matters as much as the flag. This game is **still in setup** — it is locked because
+     * its world has been generated — so a screen that inferred the reason from the status would tell
+     * the gamemaster the game had left setup, which is both wrong and unactionable. It was, until a
+     * walk through the browser showed it saying exactly that.
+     */
     $this->actingAs($gamemaster)
         ->get(route('gamemaster.games.show', ['game' => $game]))
-        ->assertInertia(fn (Assert $page) => $page->where('game.can_change_seed', false)->etc());
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('game.can_change_seed', false)
+            ->where('game.status', 'setup')
+            ->where('game.seed_lock_reason', 'This seed has already been generated from. Start the generation over to change it.')
+            ->etc(),
+        );
 
     $this->actingAs($gamemaster)
         ->put(route('gamemaster.games.seed.update', ['game' => $game]), ['seed' => 222])
