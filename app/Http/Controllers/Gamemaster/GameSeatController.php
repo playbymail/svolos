@@ -17,13 +17,13 @@ use Symfony\Component\HttpFoundation\Response;
  * The roster of one game, managed by somebody who runs it.
  *
  * The same four actions as `Admin\GameSeatController`, under `App\Http\Middleware\EnsureUserIsGamemaster`
- * instead of the admin gate, with **two refusals an administrator does not have**. Everything the
+ * instead of the admin gate, with **three refusals an administrator does not have**. Everything the
  * administrator's controller says still applies here and is not repeated: there is no destroy action and
  * there must not be one (a seat is retired, never deleted, because engine history keeps referring to it),
  * and every action is scoped to the game in the URL by `Route::scopeBindings()`, which is why `Game $game`
  * stays ahead of `GameSeat $seat` in each signature.
  *
- * ## The two refusals
+ * ## The three refusals
  *
  * - **You cannot retire yourself.** Leaving a game you run is not a thing you do to your own roster; it
  *   removes the last person able to reach this screen if you are the only gamemaster, and it is
@@ -32,9 +32,13 @@ use Symfony\Component\HttpFoundation\Response;
  *   is how a game gets a second pair of hands — but a gamemaster demoting a peer is one gamemaster
  *   ejecting another from the only screen that can undo it. Only an administrator may do that, through
  *   `Admin\GameSeatController::updateRole()`.
+ * - **You cannot change the role on a retired seat.** The administrator's copy of the action allows it
+ *   on purpose; from inside the game it is the wrong power, because the seat is already out of the
+ *   roster and rewriting its role only changes what the record says somebody was. Reactivate the seat
+ *   and change it, or ask an administrator.
  *
- * Both are 403s rather than validation errors: the value posted is well formed, it is the requester who
- * may not post it. The screen hides the corresponding controls (`can_retire` and `can_demote` in
+ * All three are 403s rather than validation errors: the value posted is well formed, it is the requester
+ * who may not post it. The screen hides the corresponding controls (`can_retire` and `can_change_role` in
  * `Gamemaster\GameController::presentSeat()`), but these checks are the boundary — the flags are not.
  *
  * ## A game role is not an application role
@@ -71,7 +75,19 @@ class GameSeatController extends Controller
     }
 
     /**
-     * Change the game role a seat holds, in the one direction a gamemaster may change it.
+     * Change the game role a seat holds, on the seats and in the direction a gamemaster may change it.
+     *
+     * ## A retired seat's role is out of reach here
+     *
+     * The administrator's copy of this action deliberately allows it — the role is what the seat *was*
+     * in the game's history, and correcting a mistake should not require putting somebody back into a
+     * game they have left. That is an argument for *correcting history*, which is the administrator's
+     * to do. From inside the game it is the wrong power to hold: the seat is already out of the roster,
+     * so no live decision turns on its role, and rewriting it changes only what the record says
+     * somebody was. A gamemaster who wants the role changed reactivates the seat and changes it, or
+     * asks an administrator.
+     *
+     * ## And a gamemaster's seat cannot lose the role
      *
      * The refusal is written as "the seat is a gamemaster's and the new role is not a gamemaster's"
      * rather than "the new role is player", so a third game role added later cannot be used as a way
@@ -83,6 +99,8 @@ class GameSeatController extends Controller
      */
     public function updateRole(GameSeatRoleUpdateRequest $request, Game $game, GameSeat $seat): RedirectResponse
     {
+        abort_unless($seat->is_active, Response::HTTP_FORBIDDEN);
+
         /*
          * `enum()` is nullable and the rules make it `required`, so the fallback is unreachable — it is
          * `Player` rather than anything else so that if the rules are ever loosened, the unreachable

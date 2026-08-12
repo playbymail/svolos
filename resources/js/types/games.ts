@@ -112,13 +112,16 @@ export type GamemasterGame = {
  * - `is_self` — the viewer's own seat, labelled as such rather than silently missing its controls;
  * - `can_retire` — false for their own seat (a gamemaster does not retire themselves) and for a seat
  *   that is already retired;
- * - `can_demote` — false for a seat that already holds `gamemaster`. Promoting a player is allowed;
- *   only an administrator can take the role back off.
+ * - `can_change_role` — whether to render the role picker at all. False for a seat that already holds
+ *   `gamemaster`, because only an administrator can take the role back off, and false for a
+ *   **retired** seat, because that role is a fact about the game's history rather than a live
+ *   decision. One flag rather than two: it answers one question, and two flags read together are two
+ *   things to keep in step.
  */
 export type GamemasterGameSeat = AdminGameSeat & {
     is_self: boolean;
     can_retire: boolean;
-    can_demote: boolean;
+    can_change_role: boolean;
 };
 
 /**

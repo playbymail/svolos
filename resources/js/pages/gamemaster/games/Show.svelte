@@ -354,14 +354,14 @@
                                 </td>
                                 <td class="px-4 py-3">
                                     <!--
-                                        A gamemaster's seat is shown as a label rather than a
-                                        picker. Handing the role out is allowed — that is the
-                                        picker on a player's row — but taking it back is the
-                                        administrator's, so there is nothing here to choose
-                                        between. `updateRole()` refuses the demotion regardless of
-                                        what this renders.
+                                        Two rows show the role as a label rather than a picker: a
+                                        gamemaster's, because handing the role out is allowed but
+                                        taking it back is the administrator's, and a retired one,
+                                        because its role is a fact about the game's history rather
+                                        than a live decision. `updateRole()` refuses both regardless
+                                        of what this renders.
                                     -->
-                                    {#if seat.can_demote}
+                                    {#if seat.can_change_role}
                                         <GameSeatRoleForm
                                             action={GameSeatController.updateRole.form(
                                                 {
@@ -379,9 +379,16 @@
                                         >
                                             {seat.role_label}
                                         </span>
+                                        <!--
+                                            Keyed off the role rather than off `is_active`: a
+                                            retired *gamemaster's* seat is refused on both counts,
+                                            so telling somebody to reactivate it would send them
+                                            round a loop that ends in the same 403.
+                                        -->
                                         <p class="text-muted-foreground">
-                                            Only an administrator can change
-                                            this.
+                                            {seat.role === 'gamemaster'
+                                                ? 'Only an administrator can change this.'
+                                                : 'Reactivate the seat to change this.'}
                                         </p>
                                     {/if}
                                 </td>
