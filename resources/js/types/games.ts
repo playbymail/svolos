@@ -40,9 +40,11 @@ export type GameRoleOption = {
  * comes from the dedicated `Game::activeSeats()` relation rather than a `withCount` closure alias.
  *
  * `seed` is the number the game's randomness is drawn from, assigned at creation. `can_change_seed` says
- * whether it may still be set — it is true only while the game is in setup, because re-seeding a game
- * that is being played would rewrite the run its turn reports describe. Like the gamemaster screen's
- * per-seat flags it is **presentation**: the server refuses a late seed whatever the screen renders.
+ * whether it may still be set: only while the game is in setup **and** nothing has been generated from
+ * it yet. `seed_lock_reason` is the sentence explaining a false one, and it comes from the server
+ * because the two reasons are different sentences — a game that has left setup and a game whose cluster
+ * already exists are not locked for the same reason. Both are **presentation**: the server refuses a
+ * late seed whatever the screen renders.
  */
 export type AdminGame = {
     id: number;
@@ -50,6 +52,7 @@ export type AdminGame = {
     short_name: string;
     seed: number;
     can_change_seed: boolean;
+    seed_lock_reason: string | null;
     status: GameStatus;
     status_label: string;
     seats_count: number;
@@ -96,7 +99,10 @@ export type GameSeatRoleTarget = Pick<
  * screen and the gamemaster's, and neither row shape needs to know about the other. The form action is
  * passed in, which is what keeps the component from importing one area's controller.
  */
-export type GameSeedTarget = Pick<AdminGame, 'seed' | 'can_change_seed'>;
+export type GameSeedTarget = Pick<
+    AdminGame,
+    'seed' | 'can_change_seed' | 'seed_lock_reason'
+>;
 
 /**
  * One game as its **gamemaster** sees it, shaped by
@@ -116,6 +122,7 @@ export type GamemasterGame = {
     short_name: string;
     seed: number;
     can_change_seed: boolean;
+    seed_lock_reason: string | null;
     status: GameStatus;
     status_label: string;
     seats_count: number;

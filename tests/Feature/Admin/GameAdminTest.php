@@ -621,6 +621,22 @@ test('the list and the game screen both show the seed and whether it can still b
         ->assertInertia(fn (Assert $page) => $page
             ->where('game.seed', 99)
             ->where('game.can_change_seed', false)
+            /*
+             * The screen renders this sentence rather than composing its own, because the other reason
+             * a seed locks — a game still in setup whose world has been generated — needs a completely
+             * different one. See `tests/Feature/Gamemaster/GenerationTest.php`.
+             */
+            ->where('game.seed_lock_reason', 'The game has left setup, so its seed is fixed. Everything it has generated was drawn from this number, and changing it now would describe a run that never happened.')
+            ->etc(),
+        );
+
+    /* A game nobody has generated anything for yet is open, and says nothing about why. */
+    $this->actingAs($admin)
+        ->get(route('admin.games.show', ['game' => $setup]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('game.can_change_seed', true)
+            ->where('game.seed_lock_reason', null)
             ->etc(),
         );
 });

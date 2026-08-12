@@ -51,6 +51,41 @@ trait PresentsGeneration
     }
 
     /**
+     * Say whether a game's base seed may still be edited, and if not, why not.
+     *
+     * There are two reasons a seed closes and they are **not** interchangeable, which is why the reason
+     * is a sentence from the server rather than something the screen infers from the status: a game in
+     * setup whose cluster has been generated is locked for a completely different reason than a game
+     * that has started, and telling somebody "the game has left setup" about a game that plainly has
+     * not is worse than saying nothing.
+     *
+     * The order matches `GameValidationRules::gameSeedRules()` — status first, then generation — so the
+     * sentence on the screen is always the message the endpoint would answer with.
+     *
+     * @return array{can_change_seed: bool, seed_lock_reason: string|null}
+     */
+    protected function presentSeedLock(Game $game): array
+    {
+        $game->loadMissing('generationRuns');
+
+        if ($game->status !== GameStatus::Setup) {
+            return [
+                'can_change_seed' => false,
+                'seed_lock_reason' => __('The game has left setup, so its seed is fixed. Everything it has generated was drawn from this number, and changing it now would describe a run that never happened.'),
+            ];
+        }
+
+        if ($game->hasGenerationRuns()) {
+            return [
+                'can_change_seed' => false,
+                'seed_lock_reason' => __('This seed has already been generated from. Start the generation over to change it.'),
+            ];
+        }
+
+        return ['can_change_seed' => true, 'seed_lock_reason' => null];
+    }
+
+    /**
      * Shape the locations a game's cluster is made of, with their stelliums if it has any yet.
      *
      * Returns an empty list until a cluster run exists, so a screen with nothing to show is given
