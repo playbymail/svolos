@@ -130,6 +130,20 @@ not reformat it, and do not add a second component library. If one component fig
 hand-roll that single component instead. Icons come from `lucide-svelte`; toasts from `svelte-sonner`
 via `resources/js/lib/flash-toast.ts`.
 
+### `Checkbox`'s hidden input must stay inside the `checked` guard
+
+`Checkbox.svelte` is a `<button role="checkbox">`, so the hidden input it renders is the *only* thing
+a form ever posts. That input was originally emitted whenever `name` was set, in **both** states — so
+`<Checkbox name="remember" />` on the login page posted `remember=""` whether or not it was ticked,
+and "Remember me" never remembered anything. Nothing caught it: `AuthenticationTest` posts `remember`
+directly rather than through the component.
+
+An unticked checkbox submits **nothing at all**, and that absence is what `boolean()` reads as false
+on the server. So the guard is the whole of the semantics, and `value` defaults to `'1'` so the common
+case needs no prop. This cannot be pinned by a test — there is no jsdom or testing-library here, and
+Vitest covers only the pure front end (see [general.md](general.md)) — so it is written down instead.
+Anything reached only through a rendered component is verified in a browser.
+
 ## Type checking
 
 `npm run types:check` is
