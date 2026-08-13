@@ -208,8 +208,15 @@ build it is the wrong one, and it is worth writing down so nobody redesigns it a
 star mix is a quota, so every seed yields 100 well-separated locations and exactly 70/20/9/1
 stelliums. A picture that answered "is this well spread" would give the same answer forever. What
 actually changes with the seed is **where the rare stelliums landed and what is within reach of what**
-— so the map direct-labels the triples and the lone quadruple, and selecting a system turns the
-readout into a rangefinder. That is also why the form is a hex map rather than a scatter: apparent
+— so the rare stelliums are made findable by size and colour, and selecting a system turns the readout
+into a rangefinder.
+
+**The caption under a hex is the system's height and nothing else.** The ordinal is an identifier
+rather than a measurement — it says nothing about where a system sits — and the readout already gives
+it on hover or focus. An earlier version printed `#51 (+12)` for triples and the quadruple while
+everything else showed a bare height; that made one caption mean two different things depending on the
+mark above it, and restated in text what the mark's size and colour already say. Do not add it back
+without a reason that survives both of those. That is also why the form is a hex map rather than a scatter: apparent
 distance is something you count off the picture, and `√(L² + Δz²)` puts the flattened dimension back.
 
 **A hex holds up to four systems, and the map must keep saying so.** A location is unique on

@@ -22,7 +22,8 @@
      * star mix is a quota, so there are always exactly 70 singles, 20 doubles, 9 triples and one
      * quadruple. "Is this cluster well spread" therefore has the same answer every time and is not
      * worth drawing. What changes with the seed is **where the rare stelliums landed** and what sits
-     * within reach of what — so the map leans on making the triples and the lone quadruple findable.
+     * within reach of what — so the map leans on making the triples and the lone quadruple stand out
+     * by size and colour, and on making distance something you can read straight off it.
      *
      * Selection is owned by the page, not here. Only one `locationDetail` prop comes back from the
      * server, so the map and the table cannot each hold their own idea of what is open.
@@ -141,11 +142,14 @@
     }
 
     /**
-     * The caption printed under a hex on the map itself.
+     * The caption printed under a hex on the map itself: the system's height, and nothing else.
      *
-     * `z` is on every system, because it is the dimension the map flattened away and has nowhere else
-     * to go. The ordinal joins it only for the stelliums worth hunting for — a triple or the lone
-     * quadruple — since a hundred ordinals at once is the clutter that makes a map unreadable.
+     * `z` earns its place because it is the dimension the map flattened away and has nowhere else to
+     * go. **The ordinal deliberately does not appear here.** It is an identifier rather than a
+     * measurement, so it says nothing about where a system sits, and the readout under the map already
+     * gives it on hover or focus. Printing it for some systems and not others also made the caption
+     * mean two different things depending on the mark it sat under — which stelliums are worth finding
+     * is already carried by size and colour, and does not need saying twice.
      */
     function captionFor(hex: HexSystem): string {
         if (hex.locations.length > 1) {
@@ -153,13 +157,8 @@
         }
 
         const location = hex.locations[0];
-        const height = location.z > 0 ? `+${location.z}` : `${location.z}`;
 
-        if ((location.star_count ?? 0) >= 3) {
-            return `#${location.ordinal} (${height})`;
-        }
-
-        return height;
+        return location.z > 0 ? `+${location.z}` : `${location.z}`;
     }
 
     /**
@@ -320,7 +319,7 @@
                         font-size="4.6"
                         class="pointer-events-none tabular-nums"
                         style:fill="var(--space-ink)"
-                        opacity={(primary.star_count ?? 0) >= 3 ? 0.95 : 0.65}
+                        opacity="0.7"
                     >
                         {captionFor(hex)}
                     </text>
