@@ -8,6 +8,7 @@ Globs: `app/Generation/**`, `app/Actions/Generation/**`, `app/Enums/Generation*.
 `database/factories/{GenerationRun,Location,Stellium,Star,Planet}Factory.php`,
 `resources/js/components/GenerationStageCard.svelte`,
 `resources/js/components/ClusterLocationsTable.svelte`,
+`resources/js/components/ClusterHexMap.svelte`, `resources/js/lib/cluster-hex.ts`,
 `resources/js/components/LocationSystemPanel.svelte`, `resources/js/types/generation.ts`,
 `tests/Unit/*GeneratorTest.php`, `tests/Unit/GeneratorPurityTest.php`,
 `tests/Feature/Gamemaster/GenerationTest.php`, `tests/Feature/GenerationModelTest.php`
@@ -196,6 +197,50 @@ entirely determined by the seed, but it means retuning **any** weight shifts eve
 regenerated world differs everywhere rather than only where the change applies. `pick()` also walks a
 weight table in insertion order, so reordering the keys of a row changes the world a seed produces
 without changing the odds of anything.
+
+## The hex map shows *placement*, because shape is the same every seed
+
+`ClusterHexMap.svelte` draws the cluster the way a strategic star map does — regular hexagons, each
+system in the hex its `x, y` falls into, `z` printed beside it as a number. The obvious reason to
+build it is the wrong one, and it is worth writing down so nobody redesigns it around that reason.
+
+**There is nothing to judge about a cluster's spread.** The generator is uniform by volume and the
+star mix is a quota, so every seed yields 100 well-separated locations and exactly 70/20/9/1
+stelliums. A picture that answered "is this well spread" would give the same answer forever. What
+actually changes with the seed is **where the rare stelliums landed and what is within reach of what**
+— so the map direct-labels the triples and the lone quadruple, and selecting a system turns the
+readout into a rangefinder. That is also why the form is a hex map rather than a scatter: apparent
+distance is something you count off the picture, and `√(L² + Δz²)` puts the flattened dimension back.
+
+**A hex holds up to four systems, and the map must keep saying so.** A location is unique on
+`(game_id, x, y, z)`, not on `(x, y)` — measured over simulated clusters about **seven systems a game
+land in a hex somebody already holds, and as many as four can stack**. `groupByHex()` therefore
+returns a *list* per hex, a stacked hex draws an offset outline with a `2×` caption, and clicking one
+steps through its occupants because no click position can distinguish them. Collapsing this to one
+system per hex is the tempting simplification, and it would look right on ninety-odd hexes while
+silently hiding the rest.
+
+Three smaller things that are load-bearing:
+
+- **`Math.abs` in `toCube()`.** `-3 % 2` is `-1` in JavaScript, so the raw remainder shears the
+  negative-`x` half of the map down a row. Every distance *within* one half stays correct and every
+  distance *across* the centre is wrong, which is exactly the failure a glance does not catch — which
+  is why `cluster-hex.test.ts` exists and why one of its tests requires the six cells `hexCentre()`
+  *paints* touching a hex to be exactly the six `hexDistance()` *calls* adjacent. Pin new geometry
+  that way rather than by example: the property catches parity bugs nobody thought of.
+- **The selection lives in `pages/gamemaster/games/Show.svelte`**, not in the map or the table. One
+  `locationDetail` prop comes back, so two owners would fetch over each other; the map and the table
+  are two views of one open location. That is also why `ClusterLocationsTable` now takes `expanded`,
+  `loading` and `onToggle` as props instead of holding them.
+- **The map's palette is read as `var(--space)` / `var(--stellium-N)`, never `var(--color-*)`.**
+  `@theme inline` *inlines* a token into the utilities Tailwind generates rather than emitting a
+  `--color-*` custom property, so a hand-written `var(--color-stellium-3)` in an SVG resolves to
+  nothing and the mark paints black. Those tokens are also deliberately **not** overridden in `.dark`:
+  a star map is a picture, and it stays deep space in both appearances. `--stellium-1` to `-4` are an
+  **ordinal** ramp — one hue, ascending lightness for a star count of 1 to 4 — not the categorical
+  `--chart-*` set, which encodes identity and would throw away the order. The steps were fitted until
+  they passed monotone lightness, an adjacent gap of 0.06 and contrast against `--space`; the legend
+  is the required relief for the dimmest step and is not optional.
 
 ## Smaller decisions worth not re-litigating
 

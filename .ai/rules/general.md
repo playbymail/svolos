@@ -19,11 +19,40 @@ clone or CI runner has no manifest until the build runs. `.github/workflows/test
 3. `prettier --check resources/` (JS/TS/Svelte/CSS formatting)
 4. `phpstan analyse` (static analysis)
 5. `svelte-check` (Svelte/TS type checking)
-6. `artisan test` (Pest suite)
+6. `vitest run` (front-end unit tests)
+7. `artisan test` (Pest suite)
 
 `composer test` deliberately still re-runs Pint and PHPStan before the suite so a bare
 `composer test` is not weaker than the gate. `ci:check` calls `artisan test` directly instead of
 `@test` so nothing runs twice. Do not drop a step to make the gate green.
+
+## Vitest covers the *pure* front end, and nothing else
+
+There are two test runners and they do not overlap. **Pest** answers everything that reaches the
+server, including what a screen renders — Feature tests over Inertia payloads, which is how component
+behaviour is covered here. **Vitest** covers front-end modules that are arithmetic and nothing else:
+today `resources/js/lib/cluster-hex.ts`, the hex map's geometry.
+
+The line is worth holding, because the reason for the second runner is narrow. A parity bug in
+`toCube()` still draws a hundred systems in a hundred plausible hexes and still returns a distance for
+every pair; the numbers are just wrong, and no screenshot and no payload assertion shows it. That is
+the same argument `GeneratorPurityTest` makes about `shuffle()` — some failures are invisible to
+behaviour. It is *not* an argument for asserting markup, and no DOM was installed: there is no
+`jsdom`, no `@testing-library`, and adding them is a new decision rather than an extension of this one.
+
+Three mechanical points:
+
+- **Tests are co-located**, `resources/js/**/*.test.ts`, so `prettier --check resources/` and
+  `tsconfig.json`'s `include` already cover them with no glob widened.
+- **`vitest.config.ts` is separate from `vite.config.ts` on purpose.** That config builds the
+  application, and two of its plugins fight a test run: `laravel()` performs an environment check —
+  which is why `vite.config.ts` already carries a `LARAVEL_BYPASS_ENV_CHECK` hack for `svelte-check` —
+  and `wayfinder()` regenerates route types on `buildStart`, seconds spent per run producing something
+  no test reads. The `@` alias is therefore **declared** in the test config rather than inherited; it
+  comes from `tsconfig.json`'s `paths`, and no plugin sets it.
+- **Import from `vitest` explicitly** (`import { describe, expect, it } from 'vitest'`) rather than
+  enabling globals, so ESLint needs no extra environment. `vitest.config.ts` is in the ESLint ignore
+  list beside `vite.config.ts`, for the same reason.
 
 ## Run `php artisan view:clear` when verifying a Blade edit locally
 

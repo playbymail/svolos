@@ -26,7 +26,7 @@
 </script>
 
 <script lang="ts">
-    import { Form } from '@inertiajs/svelte';
+    import { Form, router } from '@inertiajs/svelte';
     import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
     import Save from 'lucide-svelte/icons/save';
     import UserMinus from 'lucide-svelte/icons/user-minus';
@@ -35,6 +35,7 @@
     import GameSeatController from '@/actions/App/Http/Controllers/Gamemaster/GameSeatController';
     import GenerationController from '@/actions/App/Http/Controllers/Gamemaster/GenerationController';
     import AppHead from '@/components/AppHead.svelte';
+    import ClusterHexMap from '@/components/ClusterHexMap.svelte';
     import ClusterLocationsTable from '@/components/ClusterLocationsTable.svelte';
     import GameSeatRoleForm from '@/components/GameSeatRoleForm.svelte';
     import GameSeedForm from '@/components/GameSeedForm.svelte';
@@ -128,6 +129,49 @@
     );
 
     const retiredCount = $derived(game.seats_count - game.active_seats_count);
+
+    /*
+     * Which location is open, held here rather than in either view of it. The hex map and the table
+     * are two pictures of one cluster, and the server sends back exactly one `locationDetail` — so a
+     * second copy of this state would mean the two fetching over each other and disagreeing about
+     * what the expanded panel is showing.
+     */
+    let expandedLocation = $state<number | null>(null);
+    let loadingLocation = $state(false);
+
+    function toggleLocation(location: ClusterLocation): void {
+        if (expandedLocation === location.id) {
+            expandedLocation = null;
+
+            return;
+        }
+
+        expandedLocation = location.id;
+
+        /*
+         * Before the planets stage there is no detail to show — the map still wants the selection,
+         * to measure from, but asking the server for a system nothing will render is a round trip
+         * spent on nothing.
+         */
+        if (!locations.some((entry) => entry.planet_count !== null)) {
+            return;
+        }
+
+        loadingLocation = true;
+
+        /*
+         * `only` keeps this to the one prop: the cluster, the seats and the rest of the screen are
+         * already here and re-sending them to open a location would cost more than the location does.
+         * No new route — the same screen, asked a narrower question.
+         */
+        router.reload({
+            only: ['locationDetail'],
+            data: { location: location.id },
+            onFinish: () => {
+                loadingLocation = false;
+            },
+        });
+    }
 </script>
 
 <AppHead title={game.name} />
@@ -270,7 +314,19 @@
         </div>
 
         {#if locations.length > 0}
-            <ClusterLocationsTable {locations} detail={locationDetail} />
+            <ClusterHexMap
+                {locations}
+                selected={expandedLocation}
+                onSelect={toggleLocation}
+            />
+
+            <ClusterLocationsTable
+                {locations}
+                detail={locationDetail}
+                expanded={expandedLocation}
+                loading={loadingLocation}
+                onToggle={toggleLocation}
+            />
         {/if}
 
         {#if generation.can_start_over}

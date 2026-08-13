@@ -693,6 +693,42 @@ test('a location says how many planets it has, and says nothing before they exis
         );
 });
 
+test('every location ships the coordinates the hex map plots it from', function () {
+    $game = Game::factory()->create();
+    $gamemaster = withAcceptedStelliums($game);
+
+    /*
+     * `ClusterHexMap.svelte` lays the cluster out entirely on the client: `x` and `y` choose the hex,
+     * `z` is printed beside the system because the plane has nowhere else to put it, and `star_count`
+     * picks the mark. None of that reaches the server, so nothing else would notice these fields
+     * going missing — the screen would simply render a hundred systems stacked on the origin.
+     *
+     * Asserted over the whole payload rather than `locations.0`: a map is wrong if any one of its
+     * hundred systems has a hole in it, and the first row is the least likely to.
+     */
+    $response = $this->actingAs($gamemaster)
+        ->get(route('gamemaster.games.show', ['game' => $game]))
+        ->assertOk();
+
+    /*
+     * Walked in PHP rather than through `AssertableInertia::has()` with a callback, because that form
+     * scopes the callback to the **first** element only — it would report a hundred rows checked
+     * while checking one.
+     */
+    $locations = $response->viewData('page')['props']['locations'];
+
+    expect($locations)->toHaveCount(ClusterGenerator::LOCATION_COUNT);
+
+    foreach ($locations as $location) {
+        expect($location['x'])->toBeInt()
+            ->and($location['y'])->toBeInt()
+            ->and($location['z'])->toBeInt()
+            ->and($location['radius'])->toBeNumeric()
+            ->and($location['star_count'])->toBeGreaterThanOrEqual(1)
+            ->and($location['star_count'])->toBeLessThanOrEqual(4);
+    }
+});
+
 test('a location\'s planets are fetched a row at a time, not shipped with the screen', function () {
     $game = Game::factory()->create();
     $gamemaster = withAcceptedStelliums($game);

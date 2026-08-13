@@ -51,6 +51,13 @@
     --color-chart-4: var(--chart-4);
     --color-chart-5: var(--chart-5);
 
+    /*
+      The cluster map's palette is deliberately **not** mapped in here. `@theme inline` inlines a
+      token into the utilities it generates rather than emitting a `--color-*` custom property, so a
+      `var(--color-space)` written by hand in an SVG resolves to nothing and the mark paints black.
+      The map reads `var(--space)` and `var(--stellium-N)` from `:root` directly instead.
+    */
+
     --color-sidebar: var(--sidebar-background);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar-primary: var(--sidebar-primary);
@@ -114,6 +121,28 @@
     --chart-3: hsl(197 37% 24%);
     --chart-4: hsl(43 74% 66%);
     --chart-5: hsl(27 87% 67%);
+
+    /*
+      The cluster map's own palette, and the one part of the theme that is deliberately **not**
+      overridden in `.dark` below. A star map is a distinct object on the page, like a photograph, and
+      it reads as deep space in either appearance; a light-mode inversion would be a diagram of a
+      cluster rather than a picture of one.
+
+      `--stellium-1` through `-4` are an **ordinal** ramp — one hue, ascending lightness, for a star
+      count of 1 to 4. Not the `--chart-*` set above, which is categorical: those five hues encode
+      identity, and a star count has order, so it takes a ramp that shows the order in the colour.
+      The steps were fitted against `--space` until they passed monotone lightness, an adjacent
+      lightness gap of at least 0.06, and contrast at the dim end (3.51:1) — do not nudge one without
+      re-checking the other three.
+    */
+    --space: hsl(220 30% 6%);
+    --space-grid: hsl(0 0% 100% / 0.11);
+    --space-ink: hsl(220 16% 88%);
+    --stellium-1: hsl(160 38% 33%);
+    --stellium-2: hsl(160 48% 44%);
+    --stellium-3: hsl(160 56% 57%);
+    --stellium-4: hsl(160 64% 72%);
+
     --radius: 0.5rem;
     --sidebar-background: hsl(0 0% 98%);
     --sidebar-foreground: hsl(240 5.3% 26.1%);

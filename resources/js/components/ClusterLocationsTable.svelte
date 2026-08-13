@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { router } from '@inertiajs/svelte';
     import ChevronRight from 'lucide-svelte/icons/chevron-right';
     import LocationSystemPanel from '@/components/LocationSystemPanel.svelte';
     import type { ClusterLocation, LocationDetail } from '@/types';
@@ -11,13 +10,24 @@
      * The planets are the exception. There are several hundred of them and they do not ship with the
      * page — expanding a row asks the same screen for that one system through a partial reload, which
      * is why `detail` is a prop rather than something fetched here.
+     *
+     * Which row is open is the **page's** to hold, not this table's. Only one `locationDetail` comes
+     * back from the server, so the hex map and this table cannot each keep their own idea of what is
+     * expanded — they would fetch over each other and disagree about what the panel below is showing.
+     * The fetch itself lives with the state, in `pages/gamemaster/games/Show.svelte`.
      */
     let {
         locations,
         detail,
+        expanded = null,
+        loading = false,
+        onToggle,
     }: {
         locations: ClusterLocation[];
         detail?: LocationDetail | null;
+        expanded?: number | null;
+        loading?: boolean;
+        onToggle?: (location: ClusterLocation) => void;
     } = $props();
 
     const hasStars = $derived(
@@ -35,34 +45,7 @@
         ),
     );
 
-    /* Which row is open. Null is "none"; only one at a time, since only one detail prop comes back. */
-    let expanded = $state<number | null>(null);
-    let loading = $state(false);
-
     const columns = $derived(5 + (hasStars ? 1 : 0) + (hasPlanets ? 1 : 0));
-
-    function toggle(location: ClusterLocation): void {
-        if (expanded === location.id) {
-            expanded = null;
-
-            return;
-        }
-
-        expanded = location.id;
-        loading = true;
-
-        /*
-         * `only` keeps this to the one prop: the cluster, the seats and the rest of the screen are
-         * already here and re-sending them to open a row would cost more than the row does.
-         */
-        router.reload({
-            only: ['locationDetail'],
-            data: { location: location.id },
-            onFinish: () => {
-                loading = false;
-            },
-        });
-    }
 </script>
 
 <div class="space-y-2">
@@ -97,13 +80,18 @@
             </thead>
             <tbody>
                 {#each locations as location (location.id)}
-                    <tr class="border-b border-border last:border-b-0">
+                    <tr
+                        class="border-b border-border last:border-b-0 {expanded ===
+                        location.id
+                            ? 'bg-muted/50'
+                            : ''}"
+                    >
                         <td class="px-4 py-1.5 text-muted-foreground">
                             {#if hasPlanets}
                                 <button
                                     type="button"
                                     class="flex items-center gap-1 hover:text-foreground"
-                                    onclick={() => toggle(location)}
+                                    onclick={() => onToggle?.(location)}
                                     aria-expanded={expanded === location.id}
                                     data-test="expand-location-{location.id}"
                                 >
