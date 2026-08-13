@@ -10,10 +10,12 @@ use App\Enums\GenerationStage;
 use App\Enums\GenerationStageState;
 use App\Generation\GenerationFailed;
 use App\Generation\HomeStelliumGenerator;
+use App\Generation\HomeTemplate;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Gamemaster\GenerationRunRequest;
 use App\Models\Game;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -22,8 +24,14 @@ use Inertia\Inertia;
  *
  * Three endpoints serve every stage — generate, accept, start over — with the stage arriving as a
  * route parameter bound to `App\Enums\GenerationStage`. That is deliberate: the stages differ in what
- * they produce, not in how they are driven, so the workflow is written once and adding the planets
- * stage adds no routes, no controller methods and no screen wiring.
+ * they produce, not in how they are driven, so the workflow is written once and neither the planets
+ * stage nor the home stellia added a route, a controller method or any screen wiring.
+ *
+ * **The home stellia template did not either, and that is worth knowing it was a choice.** It is the
+ * one stage whose input can be a *file*, which looks like a reason for an endpoint of its own. It is
+ * not: the stage is still run from a seed like every other, and the document rides beside it exactly
+ * as `traveler` rides with the cluster — so `store()` simply takes a multipart request here, and the
+ * ten-route sweep in `tests/Feature/Gamemaster/GameManagementTest.php` still passes untouched.
  *
  * Access is the gamemaster gate and nothing else — an active `GameRole::Gamemaster` seat at the game
  * in the URL, decided by `EnsureUserIsGamemaster`, exactly as for the rest of this area. An
@@ -69,6 +77,7 @@ class GenerationController extends Controller
                 $request->boolean('traveler'),
                 (int) $request->validated('minimum_separation', HomeStelliumGenerator::DEFAULT_MINIMUM_SEPARATION),
                 $request->boolean('separation_in_hexes'),
+                $this->uploadedTemplate($request),
             );
         } catch (GenerationFailed $failure) {
             /*
@@ -86,10 +95,20 @@ class GenerationController extends Controller
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __(':stage generated from seed :seed. Review it, then accept or try another seed.', [
-                'stage' => $stage->label(),
-                'seed' => $run->seed,
-            ]),
+            /*
+             * A template that came from a document was not drawn from the seed, so saying so would be
+             * telling a gamemaster their file had been ignored. Everything else here reads its seed
+             * back to them because that is the number they would change to get something different.
+             */
+            'message' => is_string($run->template['file'] ?? null)
+                ? __(':stage read from :file. Review it, then accept or upload another.', [
+                    'stage' => $stage->label(),
+                    'file' => $run->template['file'],
+                ])
+                : __(':stage generated from seed :seed. Review it, then accept or try another seed.', [
+                    'stage' => $stage->label(),
+                    'seed' => $run->seed,
+                ]),
         ]);
 
         return to_route('gamemaster.games.show', ['game' => $game]);
@@ -154,5 +173,32 @@ class GenerationController extends Controller
         $game->load('generationRuns');
 
         abort_unless(in_array($game->generationStateFor($stage), $allowed, true), 403);
+    }
+
+    /**
+     * Read the home template a request uploaded, if it uploaded one.
+     *
+     * Null means one of two things, and the stage tells them apart without being asked: no file was
+     * posted because the gamemaster ticked the box to have one drawn, or no file was posted because
+     * this is not the template stage at all and nothing will ever read it.
+     *
+     * Parsing happens **before** the run is made, inside `store()`'s existing `try`, so a document
+     * that is not a template lands on the `template` field through the same `$failure->field` path an
+     * unplaceable arrangement of homes uses — and leaves no run behind, because a file nobody could
+     * read is not an attempt at anything.
+     *
+     * @return array<string, mixed>|null
+     *
+     * @throws GenerationFailed if a document was uploaded and is not a template
+     */
+    private function uploadedTemplate(GenerationRunRequest $request): ?array
+    {
+        $file = $request->file('template');
+
+        if (! $file instanceof UploadedFile) {
+            return null;
+        }
+
+        return HomeTemplate::fromJson((string) $file->get(), $file->getClientOriginalName())->toArray();
     }
 }

@@ -19,14 +19,22 @@ enum GenerationStage: string
 {
     case Cluster = 'cluster';
     case Stelliums = 'stelliums';
-    case Planets = 'planets';
+    /*
+     * The one stage that generates nothing about the map: it settles what every player's home system
+     * will look like, either from a document the gamemaster uploads or drawn from the seed. It sits
+     * here because the two stages after it both read it — the homes are chosen knowing what a home
+     * is worth, and the planets stage copies it into every home system rather than drawing one.
+     */
+    case HomeStelliaTemplate = 'home_stellia_template';
     /*
      * The only stage whose input is the game's **roster** rather than the stage before it: one home
-     * per active player. It is last because it needs a finished world to place into — single-star
-     * systems are not known until the stelliums exist — and because a player choosing where to begin
-     * should be looking at somewhere that is fully described.
+     * per active player. It needs the stelliums, because a home stands at a single-star system and
+     * those are not known until they exist, and it comes before the planets because the planets
+     * stage reads the arrangement it chose — a home system is copied from the template rather than
+     * drawn, so which systems are homes has to be settled first.
      */
     case HomeStellia = 'home_stellia';
+    case Planets = 'planets';
 
     /**
      * Get the human readable label for the stage.
@@ -45,8 +53,9 @@ enum GenerationStage: string
              * would guess `stellia`. Label is display, value is identity; only one of them is free.
              */
             self::Stelliums => 'Stellia',
-            self::Planets => 'Planets',
+            self::HomeStelliaTemplate => 'Home stellia template',
             self::HomeStellia => 'Home stellia',
+            self::Planets => 'Planets',
         };
     }
 
@@ -58,9 +67,10 @@ enum GenerationStage: string
         return match ($this) {
             self::Cluster => 'Scatters the locations that make up the cluster, each one a place a game can happen.',
             self::Stelliums => 'Puts a stellium — one to four stars bound by gravity — at every location.',
-            self::Planets => 'Gives every star one to ten planets, ordered outward, each with its habitability and its deposits.',
+            self::HomeStelliaTemplate => 'Settles the home system every player begins in: upload one, or generate it from the seed.',
             /* No unit named here: the separation is counted in hexes or through space, and the form says which. */
             self::HomeStellia => 'Gives every player a home to begin from: a single-star system, kept clear of every other.',
+            self::Planets => 'Gives every star one to ten planets, ordered outward, each with its habitability and its deposits. A home system is copied from the template instead.',
         };
     }
 

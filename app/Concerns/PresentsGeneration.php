@@ -294,10 +294,14 @@ trait PresentsGeneration
      * Shape the runs of a stage that were regenerated past.
      *
      * These are the rows with nothing left to show for them, and they are in the payload precisely
-     * because of that: the seed a gamemaster rejected is the one thing that survives the attempt, and
+     * because of that: what a gamemaster asked for is the one thing that survives the attempt, and
      * seeing the list is how somebody works out what has already been tried.
      *
-     * @return array<int, array{attempt: int, seed: int, generated_at_diff: string|null}>
+     * `file` is that same thing for a home template read from a document — the run kept it for the
+     * reason it kept the seed. It rides beside the seed rather than replacing it because a run has
+     * both, and null on every other stage is the ordinary answer: nothing was uploaded.
+     *
+     * @return array<int, array{attempt: int, seed: int, file: string|null, generated_at_diff: string|null}>
      */
     private function presentHistory(Game $game, GenerationStage $stage): array
     {
@@ -306,6 +310,7 @@ trait PresentsGeneration
             ->map(fn (GenerationRun $run): array => [
                 'attempt' => $run->attempt,
                 'seed' => $run->seed,
+                'file' => $run->template['file'] ?? null,
                 'generated_at_diff' => $run->created_at?->diffForHumans(),
             ])
             ->values()

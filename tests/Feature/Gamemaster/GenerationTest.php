@@ -35,55 +35,6 @@ use Inertia\Testing\AssertableInertia as Assert;
 */
 
 /**
- * Generate a stage as a gamemaster, and hand back the response.
- *
- * `$traveler` is posted only when it is set, because that is what an unticked checkbox does — sending
- * `traveler=0` would exercise a shape the screen never produces.
- */
-function generateStage(User $gamemaster, Game $game, GenerationStage $stage, int $seed, bool $traveler = false): TestResponse
-{
-    return test()->actingAs($gamemaster)->post(
-        route('gamemaster.games.generation.store', ['game' => $game, 'stage' => $stage->value]),
-        $traveler ? ['seed' => $seed, 'traveler' => '1'] : ['seed' => $seed],
-    );
-}
-
-/**
- * Take a game as far as an accepted cluster, and hand back its gamemaster.
- */
-function withAcceptedCluster(Game $game, int $seed = 4242): User
-{
-    $gamemaster = gamemasterOf($game);
-
-    generateStage($gamemaster, $game, GenerationStage::Cluster, $seed);
-
-    test()->actingAs($gamemaster)->post(
-        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'cluster'])
-    );
-
-    return $gamemaster;
-}
-
-/**
- * Take a game as far as accepted stelliums, and hand back its gamemaster.
- *
- * The setup for every planets test: planets hang off stars, so the stars have to exist and the stage
- * before them has to be accepted before the planets stage will run at all.
- */
-function withAcceptedStelliums(Game $game, int $seed = 7): User
-{
-    $gamemaster = withAcceptedCluster($game);
-
-    generateStage($gamemaster, $game, GenerationStage::Stelliums, $seed);
-
-    test()->actingAs($gamemaster)->post(
-        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'stelliums'])
-    );
-
-    return $gamemaster;
-}
-
-/**
  * Ask the gamemaster's game screen for one optional prop, the way the browser does.
  *
  * The version header has to be the real one: Inertia answers a mismatched version with a 409 telling
@@ -477,7 +428,7 @@ test('the stelliums put one group of stars at every location, in the advertised 
     expect($stellium?->stars->pluck('ordinal')->all())->toBe(range(1, 4));
 });
 
-test('accepting the stelliums unlocks the planets rather than finishing the world', function () {
+test('accepting the stelliums unlocks the home template rather than finishing the world', function () {
     $game = Game::factory()->create();
     $gamemaster = withAcceptedCluster($game);
 
@@ -490,40 +441,66 @@ test('accepting the stelliums unlocks the planets rather than finishing the worl
     $game->load('generationRuns');
 
     /*
-     * The check sweeps every stage rather than naming the last one, which is exactly why adding the
-     * planets stage made every half-built game incomplete again. That is the intended behaviour.
+     * The check sweeps every stage rather than naming the last one, which is exactly why adding a
+     * stage makes every half-built game incomplete again. That is the intended behaviour, and it has
+     * now happened twice — for the planets, and for the template.
      */
     expect($game->isGenerationComplete())->toBeFalse();
-    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::Planets);
-    expect($game->generationStateFor(GenerationStage::Planets)->value)->toBe('ready');
+    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::HomeStelliaTemplate);
+    expect($game->generationStateFor(GenerationStage::HomeStelliaTemplate)->value)->toBe('ready');
 });
 
-test('accepting the planets unlocks the home stellia, and does not complete the generation', function () {
+test('the stages unlock one another in the order the enum declares them', function () {
     /*
-     * This used to assert that the planets *finished* a game's world, and it is the test the
-     * `GenerationStage` docblock warns will change: a new stage makes every unfinished game incomplete
-     * again, deliberately, because a game missing a generation step is not ready to be played. The
-     * assertion that matters is not the count — it is that accepting one stage opens exactly the next.
+     * The reordering test. Each stage opens exactly the next and nothing further, which is the whole
+     * of what the declaration order buys — so this walks the chain rather than asserting any one link,
+     * and would fail on a stage moved, added or dropped anywhere along it.
      */
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedStelliums($game);
+    $gamemaster = gamemasterOf($game);
 
-    generateStage($gamemaster, $game, GenerationStage::Planets, 88_213);
+    foreach (GenerationStage::cases() as $position => $stage) {
+        expect($game->fresh()?->load('generationRuns')->firstUnfinishedGenerationStage())->toBe($stage);
+
+        $seeds = [4242, 7, 11, 3, 88_213];
+
+        $stage === GenerationStage::HomeStelliaTemplate
+            ? generateTemplate($gamemaster, $game, $seeds[$position])
+            : generateStage($gamemaster, $game, $stage, $seeds[$position]);
+
+        $this->actingAs($gamemaster)->post(
+            route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => $stage->value])
+        )->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
+    }
+
+    expect($game->fresh()?->load('generationRuns')->isGenerationComplete())->toBeTrue();
+});
+
+test('accepting the home stellia unlocks the planets, and does not complete the generation', function () {
+    /*
+     * This test has been rewritten twice as stages arrived, and it is the one the `GenerationStage`
+     * docblock warns will keep changing. The assertion that matters is not which stage is last — it is
+     * that accepting one opens exactly the next.
+     */
+    $game = Game::factory()->create();
+    $gamemaster = withAcceptedTemplate($game);
+
+    generateStage($gamemaster, $game, GenerationStage::HomeStellia, 3);
 
     $this->actingAs($gamemaster)->post(
-        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'planets'])
+        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'home_stellia'])
     )->assertRedirect(route('gamemaster.games.show', ['game' => $game]));
 
     $game->load('generationRuns');
 
     expect($game->isGenerationComplete())->toBeFalse();
-    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::HomeStellia);
-    expect($game->generationStateFor(GenerationStage::HomeStellia)->value)->toBe('ready');
+    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::Planets);
+    expect($game->generationStateFor(GenerationStage::Planets)->value)->toBe('ready');
 });
 
 test('a gamemaster gives every star its planets', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedStelliums($game);
+    $gamemaster = withAcceptedHomeStellia($game);
 
     $response = generateStage($gamemaster, $game, GenerationStage::Planets, 88_213);
 
@@ -543,7 +520,7 @@ test('a gamemaster gives every star its planets', function () {
 
 test('every star numbers its planets from one, without a gap', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedStelliums($game);
+    $gamemaster = withAcceptedHomeStellia($game);
 
     generateStage($gamemaster, $game, GenerationStage::Planets, 88_213);
 
@@ -556,12 +533,12 @@ test('every star numbers its planets from one, without a gap', function () {
     }
 });
 
-test('the planets cannot be generated until the stelliums are accepted', function () {
+test('the planets cannot be generated until the home stellia are accepted', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedCluster($game);
+    $gamemaster = withAcceptedTemplate($game);
 
-    /* A stellium run that exists but is only pending is not an accepted one. */
-    generateStage($gamemaster, $game, GenerationStage::Stelliums, 7);
+    /* A home stellia run that exists but is only pending is not an accepted one. */
+    generateStage($gamemaster, $game, GenerationStage::HomeStellia, 3);
 
     generateStage($gamemaster, $game, GenerationStage::Planets, 88_213)->assertForbidden();
 
@@ -574,7 +551,7 @@ test('the planets cannot be generated until the stelliums are accepted', functio
 
 test('regenerating the planets replaces them and keeps the seed that was tried', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedStelliums($game);
+    $gamemaster = withAcceptedHomeStellia($game);
 
     generateStage($gamemaster, $game, GenerationStage::Planets, 88_213);
 
@@ -600,10 +577,10 @@ test('regenerating the planets replaces them and keeps the seed that was tried',
 
 test('the same seed gives the same planets, so an accepted world can be replayed', function () {
     $first = Game::factory()->create();
-    generateStage(withAcceptedStelliums($first), $first, GenerationStage::Planets, 88_213);
+    generateStage(withAcceptedHomeStellia($first), $first, GenerationStage::Planets, 88_213);
 
     $second = Game::factory()->create();
-    generateStage(withAcceptedStelliums($second), $second, GenerationStage::Planets, 88_213);
+    generateStage(withAcceptedHomeStellia($second), $second, GenerationStage::Planets, 88_213);
 
     $shape = fn (Game $game): array => Planet::query()
         ->join('stars', 'stars.id', '=', 'planets.star_id')
@@ -621,7 +598,7 @@ test('the same seed gives the same planets, so an accepted world can be replayed
 
 test('starting over deletes the whole world and every record of it', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedStelliums($game);
+    $gamemaster = withAcceptedHomeStellia($game);
 
     generateStage($gamemaster, $game, GenerationStage::Planets, 88_213);
 
@@ -767,7 +744,7 @@ test('the screen carries every stage, its seed and the attempts that were droppe
 
 test('a location says how many planets it has, and says nothing before they exist', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedStelliums($game);
+    $gamemaster = withAcceptedHomeStellia($game);
 
     /*
      * Null rather than zero, and for a different reason than `star_count`'s null: the stellium already
@@ -833,7 +810,7 @@ test('every location ships the coordinates the hex map plots it from', function 
 
 test('a location\'s planets are fetched a row at a time, not shipped with the screen', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedStelliums($game);
+    $gamemaster = withAcceptedHomeStellia($game);
 
     generateStage($gamemaster, $game, GenerationStage::Planets, 88_213);
 
@@ -880,7 +857,7 @@ test('one game cannot read another game\'s system through the location parameter
     $gamemaster = withAcceptedStelliums($game);
 
     $other = Game::factory()->create();
-    generateStage(withAcceptedStelliums($other), $other, GenerationStage::Planets, 88_213);
+    generateStage(withAcceptedHomeStellia($other), $other, GenerationStage::Planets, 88_213);
 
     $stranger = $other->locations()->orderBy('ordinal')->firstOrFail();
 
@@ -988,7 +965,7 @@ test('deleting a game takes its whole world with it', function () {
      * has something to be true about — a count of zero proves nothing about a table that was empty.
      */
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedStelliums($game);
+    $gamemaster = withAcceptedHomeStellia($game);
 
     generateStage($gamemaster, $game, GenerationStage::Planets, 88_213);
 

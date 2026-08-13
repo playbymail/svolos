@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\PlanetType;
+use App\Generation\HomeTemplateGenerator;
 use App\Generation\PlanetGenerator;
 use App\Generation\PlanetPlan;
 use App\Generation\PlanetProfile;
@@ -288,4 +289,113 @@ test('no stars means no planets rather than a failure', function () {
         PlanetType::GasGiant->value => 0,
         PlanetType::Icy->value => 0,
     ]);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Systems somebody begins at
+|--------------------------------------------------------------------------
+|
+| A star named in `$homeSystems` takes its planets from the game's home template instead of the dice:
+| the same count, types and habitability for every player, so nobody starts with a better home than
+| anybody else. Only the deposits are still drawn, which is the one thing a home is allowed to differ
+| in — what it is worth to mine.
+|
+| The generator is told none of that. It is handed a list of planets and an index, and never learns
+| what a "home" is, which is why the tests below are about *substitution* rather than about homes.
+|
+*/
+
+test('a home system gets exactly the planets it was given', function () {
+    $template = (new HomeTemplateGenerator)->generate(4242);
+
+    $plan = (new PlanetGenerator)->generate(88_213, 6, [2 => $template->planets]);
+
+    $home = $plan->systems[2];
+
+    expect($home->count())->toBe(count($template->planets));
+
+    foreach ($home->planets as $ordinal => $planet) {
+        expect($planet->type)->toBe($template->planets[$ordinal]->type);
+        expect($planet->habitability)->toBe($template->planets[$ordinal]->habitability);
+    }
+});
+
+test('a home system still has its deposits drawn', function () {
+    /*
+     * The half of a home that is *not* settled in advance, and the reason the template does not simply
+     * become the planets. Every deposit stays inside its own type's table, exactly as a drawn planet's
+     * would.
+     */
+    $template = (new HomeTemplateGenerator)->generate(4242);
+
+    $home = (new PlanetGenerator)->generate(88_213, 6, [0 => $template->planets])->systems[0];
+
+    foreach ($home->planets as $planet) {
+        foreach (['fuel' => $planet->fuel, 'metals' => $planet->metals, 'minerals' => $planet->minerals] as $deposit => $value) {
+            [$dice, $sides, $modifier] = PlanetGenerator::DEPOSIT_DICE[$planet->type->value][$deposit];
+
+            expect($value)
+                ->toBeGreaterThanOrEqual($dice + $modifier)
+                ->toBeLessThanOrEqual($dice * $sides + $modifier);
+        }
+    }
+});
+
+test('two home systems in one cluster differ only in what they are worth to mine', function () {
+    /*
+     * The requirement stated as directly as it can be: identical to look at, different to work. Both
+     * halves matter — a generator that gave them the same deposits too would make the deposits
+     * pointless, and one that redrew their types would give one player a better home.
+     */
+    $template = (new HomeTemplateGenerator)->generate(4242);
+
+    $plan = (new PlanetGenerator)->generate(88_213, 20, [3 => $template->planets, 11 => $template->planets]);
+
+    $shape = fn (PlanetSystem $system): array => array_map(
+        fn (PlanetProfile $planet): array => [$planet->type->value, $planet->habitability],
+        $system->planets,
+    );
+
+    $worth = fn (PlanetSystem $system): array => array_map(
+        fn (PlanetProfile $planet): array => [$planet->fuel, $planet->metals, $planet->minerals],
+        $system->planets,
+    );
+
+    expect($shape($plan->systems[3]))->toBe($shape($plan->systems[11]));
+    expect($worth($plan->systems[3]))->not->toBe($worth($plan->systems[11]));
+});
+
+test('naming no home systems leaves the cluster exactly as it was drawn before', function (int $seed) {
+    /*
+     * The compatibility guard for the parameter itself. Every pinned table and mix in this file is
+     * asserted against the two-argument call, so a default that quietly changed the stream would break
+     * them all at once and this says which change did it.
+     */
+    $generator = new PlanetGenerator;
+
+    expect($generator->generate($seed, 141, [])->summary())
+        ->toBe($generator->generate($seed, 141)->summary());
+})->with(planetSeeds());
+
+test('a home system is drawn from the same stream as everything around it', function () {
+    /*
+     * Not a second randomizer and not a second seed: naming a home changes what the stars *after* it
+     * get, because the draws it makes come out of the one stream in star order. A generator that gave
+     * home systems their own stream would leave the rest of the cluster identical, which is what this
+     * refuses.
+     */
+    $template = (new HomeTemplateGenerator)->generate(4242);
+    $generator = new PlanetGenerator;
+
+    $without = $generator->generate(88_213, 10);
+    $with = $generator->generate(88_213, 10, [0 => $template->planets]);
+
+    /* The last star in the cluster, as far downstream of the substitution as this plan reaches. */
+    $later = fn (PlanetPlan $plan): array => array_map(
+        fn (PlanetProfile $planet): array => [$planet->type->value, $planet->habitability, $planet->fuel],
+        $plan->systems[9]->planets,
+    );
+
+    expect($later($with))->not->toBe($later($without));
 });

@@ -11,8 +11,10 @@ use App\Models\Location;
 use App\Models\Stellium;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /*
@@ -223,4 +225,169 @@ function invitationTokenFromLastEmail(): string
     preg_match('#/invitations/([A-Za-z0-9]{64})#', $body, $matches);
 
     return $matches[1];
+}
+
+/*
+|--------------------------------------------------------------------------
+| Walking a game through its generation stages
+|--------------------------------------------------------------------------
+|
+| The stages build on one another, so a test about any one of them has to run every stage before it —
+| and these run the **real** generators, because a fabricated cluster would not tell us whether the
+| rules the later stages draw under can actually be satisfied. (`withCompletedGeneration()` above is
+| the opposite tool, for tests about a game that is already built.)
+|
+| They live here rather than in a test file for the reason `withCompletedGeneration()` does: three
+| files in two directories need them now, and a helper declared in a test file is only loaded when that
+| file is — which a `--filter` run need not do.
+|
+*/
+
+/**
+ * Generate a stage as a gamemaster, and hand back the response.
+ *
+ * `$traveler` is posted only when it is set, because that is what an unticked checkbox does — sending
+ * `traveler=0` would exercise a shape the screen never produces.
+ */
+function generateStage(User $gamemaster, Game $game, GenerationStage $stage, int $seed, bool $traveler = false): TestResponse
+{
+    return test()->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.store', ['game' => $game, 'stage' => $stage->value]),
+        $traveler ? ['seed' => $seed, 'traveler' => '1'] : ['seed' => $seed],
+    );
+}
+
+/**
+ * Take a game as far as an accepted cluster, and hand back its gamemaster.
+ */
+function withAcceptedCluster(Game $game, int $seed = 4242): User
+{
+    $gamemaster = gamemasterOf($game);
+
+    generateStage($gamemaster, $game, GenerationStage::Cluster, $seed);
+
+    test()->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'cluster'])
+    );
+
+    return $gamemaster;
+}
+
+/**
+ * Take a game as far as accepted stelliums, and hand back its gamemaster.
+ *
+ * Where the stars come from, and so the setup behind every stage after it.
+ */
+function withAcceptedStelliums(Game $game, int $seed = 7): User
+{
+    $gamemaster = withAcceptedCluster($game);
+
+    generateStage($gamemaster, $game, GenerationStage::Stelliums, $seed);
+
+    test()->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'stelliums'])
+    );
+
+    return $gamemaster;
+}
+
+/**
+ * Take a game as far as an accepted home template, and hand back its gamemaster.
+ *
+ * Generated rather than uploaded, because these tests are about the stages around it rather than about
+ * the document — `HomeTemplateTest` is where the uploaded half is exercised.
+ *
+ * The setup for every home stellia and planets test: both stages read the template, and neither will
+ * run until it has been accepted.
+ */
+function withAcceptedTemplate(Game $game, int $seed = 11): User
+{
+    $gamemaster = withAcceptedStelliums($game);
+
+    generateTemplate($gamemaster, $game, $seed);
+
+    test()->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'home_stellia_template'])
+    );
+
+    return $gamemaster;
+}
+
+/**
+ * Settle a game's home template, either by drawing one or by uploading a document.
+ *
+ * The two ways the stage can be run, behind one helper because every caller that does not care which
+ * wants the drawn one. `generate_template` is posted only when no file is — the screen's checkbox and
+ * its file input are alternatives, and posting both would exercise a shape it never produces.
+ */
+function generateTemplate(User $gamemaster, Game $game, int $seed, ?UploadedFile $document = null): TestResponse
+{
+    return test()->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.store', ['game' => $game, 'stage' => 'home_stellia_template']),
+        $document === null
+            ? ['seed' => $seed, 'generate_template' => '1']
+            : ['seed' => $seed, 'template' => $document],
+    );
+}
+
+/**
+ * Write a home template document the way a gamemaster would hand one over.
+ *
+ * Nine planets by default, with the third as the home world, so an uploaded template can be compared
+ * against a generated one without the shape itself being the difference.
+ *
+ * @param  array<int, array<string, mixed>>|null  $planets
+ */
+function templateDocument(?array $planets = null, string $name = 'homeworld.json'): UploadedFile
+{
+    $planets ??= [
+        ['ordinal' => 1, 'type' => 'rocky', 'habitability' => 3],
+        ['ordinal' => 2, 'type' => 'rocky', 'habitability' => 8],
+        ['ordinal' => 3, 'type' => 'rocky', 'habitability' => 25, 'home' => true, 'fuel' => 5, 'metals' => 5, 'minerals' => 5],
+        ['ordinal' => 4, 'type' => 'asteroids', 'habitability' => 0],
+        ['ordinal' => 5, 'type' => 'gas_giant', 'habitability' => 2],
+        ['ordinal' => 6, 'type' => 'icy', 'habitability' => 4],
+        ['ordinal' => 7, 'type' => 'icy', 'habitability' => 1],
+        ['ordinal' => 8, 'type' => 'asteroids', 'habitability' => 0],
+        ['ordinal' => 9, 'type' => 'icy', 'habitability' => 6],
+    ];
+
+    return UploadedFile::fake()->createWithContent(
+        $name,
+        (string) json_encode(['planets' => $planets]),
+    );
+}
+
+/**
+ * Take a game as far as an accepted arrangement of homes, and hand back its gamemaster.
+ *
+ * The setup for every planets test, since the planets stage is now last. Most of these games have
+ * nobody seated, which is an ordinary state rather than a shortcut: the stage places no homes, accepts
+ * cleanly, and leaves every star to be drawn — so the assertions about what the planet generator
+ * produces are about the drawn path and nothing else.
+ */
+function withAcceptedHomeStellia(Game $game, int $seed = 3): User
+{
+    $gamemaster = withAcceptedTemplate($game);
+
+    generateStage($gamemaster, $game, GenerationStage::HomeStellia, $seed);
+
+    test()->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'home_stellia'])
+    );
+
+    return $gamemaster;
+}
+
+/**
+ * Seat some players at a game, in a fixed order.
+ *
+ * @return array<int, GameSeat>
+ */
+function seatPlayers(Game $game, int $count): array
+{
+    return array_map(
+        fn (): GameSeat => GameSeat::factory()->for($game)->for(User::factory())->create(),
+        range(1, $count),
+    );
 }

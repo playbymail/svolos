@@ -70,6 +70,38 @@ class GenerationFailed extends RuntimeException
     }
 
     /**
+     * An uploaded home template was not JSON at all.
+     *
+     * Reachable the moment somebody uploads the wrong file, so the sentence names the likely mistake
+     * rather than only the parser's complaint — which on its own ("Syntax error") tells a gamemaster
+     * nothing about what to do next.
+     */
+    public static function templateUnreadable(string $reason): self
+    {
+        $failure = new self("That file is not readable as JSON ({$reason}). Upload the template document itself.");
+
+        $failure->field = 'template';
+
+        return $failure;
+    }
+
+    /**
+     * An uploaded home template was JSON, but not a home template.
+     *
+     * The most reachable failure in the whole application — a gamemaster writing a document by hand
+     * will hit it — so `HomeTemplate` composes the sentence naming the planet and the field, and this
+     * only carries it to the form. Like `homesUnplaceable()`, the field is the one they can fix.
+     */
+    public static function templateMalformed(string $problem): self
+    {
+        $failure = new self($problem);
+
+        $failure->field = 'template';
+
+        return $failure;
+    }
+
+    /**
      * A weighted choice rolled past the end of the table it was choosing from.
      *
      * Only reachable if a table's weights no longer sum to what was rolled against them, which means

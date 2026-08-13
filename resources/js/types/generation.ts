@@ -6,7 +6,11 @@
  * server's answer.
  */
 export type GenerationStage =
-    'cluster' | 'stelliums' | 'planets' | 'home_stellia';
+    | 'cluster'
+    | 'stelliums'
+    | 'home_stellia_template'
+    | 'home_stellia'
+    | 'planets';
 
 /**
  * How many hexes apart two home stellia stand when nobody has said otherwise.
@@ -39,12 +43,18 @@ export type GenerationStageState = 'locked' | 'ready' | 'review' | 'accepted';
  * One run of a stage's generator that was regenerated past, as shaped by
  * `App\Concerns\PresentsGeneration::presentHistory()`.
  *
- * The seed is the whole point: a superseded run produced nothing that still exists, so the number it
- * used is all that survives it — and seeing the list is how a gamemaster knows what has been tried.
+ * What was asked for is the whole point: a superseded run produced nothing that still exists, so the
+ * input it used is all that survives it — and seeing the list is how a gamemaster knows what has been
+ * tried.
+ *
+ * `file` is that input for a home template read from a document, where the seed decided nothing and
+ * the name is what somebody would recognise. Null everywhere else, which is the ordinary answer rather
+ * than a missing value: nothing was uploaded.
  */
 export type GenerationAttempt = {
     attempt: number;
     seed: number;
+    file: string | null;
     generated_at_diff: string | null;
 };
 

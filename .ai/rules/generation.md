@@ -11,15 +11,28 @@ Globs: `app/Generation/**`, `app/Actions/Generation/**`, `app/Enums/Generation*.
 `resources/js/components/ClusterHexMap.svelte`, `resources/js/lib/cluster-hex.ts`,
 `resources/js/components/LocationSystemPanel.svelte`, `resources/js/types/generation.ts`,
 `tests/Unit/*GeneratorTest.php`, `tests/Unit/GeneratorPurityTest.php`,
-`tests/Feature/Gamemaster/GenerationTest.php`, `tests/Feature/GenerationModelTest.php`
+`tests/Feature/Gamemaster/GenerationTest.php`, `tests/Feature/GenerationModelTest.php`,
+`tests/Pest.php`
 
 A game's world is built in **stages**, by its gamemaster, while the game is in `Setup`: generate from
-a seed, review, then accept or try another seed. Accepting unlocks the next stage. There are four —
-`Cluster` (100 locations), `Stelliums` (one star group per location, 141 stars in all), `Planets`
-(one to ten around every star) and `HomeStellia` (one starting system per player). Read
-[games.md](games.md) for the seed itself, [gamemaster.md](gamemaster.md) for the area's gate, and
-[home-stellia.md](home-stellia.md) for the last stage, which is unlike the other three in three ways
-and adds no routes at all.
+a seed, review, then accept or try another seed. Accepting unlocks the next stage. There are five, in
+this order:
+
+1. `Cluster` — 100 locations;
+2. `Stelliums` — one star group per location, 141 stars in all;
+3. `HomeStelliaTemplate` — the home system every player will begin in;
+4. `HomeStellia` — which systems those are, one per player;
+5. `Planets` — one to ten around every star, **except** a home system, which is copied from the
+   template.
+
+Read [games.md](games.md) for the seed itself, [gamemaster.md](gamemaster.md) for the area's gate,
+[home-template.md](home-template.md) for the third stage and [home-stellia.md](home-stellia.md) for
+the fourth.
+
+**The last three are in that order because of a dependency, not a preference.** The planets stage used
+to run third and draw every star alike; it now runs last because a home system is *copied* rather than
+drawn, so it needs both the template to copy and the arrangement that says where to copy it. Anyone
+tempted to move the planets back should read the top of `GeneratePlanets` first.
 
 ## A generator draws from its seed and from **nothing** else
 
@@ -67,6 +80,14 @@ the pending run — the row and its seed survive, whatever it wrote (locations, 
 deleted — because the seeds that were tried are the debugging record, while only one cluster can be
 the game's at a time. `attempt` counts superseded runs too, so "attempt 3" keeps meaning the third time somebody
 asked.
+
+**Inputs are columns on the run; artefacts get tables.** That is the line to hold when adding
+anything: `seed`, `traveler`, `minimum_separation`, `separation_in_hexes` and `template` are all
+records of what somebody *asked for*, so they live on the run and survive being superseded, while
+locations, stelliums, stars, planets and home stelliums are what a run *produced* and are deleted by
+its `discard()`. `template` is the one that looks like it wants a table of its own — it is a list of
+nine planets — and putting it in one would mean a superseded template run losing the very document
+that identifies it, which is the thing a seed exists to be.
 
 The game's generation state is derived from those runs by `Game::generationStateFor()`; there is **no
 `generation_stage` column**, and adding one would create a copy that can disagree with the rows it
@@ -219,6 +240,16 @@ why the percentages read as the counts today.
 expected planets a game** and 1,410 at the very most. They are numbered outward, and a planet's
 position in its system decides what kind of thing it is.
 
+*Except a star somebody begins at.* `generate()` takes a third argument naming those by their index in
+the star count, with the planets the game's template settled. Those systems skip the count roll and
+the type and habitability rolls and **draw only their deposits** — which is exactly what a home is
+allowed to differ in, and why the parameter is a list of planets rather than a flag. It comes off the
+same single stream in star order, so naming a home changes what the stars *after* it get; that is the
+correct behaviour and a test pins it. Two things follow that are easy to trip over: a given seed
+produces different planets than it did before the parameter existed (a deliberate break, taken when
+the stages were reordered), and the generator still never learns what a "home" is — it is handed a
+list and an index, and `GeneratePlanets` is what knows the rest.
+
 *The zones come from our own solar system, and the arithmetic is integer.* Of nine bodies, orbits 1–4
 are rocky, 5 is the belt, 6–7 are gas giants, 8–9 are ice giants — so `ZONE_BOUNDARIES` is `[4, 5, 7]`
 out of `SOLAR_SYSTEM_ORBITS`, and a star with nine planets reproduces that arrangement exactly. A
@@ -345,9 +376,17 @@ Three smaller things that are load-bearing:
 ## Smaller decisions worth not re-litigating
 
 - **One controller, three routes, stage as a route parameter.** `{stage}` binds to the enum, so an
-  unknown stage 404s with no code and the planets stage adds no routes, no controller methods and no
-  screen wiring. `StageGenerationRegistry` maps stage → action with a `match`, so adding a case without
-  an implementation is a static-analysis error rather than a silently missing stage.
+  unknown stage 404s with no code, and neither the planets stage nor the home stellia nor the template
+  added a route, a controller method or any screen wiring. `StageGenerationRegistry` maps stage →
+  action with a `match`, so adding a case without an implementation is a static-analysis error rather
+  than a silently missing stage.
+
+  **The template stage is the one that nearly broke this, and did not.** It is settled by a *file*,
+  which looks like a reason for an endpoint of its own; it is not, because the stage is still run from
+  a seed and the document rides beside it exactly as `traveler` rides with the cluster. `store()` just
+  takes a multipart request. The gamemaster area therefore still holds **ten** routes and
+  `GameManagementTest`'s sweep passes untouched — worth knowing before adding an eleventh for the next
+  stage that carries something bulky.
 - **`RunGeneration` owns the transaction and the bookkeeping**; a `StageGeneration` implementation only
   writes and discards its own rows. A generator that throws must leave the game exactly as it was
   rather than with a run row claiming a cluster that was never written.

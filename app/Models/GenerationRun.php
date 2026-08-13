@@ -30,6 +30,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * is gone, because only one set of those can be the game's at a time. That asymmetry is the design —
  * the attempt is history, its output was never the game's.
  *
+ * ## What the run was asked for lives here; what it produced does not
+ *
+ * `seed`, `traveler`, `minimum_separation`, `separation_in_hexes` and `template` are all **inputs**:
+ * the record of what somebody asked for, which is why they survive being superseded while the rows
+ * they produced do not. `template` is the odd-looking one only because it is large — it is the home
+ * system every player begins in, either parsed from an uploaded document or drawn from `seed`, and
+ * it is on the run for exactly the reason the seed is. See the migration that adds it.
+ *
  * @property int $id
  * @property int $game_id
  * @property GenerationStage $stage
@@ -37,6 +45,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $traveler
  * @property int $minimum_separation
  * @property bool $separation_in_hexes
+ * @property array<string, mixed>|null $template
  * @property int $attempt
  * @property array<string, mixed>|null $summary
  * @property CarbonImmutable|null $accepted_at
@@ -167,6 +176,7 @@ class GenerationRun extends Model
             'traveler' => 'boolean',
             'minimum_separation' => 'integer',
             'separation_in_hexes' => 'boolean',
+            'template' => 'array',
             'attempt' => 'integer',
             'summary' => 'array',
             'accepted_at' => 'datetime',

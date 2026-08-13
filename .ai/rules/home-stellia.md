@@ -12,6 +12,10 @@ Every player's faction starts somewhere: a single-star system, a set number of h
 other. Read [generation.md](generation.md) first — this is the fourth stage of the machine described
 there, and every rule about *when* a stage may run applies here unchanged and is not repeated.
 
+**It is no longer the last stage.** The planets follow it, because a home system is copied from the
+game's template rather than drawn and this stage is what settles which systems are homes. See
+[home-template.md](home-template.md) for the stage before it, which it now waits on.
+
 ## It is a **stage**, which is why it added no routes
 
 The obvious build is a screen of its own: pick a player, click a hex, confirm, repeat. It was designed
@@ -34,8 +38,8 @@ Two consequences worth stating so nobody looks for the missing piece:
 
 - **There is no `HomeStelliumController` and no home stellia route.** `{stage}` binds to the enum, so
   the three existing generation routes serve it. The gamemaster area still holds exactly **ten**
-  routes, and `GameManagementTest`'s sweep passes unchanged — that sweep is now also what keeps the
-  disabled template-upload block on the screen inert.
+  routes and `GameManagementTest`'s sweep passes unchanged — which stayed true even when the template
+  stage arrived carrying a file upload, for the reason [generation.md](generation.md) gives.
 - **Nothing about this is a fifth item on [gamemaster.md](gamemaster.md)'s list** of things a
   gamemaster may not do. That list is about the *requester*; the refusals here are the stage machine's
   ordinary ones about the game's state, and an administrator would be refused identically.
@@ -188,6 +192,8 @@ already rolled back, so nothing is written.
   quietly wrong on the rest, the failure [generation.md](generation.md) says the map must keep
   avoiding. The locations table and the roster both name the home in text for the same reason the star
   legend is not optional: the glow must never be the only channel.
-- **The template-upload block is inert UI** — no route, no controller, no column. It says in the
-  interface that placing homes from a prepared file is where this is going, and the route sweep is what
-  keeps it from quietly acquiring an endpoint.
+- **The template-upload block used to be inert UI on this card and is now a stage of its own.** It sat
+  here disabled, saying in the interface that placing homes from a prepared file was where this was
+  going. It went somewhere slightly different — the document describes the home *system* rather than
+  where the homes go — so it moved to the stage before this one. See
+  [home-template.md](home-template.md); nothing about the upload lives on this card any more.

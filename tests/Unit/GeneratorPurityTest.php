@@ -2,6 +2,8 @@
 
 use App\Generation\ClusterGenerator;
 use App\Generation\HomeStelliumGenerator;
+use App\Generation\HomeTemplate;
+use App\Generation\HomeTemplateGenerator;
 use App\Generation\PlanetGenerator;
 use App\Generation\SeededRandomizer;
 use App\Generation\StelliumGenerator;
@@ -41,6 +43,7 @@ function seededGenerators(): array
          * drawn that way honours every separation and simply lands somewhere else next time.
          */
         HomeStelliumGenerator::class,
+        HomeTemplateGenerator::class,
     ];
 }
 
@@ -52,15 +55,20 @@ function seededGenerators(): array
  * randomizer and so never calls `SeededRandomizer::for`, which would fail the containment test below;
  * and the tempting fix, calling `SeededRandomizer::for` inside the helper, is a genuine bug, because it
  * would restart the stream on every call and make every planet in a game identical. So a helper
- * belongs on this list and not on that one. There is no such helper today — `PlanetGenerator` keeps
- * its `roll()` and `pick()` private for exactly this reason — and the split is what makes adding one
- * safe rather than a trap.
+ * belongs on this list and not on that one. `PlanetGenerator` keeps its `roll()` and `pick()` private
+ * for exactly this reason, and the split is what makes adding a shared one safe rather than a trap.
+ *
+ * `HomeTemplate` is the first entry that is on this list and not on that one, though for the other
+ * reason a class can be: it **parses** rather than draws. A template read out of an uploaded document
+ * has no seed and must not acquire one — a "sensible default" filled in with `random_int()` for a
+ * field somebody left out would be a home that differed between players, which is the one thing the
+ * whole stage exists to prevent.
  *
  * @return array<int, class-string>
  */
 function generationSources(): array
 {
-    return seededGenerators();
+    return [...seededGenerators(), HomeTemplate::class];
 }
 
 test('nothing in the generation subsystem reaches for an unseeded source of randomness', function (string $class) {

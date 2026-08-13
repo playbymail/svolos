@@ -68,6 +68,11 @@
      * stellium has, so its keys are bare numbers and would read as "1 342" without the noun. That is
      * why `mix` is named here and nothing else is — a stage whose keys already say what they are
      * should not have to be added to this function.
+     *
+     * A key whose value is **null** is dropped rather than printed. Null means the stage had nothing
+     * to record — a template that was drawn rather than read from a file, a lone home with no nearest
+     * neighbour to measure against — and `String(null)` renders that as the word "null" beside a
+     * label, which reads as a fault rather than as an absence.
      */
     function summaryEntries(
         summary: Record<string, unknown> | null,
@@ -77,7 +82,11 @@
         }
 
         return Object.entries(summary).flatMap(([key, value]) => {
-            if (value !== null && typeof value === 'object') {
+            if (value === null) {
+                return [];
+            }
+
+            if (typeof value === 'object') {
                 return Object.entries(value as Record<string, unknown>).map(
                     ([name, count]) => ({
                         key: `${key}.${name}`,
@@ -114,6 +123,48 @@
     let separationInHexes = $derived(stage.separation_in_hexes ?? false);
 
     const separationUnit = $derived(separationInHexes ? 'hexes' : 'distance');
+
+    /*
+     * Which of the two ways to settle a template the gamemaster is using. Writable off nothing, unlike
+     * the separation above: there is no stored flag to inherit, because a run remembers the *document*
+     * it read and not which control produced it. Starting unticked makes uploading the default, which
+     * is the deliberate choice — a game whose homes are decided in advance is the reason the stage
+     * exists, and drawing one is the fallback.
+     *
+     * The file input is disabled rather than hidden while the box is ticked, so the layout does not
+     * move under the pointer as somebody makes up their mind. A disabled input posts nothing, which is
+     * exactly what `required_without:generate_template` expects.
+     */
+    let generateTemplate = $state(false);
+
+    const isTemplateStage = $derived(stage.stage === 'home_stellia_template');
+
+    /**
+     * A document of the shape the parser accepts, for the gamemaster writing their first one.
+     *
+     * Kept short — three planets rather than nine — because it is a shape to copy rather than a
+     * template to use: what it has to show is the two keys every planet needs and the four more that
+     * only the home world carries.
+     */
+    const exampleTemplate = JSON.stringify(
+        {
+            planets: [
+                { ordinal: 1, type: 'rocky', habitability: 4 },
+                {
+                    ordinal: 2,
+                    type: 'rocky',
+                    habitability: 25,
+                    home: true,
+                    fuel: 5,
+                    metals: 5,
+                    minerals: 5,
+                },
+                { ordinal: 3, type: 'icy', habitability: 1 },
+            ],
+        },
+        null,
+        2,
+    );
 </script>
 
 <section
@@ -273,7 +324,11 @@
                             the same number really does produce a different arrangement, and the
                             "choose a different seed" rule is switched off for it on the server too.
                         -->
-                        {#if stage.state !== 'review'}
+                        {#if isTemplateStage && !generateTemplate}
+                            The seed is recorded either way. An uploaded
+                            template is read from the document rather than drawn
+                            from it, so any seed will do here.
+                        {:else if stage.state !== 'review'}
                             The same seed always produces the same result, which
                             is what makes a game reproducible.
                         {:else if stage.stage === 'home_stellia'}
@@ -300,15 +355,20 @@
                     >
                         {#if processing}
                             <Spinner />
+                        {:else if isTemplateStage && !generateTemplate}
+                            <Upload class="h-4 w-4" />
                         {:else}
                             <Dices class="h-4 w-4" />
                         {/if}
                         <!--
-                            "Try another seed" is the wrong label for the one stage where the seed
-                            need not change: there, regenerating is asking for another arrangement of
-                            the same world.
+                            "Try another seed" is the wrong label for the two stages where the seed
+                            need not change: for the home stellia, regenerating is asking for another
+                            arrangement of the same world, and for an uploaded template the seed had
+                            nothing to do with what came out.
                         -->
-                        {#if stage.state !== 'review'}
+                        {#if isTemplateStage && !generateTemplate}
+                            Upload
+                        {:else if stage.state !== 'review'}
                             Generate
                         {:else if stage.stage === 'home_stellia'}
                             Try another arrangement
@@ -317,6 +377,81 @@
                         {/if}
                     </Button>
                 </div>
+
+                {#if isTemplateStage}
+                    <!--
+                        The two ways to settle a template, as one control and its alternative. They
+                        share this stage's single form and its single submit, because they are two
+                        answers to one question rather than two things a gamemaster might do.
+
+                        The file input keeps the `data-test` hooks the inert placeholder that stood
+                        here carried, since they named the right things all along.
+                    -->
+                    <div class="grid gap-2 sm:col-span-2">
+                        <Label
+                            for="generate-template-{stage.stage}"
+                            class="flex items-center space-x-3"
+                        >
+                            <Checkbox
+                                id="generate-template-{stage.stage}"
+                                name="generate_template"
+                                bind:checked={generateTemplate}
+                                data-test="generation-generate-template-input"
+                            />
+                            <span
+                                >Generate a template instead of uploading one</span
+                            >
+                        </Label>
+                        <p class="text-xs text-muted-foreground">
+                            {#if generateTemplate}
+                                Nine planets, with the third as the home world
+                                at the top of the habitability scale. What the
+                                seed decides is what they are worth.
+                            {:else}
+                                Upload the home system every player will begin
+                                in. Tick the box to have one drawn instead.
+                            {/if}
+                        </p>
+                    </div>
+
+                    <div
+                        class="grid gap-2 sm:col-span-2"
+                        data-test="home-stellia-template-upload"
+                    >
+                        <Label
+                            for="home-stellia-template"
+                            class={generateTemplate
+                                ? 'text-muted-foreground'
+                                : undefined}
+                        >
+                            Template document
+                        </Label>
+                        <Input
+                            id="home-stellia-template"
+                            type="file"
+                            name="template"
+                            accept="application/json,.json"
+                            disabled={generateTemplate}
+                            data-test="home-stellia-template-input"
+                        />
+                        <InputError message={errors.template} />
+
+                        <details class="text-xs text-muted-foreground">
+                            <summary class="cursor-pointer">
+                                What a template document looks like
+                            </summary>
+                            <p class="mt-2">
+                                Every planet needs a type and a habitability.
+                                Exactly one carries <code>"home": true</code> and
+                                its three deposits — that is the world the players
+                                begin on, and the only one identical for everybody.
+                                The rest are drawn for each player.
+                            </p>
+                            <pre
+                                class="mt-2 overflow-x-auto rounded bg-muted p-2">{exampleTemplate}</pre>
+                        </details>
+                    </div>
+                {/if}
 
                 {#if stage.stage === 'cluster'}
                     <!--
@@ -422,58 +557,14 @@
         </Form>
     {/if}
 
-    {#if stage.stage === 'home_stellia' && canRun}
-        <!--
-            Not built yet, and shown anyway so the workflow reads honestly: placing homes from a
-            prepared file is how this stage is meant to work eventually, and generating them is the
-            interim. Inert in every sense — there is no route behind it, no controller method and no
-            column, and the gamemaster route sweep in `GameManagementTest` is what keeps it that way.
-        -->
-        <div
-            class="grid gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-4"
-            aria-disabled="true"
-            data-test="home-stellia-template-upload"
-        >
-            <div class="flex flex-wrap items-center gap-2">
-                <Label
-                    for="home-stellia-template"
-                    class="text-muted-foreground"
-                >
-                    Upload a home stellia template
-                </Label>
-                <Badge variant="outline">Future implementation</Badge>
-            </div>
-            <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <Input
-                    id="home-stellia-template"
-                    type="file"
-                    disabled
-                    tabindex={-1}
-                    data-test="home-stellia-template-input"
-                />
-                <Button
-                    type="button"
-                    variant="secondary"
-                    disabled
-                    tabindex={-1}
-                    data-test="home-stellia-template-button"
-                >
-                    <Upload class="h-4 w-4" />
-                    Upload
-                </Button>
-            </div>
-            <p class="text-xs text-muted-foreground">
-                A template will one day place every home from a prepared file,
-                for a game whose starting positions are decided in advance.
-                Generate them above for now.
-            </p>
-        </div>
-    {/if}
-
     {#if stage.history.length > 0}
         <!--
-            The seeds that were tried and dropped. They produced nothing that still exists, so the
-            number is all that is left of them — and it is the thing worth keeping.
+            The attempts that were tried and dropped. They produced nothing that still exists, so what
+            was asked for is all that is left of them — and it is the thing worth keeping.
+
+            Which is the seed, except for a template read from a document: there the number decided
+            nothing and the file name is what somebody would recognise. Both are on the payload, and
+            the one that identifies the attempt is the one shown.
         -->
         <details class="text-sm" data-test="generation-history-{stage.stage}">
             <summary class="cursor-pointer text-muted-foreground">
@@ -483,9 +574,10 @@
             <ul class="mt-2 space-y-1">
                 {#each stage.history as attempt (attempt.attempt)}
                     <li class="text-muted-foreground">
-                        Attempt {attempt.attempt} · seed
+                        Attempt {attempt.attempt} ·
+                        {attempt.file ? 'file' : 'seed'}
                         <code class="rounded bg-muted px-1 py-0.5 text-xs">
-                            {attempt.seed}
+                            {attempt.file ?? attempt.seed}
                         </code>
                         · {attempt.generated_at_diff ?? '—'}
                     </li>

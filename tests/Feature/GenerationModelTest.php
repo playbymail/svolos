@@ -113,35 +113,24 @@ test('generation is complete only when every stage has been accepted', function 
     /*
      * The check sweeps `GenerationStage::cases()` rather than naming the last stage, so adding a stage
      * makes every unfinished game incomplete again — which is the intended behaviour, and the reason
-     * this asserts against the enum rather than against a number. Adding the planets stage is what
-     * this comment used to predict; the next stage will need one more step below and nothing else.
+     * this asserts against the enum rather than against a number.
+     *
+     * **The walk is over `cases()` too, and that is the point of writing it this way.** Spelled out
+     * stage by stage, this test had to be rewritten every time one was added and again when they were
+     * reordered — and each rewrite was a chance to encode the new order in two places instead of one.
+     * Driven by the enum it asserts nothing about which stages exist, only that they open one at a
+     * time and in the declared order, which is the actual rule.
      */
     $game = Game::factory()->create();
     $game->load('generationRuns');
 
-    expect($game->isGenerationComplete())->toBeFalse();
-    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::Cluster);
+    foreach (GenerationStage::cases() as $stage) {
+        expect($game->isGenerationComplete())->toBeFalse();
+        expect($game->firstUnfinishedGenerationStage())->toBe($stage);
 
-    GenerationRun::factory()->for($game)->stage(GenerationStage::Cluster)->accepted()->create();
-    $game->load('generationRuns');
-
-    expect($game->isGenerationComplete())->toBeFalse();
-    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::Stelliums);
-
-    GenerationRun::factory()->for($game)->stage(GenerationStage::Stelliums)->accepted()->create();
-    $game->load('generationRuns');
-
-    expect($game->isGenerationComplete())->toBeFalse();
-    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::Planets);
-
-    GenerationRun::factory()->for($game)->stage(GenerationStage::Planets)->accepted()->create();
-    $game->load('generationRuns');
-
-    expect($game->isGenerationComplete())->toBeFalse();
-    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::HomeStellia);
-
-    GenerationRun::factory()->for($game)->stage(GenerationStage::HomeStellia)->accepted()->create();
-    $game->load('generationRuns');
+        GenerationRun::factory()->for($game)->stage($stage)->accepted()->create();
+        $game->load('generationRuns');
+    }
 
     expect($game->isGenerationComplete())->toBeTrue();
     expect($game->firstUnfinishedGenerationStage())->toBeNull();

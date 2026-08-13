@@ -3,6 +3,7 @@
 namespace App\Actions\Generation;
 
 use App\Enums\GenerationStage;
+use App\Generation\HomeTemplate;
 use App\Generation\PlanetGenerator;
 use App\Models\GenerationRun;
 use App\Models\Planet;
@@ -10,6 +11,21 @@ use App\Models\Star;
 
 /**
  * Writes the planets a planets run produced.
+ *
+ * ## The last stage, because two others decide what it writes
+ *
+ * A star somebody begins at does not get a drawn system. Its planets come from the game's accepted
+ * **home template** — the same count, types and habitability for every player — and only their
+ * deposits are drawn, so homes look identical and are worth different amounts to work. The home world
+ * itself is settled completely, deposits included, and is overwritten here after the generator has
+ * drawn over it.
+ *
+ * That is why this runs last: it needs the template to copy and the home stellia to know *which*
+ * systems to copy it into. It also means a given seed no longer produces the planets it produced when
+ * this stage ran third — fewer systems are drawn from scratch and the stream is spent differently.
+ * The break was the point of the reordering.
+ *
+ * ## Pairing
  *
  * The plan is a list of systems in star order, so it is paired with the game's stars read in the same
  * order. That order is two levels deep now, and both levels already carry it: `Game::locations()`
@@ -60,15 +76,34 @@ class GeneratePlanets implements StageGeneration
     public function handle(GenerationRun $run): array
     {
         $stars = $this->starsOf($run);
+        $template = $this->templateOf($run);
+        $homes = $this->homeStarIndexes($run, $stars);
 
-        $plan = $this->generator->generate($run->seed, count($stars));
+        $plan = $this->generator->generate(
+            $run->seed,
+            count($stars),
+            array_fill_keys($homes, $template->planets),
+        );
+
+        $homeOrbit = $template->homeOrdinal() - 1;
+        $homeWorld = $template->home();
 
         $now = now();
 
         $rows = [];
 
         foreach ($stars as $index => $star) {
+            $isHome = in_array($index, $homes, true);
+
             foreach ($plan->systems[$index]->planets as $orbit => $planet) {
+                /*
+                 * The one planet the template settles completely. The generator drew deposits for it
+                 * along with everything else — it does not know which orbit is anybody's home — and
+                 * this is where they are replaced, so that every player's home world is identical down
+                 * to the last column.
+                 */
+                $fixed = $isHome && $orbit === $homeOrbit;
+
                 $rows[] = [
                     'star_id' => $star->id,
                     'generation_run_id' => $run->id,
@@ -76,9 +111,9 @@ class GeneratePlanets implements StageGeneration
                     'ordinal' => $orbit + 1,
                     'type' => $planet->type->value,
                     'habitability' => $planet->habitability,
-                    'fuel' => $planet->fuel,
-                    'metals' => $planet->metals,
-                    'minerals' => $planet->minerals,
+                    'fuel' => $fixed ? $homeWorld->fuel : $planet->fuel,
+                    'metals' => $fixed ? $homeWorld->metals : $planet->metals,
+                    'minerals' => $fixed ? $homeWorld->minerals : $planet->minerals,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
@@ -89,7 +124,11 @@ class GeneratePlanets implements StageGeneration
             Planet::query()->insert($chunk);
         }
 
-        return $plan->summary();
+        return [
+            ...$plan->summary(),
+            'homes' => count($homes),
+            'home_planets' => count($template->planets),
+        ];
     }
 
     /**
@@ -105,6 +144,11 @@ class GeneratePlanets implements StageGeneration
      *
      * Locations by ordinal, then stars by ordinal within each — both orderings come from the relations
      * themselves, so this loop only flattens them.
+     *
+     * The stellium is set back onto each star on the way past. It is the record already in hand, and
+     * `homeStarIndexes()` needs `location_id` off it — without this the inverse relation is not loaded
+     * and reading it would lazily fetch a stellium per star, which is 141 queries for something this
+     * loop is holding.
      *
      * @return list<Star>
      */
@@ -125,10 +169,60 @@ class GeneratePlanets implements StageGeneration
             }
 
             foreach ($stellium->stars as $star) {
+                $star->setRelation('stellium', $stellium);
+
                 $stars[] = $star;
             }
         }
 
         return $stars;
+    }
+
+    /**
+     * Read the home template this run's game accepted.
+     *
+     * Unconditional, because the stage cannot run until the template stage has been accepted — that is
+     * `Game::generationStateFor()`'s doing, and the controller refuses anything else with a 403. A
+     * fallback here would be a second, weaker copy of that rule, and the shape it would have to invent
+     * is exactly the thing the template exists to stop being invented.
+     */
+    private function templateOf(GenerationRun $run): HomeTemplate
+    {
+        $template = $run->game->generationRunFor(GenerationStage::HomeStelliaTemplate)?->template;
+
+        return HomeTemplate::fromArray($template ?? []);
+    }
+
+    /**
+     * Find which stars in the canonical order somebody begins at.
+     *
+     * A home stands at a single-star system — `GenerateHomeStellia` draws only from those — so each
+     * home location contributes exactly one star, and the index of that star in the flattened order is
+     * all the generator needs to be told.
+     *
+     * Matching on `stellium->location_id` rather than re-walking the locations keeps this to the
+     * collection already loaded by `starsOf()`'s eager load, and the home locations come from the
+     * accepted arrangement rather than from any property of the system itself: being somebody's home
+     * is a fact about the roster, not about the stars.
+     *
+     * @param  list<Star>  $stars
+     * @return list<int>
+     */
+    private function homeStarIndexes(GenerationRun $run, array $stars): array
+    {
+        $homeLocations = $run->game->generationRunFor(GenerationStage::HomeStellia)
+            ?->homeStelliums()
+            ->pluck('location_id')
+            ->all() ?? [];
+
+        $indexes = [];
+
+        foreach ($stars as $index => $star) {
+            if (in_array($star->stellium->location_id, $homeLocations, true)) {
+                $indexes[] = $index;
+            }
+        }
+
+        return $indexes;
     }
 }

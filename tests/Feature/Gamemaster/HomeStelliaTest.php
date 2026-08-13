@@ -16,11 +16,14 @@ use Inertia\Testing\AssertableInertia as Assert;
 | Giving every player somewhere to begin
 |--------------------------------------------------------------------------
 |
-| The fourth and last generation stage, and it is a **stage** rather than a screen of its own for the
-| reason the whole subsystem is built that way: run from a seed, review, accept or try again, and lose
-| it all when somebody starts over. That decision is what this file is really testing — it adds no
-| routes, so everything about *when* it may run is already covered by `GenerationTest`, and what is
-| left is what makes this stage different from the three before it.
+| The fourth generation stage, and it is a **stage** rather than a screen of its own for the reason the
+| whole subsystem is built that way: run from a seed, review, accept or try again, and lose it all when
+| somebody starts over. That decision is what this file is really testing — it adds no routes, so
+| everything about *when* it may run is already covered by `GenerationTest`, and what is left is what
+| makes this stage different from the ones around it.
+|
+| It is no longer last. The planets stage follows it, because a home system is copied from the game's
+| template rather than drawn, and which systems are homes is what this stage settles.
 |
 | Three things are different, and each has tests here:
 |
@@ -32,26 +35,6 @@ use Inertia\Testing\AssertableInertia as Assert;
 |   the stage was accepted has no home, which is the hole `gameStatusRules()` covers.
 |
 */
-
-/**
- * Take a game as far as accepted planets, and hand back its gamemaster.
- *
- * The real generators throughout, because the home stellia stage draws from what they produced: it
- * needs single-star systems at real coordinates, and a fabricated cluster would not tell us whether
- * the separation rule can actually be satisfied.
- */
-function withAcceptedPlanets(Game $game): User
-{
-    $gamemaster = withAcceptedStelliums($game);
-
-    generateStage($gamemaster, $game, GenerationStage::Planets, 88_213);
-
-    test()->actingAs($gamemaster)->post(
-        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'planets'])
-    );
-
-    return $gamemaster;
-}
 
 /**
  * Generate the home stellia, optionally at a separation other than the default.
@@ -75,20 +58,7 @@ function generateHomes(User $gamemaster, Game $game, int $seed, ?int $separation
     );
 }
 
-/**
- * Seat some players at a game, in a fixed order.
- *
- * @return array<int, GameSeat>
- */
-function seatPlayers(Game $game, int $count): array
-{
-    return array_map(
-        fn (): GameSeat => GameSeat::factory()->for($game)->for(User::factory())->create(),
-        range(1, $count),
-    );
-}
-
-test('the stage is locked until the planets have been accepted', function () {
+test('the stage is locked until the home template has been accepted', function () {
     $game = Game::factory()->create();
     $gamemaster = withAcceptedStelliums($game);
 
@@ -104,7 +74,7 @@ test('the stage is locked until the planets have been accepted', function () {
 
 test('a gamemaster places one home per player, single-starred and well clear of each other', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     $seats = seatPlayers($game, 4);
 
@@ -149,7 +119,7 @@ test('ticking the box counts the separation in hexes instead', function () {
      * column are well apart through space and zero apart on the map.
      */
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     seatPlayers($game, 4);
 
@@ -179,7 +149,7 @@ test('the same seed and separation give different arrangements under the two mea
      * that this is a choice and not a label.
      */
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     seatPlayers($game, 4);
 
@@ -194,7 +164,7 @@ test('the same seed and separation give different arrangements under the two mea
 
 test('the summary reports what was asked for and what was achieved', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     seatPlayers($game, 3);
 
@@ -222,7 +192,7 @@ test('generating again with the same seed is allowed, and lands somewhere else',
      * not — and the rule is switched off in `GenerationRunRequest` to match.
      */
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     seatPlayers($game, 4);
 
@@ -246,7 +216,7 @@ test('a separation this cluster cannot satisfy is a message on that field, not a
      * rejected field naming the dial that has to move, and nothing is written.
      */
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     seatPlayers($game, 6);
 
@@ -259,7 +229,7 @@ test('a separation this cluster cannot satisfy is a message on that field, not a
 
 test('a separation wider than the cluster is refused before a generator runs', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     seatPlayers($game, 2);
 
@@ -272,7 +242,7 @@ test('gamemasters and retired seats are not given homes', function () {
      * a starting system for either would put a faction on the map that nobody is playing.
      */
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     [$playing] = seatPlayers($game, 1);
 
@@ -287,7 +257,7 @@ test('gamemasters and retired seats are not given homes', function () {
 
 test('a game with no players generates an empty arrangement and is still acceptable', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     generateHomes($gamemaster, $game, 4242)->assertRedirect();
 
@@ -297,12 +267,24 @@ test('a game with no players generates an empty arrangement and is still accepta
         route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'home_stellia'])
     )->assertRedirect();
 
-    expect($game->load('generationRuns')->isGenerationComplete())->toBeTrue();
+    /*
+     * An empty arrangement is a real one: the stage is accepted and the planets open behind it, rather
+     * than the game stalling on a stage that had nothing to do.
+     */
+    expect($game->load('generationRuns')->generationStateFor(GenerationStage::HomeStellia)->value)
+        ->toBe('accepted');
+    expect($game->generationStateFor(GenerationStage::Planets)->value)->toBe('ready');
 });
 
-test('accepting the home stellia is what completes the generation', function () {
+test('a game is not complete until the planets are drawn over the homes', function () {
+    /*
+     * This stage used to be the one that finished a world, and it is no longer: the planets follow it,
+     * because a home system is copied from the template rather than drawn and this is what decides
+     * which systems those are. Asserted from here as well as from `GenerationTest` because the order
+     * of these two in particular is the whole reason the workflow was rearranged.
+     */
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     seatPlayers($game, 2);
     generateHomes($gamemaster, $game, 4242);
@@ -311,6 +293,15 @@ test('accepting the home stellia is what completes the generation', function () 
 
     $this->actingAs($gamemaster)->post(
         route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'home_stellia'])
+    )->assertRedirect();
+
+    expect($game->load('generationRuns')->isGenerationComplete())->toBeFalse();
+    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::Planets);
+
+    generateStage($gamemaster, $game, GenerationStage::Planets, 88_213);
+
+    $this->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'planets'])
     )->assertRedirect();
 
     expect($game->load('generationRuns')->isGenerationComplete())->toBeTrue();
@@ -324,7 +315,7 @@ test('starting the generation over takes every home with it, and leaves the rost
      * them and there is no code anybody has to remember to write.
      */
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     seatPlayers($game, 3);
     generateHomes($gamemaster, $game, 4242);
@@ -344,7 +335,7 @@ test('starting the generation over takes every home with it, and leaves the rost
 
 test('the screen carries the arrangement, on the map and on the roster', function () {
     $game = Game::factory()->create();
-    $gamemaster = withAcceptedPlanets($game);
+    $gamemaster = withAcceptedTemplate($game);
 
     $seats = seatPlayers($game, 2);
     generateHomes($gamemaster, $game, 4242, 7, inHexes: true);

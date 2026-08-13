@@ -13,6 +13,22 @@ use Random\Randomizer;
  * not which — nothing about one planet system depends on another, so the shape of the cluster is
  * information this class could not use and deliberately never sees.
  *
+ * ## Some systems are settled before this runs, and only their deposits are drawn
+ *
+ * A star somebody begins at gets its planets from the game's home template rather than from the dice:
+ * the same count, the same types and the same habitability for every player, so nobody starts with a
+ * better home than anybody else. `$homeSystems` maps a star's **index in the count** to that template,
+ * and those systems skip the count roll and the type and habitability rolls.
+ *
+ * They do **not** skip the deposit rolls, and that is the point of the feature: what a home system is
+ * worth to mine is drawn for each player separately. So two players' homes are identical to look at
+ * and different to work.
+ *
+ * All of it comes off the same single stream, in star order, so a seed still describes one fixed
+ * cluster. What it describes changed when this parameter arrived — a given seed produces different
+ * planets than it did before homes existed, because the draws no longer happen in the same order.
+ * That was a deliberate break, not a regression.
+ *
  * ## Where a planet sits decides what it is
  *
  * Each star gets `PLANET_DICE` planets, numbered outward from 1. A planet's position in its system is
@@ -154,27 +170,79 @@ class PlanetGenerator
     /**
      * Give each of a cluster's stars its planets, in the order the stars were counted.
      *
+     * `$homeSystems` names the stars somebody begins at, by their position in that same order, and
+     * gives each the planets its game's template settled — see the class docblock for why those are
+     * still drawn against here rather than skipped.
+     *
+     * @param  array<int, list<HomeTemplatePlanet>>  $homeSystems
+     *
      * @throws GenerationFailed if a zone's weights do not cover the roll made against them
      */
-    public function generate(int $seed, int $starCount): PlanetPlan
+    public function generate(int $seed, int $starCount, array $homeSystems = []): PlanetPlan
     {
         $randomizer = SeededRandomizer::for($seed);
 
         $systems = [];
 
         for ($star = 0; $star < $starCount; $star++) {
-            $count = $this->roll($randomizer, self::PLANET_DICE);
-
-            $planets = [];
-
-            for ($ordinal = 1; $ordinal <= $count; $ordinal++) {
-                $planets[] = $this->profile($randomizer, $ordinal, $count);
-            }
-
-            $systems[] = new PlanetSystem($planets);
+            $systems[] = isset($homeSystems[$star])
+                ? $this->homeSystem($randomizer, $homeSystems[$star])
+                : $this->drawnSystem($randomizer);
         }
 
         return new PlanetPlan($systems);
+    }
+
+    /**
+     * Draw a whole system: how many planets, then what each of them is.
+     *
+     * @throws GenerationFailed
+     */
+    private function drawnSystem(Randomizer $randomizer): PlanetSystem
+    {
+        $count = $this->roll($randomizer, self::PLANET_DICE);
+
+        $planets = [];
+
+        for ($ordinal = 1; $ordinal <= $count; $ordinal++) {
+            $planets[] = $this->profile($randomizer, $ordinal, $count);
+        }
+
+        return new PlanetSystem($planets);
+    }
+
+    /**
+     * Fill in a system whose planets were settled in advance.
+     *
+     * How many planets there are, what each one is and how habitable it is all come from the template,
+     * so **the only thing drawn here is the deposits**. That is the whole of what a home template
+     * leaves to chance: every player's home looks identical on the map and differs in what it is worth
+     * to mine.
+     *
+     * The home world's three deposits are drawn and then thrown away by `GeneratePlanets`, which
+     * overwrites them with the template's own. Drawing them anyway keeps the schedule uniform at three
+     * rolls a planet — a generator whose draw count depended on which planet was somebody's home would
+     * be a rule this class has no business knowing, and it never learns what a "home" is.
+     *
+     * @param  list<HomeTemplatePlanet>  $template
+     */
+    private function homeSystem(Randomizer $randomizer, array $template): PlanetSystem
+    {
+        $planets = [];
+
+        foreach ($template as $planet) {
+            $deposits = self::DEPOSIT_DICE[$planet->type->value];
+
+            $planets[] = new PlanetProfile(
+                $planet->type,
+                $planet->habitability,
+                $this->roll($randomizer, $deposits['fuel']),
+                $this->roll($randomizer, $deposits['metals']),
+                $this->roll($randomizer, $deposits['minerals']),
+            );
+        }
+
+        return new PlanetSystem($planets);
     }
 
     /**
