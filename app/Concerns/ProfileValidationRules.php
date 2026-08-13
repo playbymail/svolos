@@ -34,12 +34,18 @@ trait ProfileValidationRules
     /**
      * Get the validation rules used to validate user emails.
      *
+     * `$required` exists for the one caller that may legitimately be handed nothing: creating an
+     * agent, where leaving the address out means "derive one on the reserved domain" rather than
+     * "forgot to fill this in". It swaps `required` for `nullable` and changes nothing else, so an
+     * address that *is* supplied is held to exactly the same shape and uniqueness as everywhere
+     * else. Every other caller wants the default.
+     *
      * @return array<int, ValidationRule|array<mixed>|string>
      */
-    protected function emailRules(?int $userId = null): array
+    protected function emailRules(?int $userId = null, bool $required = true): array
     {
         return [
-            'required',
+            $required ? 'required' : 'nullable',
             'string',
             'email',
             'max:255',

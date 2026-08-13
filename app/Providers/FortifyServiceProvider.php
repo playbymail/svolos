@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -41,6 +43,44 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
+
+        $this->refuseAgentSignIn();
+    }
+
+    /**
+     * Refuse the login form to an agent account, whatever it posts.
+     *
+     * Agents authenticate by bearer token against `api/*` and have no business on the sign-in form.
+     * They already hold an unusable 64-character password nobody has ever seen, so this callback is
+     * not what stops a guess — it is what makes the refusal a *rule* rather than a lucky consequence
+     * of the password being long. See `.ai/rules/agents.md`, which lists this as one of the four
+     * places a person could otherwise reach an agent account.
+     *
+     * The credentials are checked **first**, by the framework, and the account is only then rejected.
+     * That ordering is the point: a wrong password and a correct password on an agent account fail
+     * identically, so the form cannot be used to work out which addresses belong to agents.
+     * `Auth::validate()` is what does the checking, so the hasher, the `Validated` event and the
+     * timebox that guards against user enumeration all stay the framework's business rather than
+     * being reimplemented here.
+     *
+     * One known consequence: `Auth::validate()` does not rehash a password whose hashing cost is out
+     * of date, which `Auth::attempt()` would have done. Nothing in this application changes the
+     * hashing configuration, so the cost never goes stale — but if it ever does, this is why old
+     * hashes stop being upgraded at sign-in.
+     */
+    private function refuseAgentSignIn(): void
+    {
+        Fortify::authenticateUsing(function (Request $request): ?User {
+            $username = (string) $request->input(Fortify::username());
+
+            if (! Auth::validate([Fortify::username() => $username, 'password' => $request->input('password')])) {
+                return null;
+            }
+
+            $user = User::query()->where(Fortify::username(), $username)->first();
+
+            return $user instanceof User && ! $user->isAgent() ? $user : null;
+        });
     }
 
     /**

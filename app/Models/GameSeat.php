@@ -43,6 +43,7 @@ use Illuminate\Support\Carbon;
  * @property-read Game $game
  * @property-read User $user
  * @property-read HomeStellium|null $homeStellium
+ * @property-read AgentCredential|null $agentCredential
  */
 #[Fillable(['user_id', 'role'])]
 class GameSeat extends Model
@@ -102,6 +103,24 @@ class GameSeat extends Model
     public function homeStellium(): HasOne
     {
         return $this->hasOne(HomeStellium::class);
+    }
+
+    /**
+     * Get the bearer token an agent uses to act as this seat, if one has been issued.
+     *
+     * At most one, because `agent_credentials.game_seat_id` is unique: minting a replacement
+     * overwrites the row rather than leaving two live tokens for one seat.
+     *
+     * The relation is on the seat rather than on the account because a token authenticates as *this
+     * place at this game* and nothing wider. Note that a credential here does not make the account an
+     * agent — `users.is_agent` answers that, and the two come apart the moment an agent is delegated
+     * a person's seat. See `.ai/rules/agents.md`.
+     *
+     * @return HasOne<AgentCredential, $this>
+     */
+    public function agentCredential(): HasOne
+    {
+        return $this->hasOne(AgentCredential::class);
     }
 
     /**

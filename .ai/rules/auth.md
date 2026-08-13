@@ -10,10 +10,21 @@ Authentication is Laravel Fortify, headless, with Svelte pages for every screen.
 
 ## Registration is deliberately absent — `/register` must 404
 
-Accounts are created **only** by accepting an invitation, so `Features::registration()` is not in
-`config/fortify.php` and Fortify registers no `/register` routes. `Fortify::registerView()` and
+**Nobody creates their own account.** `Features::registration()` is not in `config/fortify.php`,
+Fortify registers no `/register` routes, `Fortify::registerView()` and
 `resources/js/pages/auth/Register.svelte` are gone, and neither `Login.svelte` nor `Welcome.svelte`
 links to a sign-up page.
+
+The rule is about *self-service*, not about there being one door. Three things create an account, and
+every one of them is somebody else deciding you should have it:
+
+- a person accepts an **invitation** an administrator sent ([invitations.md](invitations.md));
+- an operator with a shell runs **`app:create-admin`** ([roles.md](roles.md));
+- an administrator creates an **agent** on `/admin/agents` ([agents.md](agents.md)), which is an
+  account no person ever signs in to.
+
+Adding a fourth is a decision, not a convenience. What must not come back is a route a *stranger* can
+reach that ends in an account.
 
 This is the design, not an oversight. Do not "fix" the missing route, do not re-add the feature
 (not commented out, not behind a config flag), and do not restore a sign-up link.

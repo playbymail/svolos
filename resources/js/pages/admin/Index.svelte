@@ -13,6 +13,7 @@
 
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
+    import BotMessageSquare from 'lucide-svelte/icons/bot-message-square';
     import ChevronRight from 'lucide-svelte/icons/chevron-right';
     import Dices from 'lucide-svelte/icons/dices';
     import MailPlus from 'lucide-svelte/icons/mail-plus';
@@ -21,6 +22,7 @@
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';
     import { toUrl } from '@/lib/utils';
+    import { index as agentsIndex } from '@/routes/admin/agents';
     import { index as gamesIndex } from '@/routes/admin/games';
     import { index as invitationsIndex } from '@/routes/admin/invitations';
     import { index as sessionsIndex } from '@/routes/admin/sessions';
@@ -99,6 +101,29 @@
                 <p class="text-sm text-muted-foreground">
                     Create games and manage who sits at each one. A game role
                     applies to that game only.
+                </p>
+            </div>
+            <ChevronRight
+                class="ms-auto h-4 w-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+            />
+        </Link>
+
+        <Link
+            href={toUrl(agentsIndex())}
+            class="flex items-center gap-4 rounded-lg border border-border p-4 transition-colors hover:bg-accent"
+        >
+            <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted"
+                aria-hidden="true"
+            >
+                <BotMessageSquare class="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div class="space-y-0.5">
+                <p class="font-medium tracking-tight">Agents</p>
+                <p class="text-sm text-muted-foreground">
+                    Create accounts that play by themselves, and issue the
+                    tokens they sign in with.
                 </p>
             </div>
             <ChevronRight

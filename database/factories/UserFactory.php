@@ -66,6 +66,22 @@ class UserFactory extends Factory
     }
 
     /**
+     * Indicate that the account is driven by software rather than by a person.
+     *
+     * The address is on `.invalid` and the password is unguessable, matching what
+     * `App\Actions\Agents\CreateAgent` produces, so a test that reaches for this state gets an
+     * account the interactive sign-in surface refuses for the same reasons the real one does.
+     */
+    public function agent(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'is_agent' => true,
+            'email' => fake()->unique()->userName().'@agents.invalid',
+            'password' => Hash::make(Str::random(64)),
+        ]);
+    }
+
+    /**
      * Indicate that the model has confirmed two-factor authentication configured.
      *
      * The secret is a real base32 TOTP secret rather than a placeholder so tests can derive

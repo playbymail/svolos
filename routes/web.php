@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin\AgentController;
+use App\Http\Controllers\Admin\AgentCredentialController;
 use App\Http\Controllers\Admin\GameController;
 use App\Http\Controllers\Admin\GameSeatController;
 use App\Http\Controllers\Admin\InvitationController;
@@ -169,6 +171,45 @@ Route::middleware(['auth', 'verified', 'admin'])
             Route::put('games/{game}/seats/{seat}/role', [GameSeatController::class, 'updateRole'])->name('games.seats.role.update');
             Route::put('games/{game}/seats/{seat}/retire', [GameSeatController::class, 'retire'])->name('games.seats.retire');
             Route::put('games/{game}/seats/{seat}/reactivate', [GameSeatController::class, 'reactivate'])->name('games.seats.reactivate');
+        });
+
+        /*
+         * Agent accounts, and the tokens their seats authenticate with.
+         *
+         * Seating an agent is **not** here: an agent is added to a roster through the game's own seat
+         * routes above, like any other account, because a roster is one game's business and a
+         * gamemaster runs it. Only minting the credential is an administrator's, which is why these
+         * two routes hang off the agent rather than off the game.
+         *
+         * `scopeBindings()` makes the seat resolve through the agent's own seats, so a seat id
+         * belonging to somebody else 404s instead of being issued a token through the wrong agent's
+         * URL — the same reason the game seat routes are scoped. `User $user` therefore has to stay
+         * first in both controller signatures.
+         *
+         * The parameter is `{gameSeat}` rather than `{seat}` because scoping resolves the relation
+         * from the **parameter name**, not from the path segment: `{seat}` would look for
+         * `User::seats()`, and this side of the relation is deliberately called `gameSeats()` (see
+         * `App\Models\User`).
+         *
+         * The path says `credentials` and not `seats/{seat}/credential`, which would otherwise be the
+         * natural nesting. `GameSeatAdminTest` sweeps every route whose URI contains `seats` and
+         * fails any that accepts `DELETE`, because seats are retired and never deleted — and a revoke
+         * route nested under `seats` matches that sweep by wording alone. The invariant is worth more
+         * than the prettier URL, so the resource being addressed is named for what is actually
+         * deleted: the credential.
+         *
+         * The writes carry `throttle:6,1`, matching the invitation POST: both hand out a secret.
+         */
+        Route::get('agents', [AgentController::class, 'index'])->name('agents.index');
+        Route::get('agents/create', [AgentController::class, 'create'])->name('agents.create');
+        Route::post('agents', [AgentController::class, 'store'])->middleware('throttle:6,1')->name('agents.store');
+        Route::get('agents/{user}', [AgentController::class, 'show'])->name('agents.show');
+
+        Route::scopeBindings()->middleware('throttle:6,1')->group(function () {
+            Route::post('agents/{user}/credentials/{gameSeat}', [AgentCredentialController::class, 'store'])
+                ->name('agents.credential.store');
+            Route::delete('agents/{user}/credentials/{gameSeat}', [AgentCredentialController::class, 'destroy'])
+                ->name('agents.credential.destroy');
         });
 
         Route::get('users', [UserController::class, 'index'])->name('users.index');

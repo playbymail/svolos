@@ -33,6 +33,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property UserRole $role
+ * @property bool $is_agent
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
@@ -55,12 +56,14 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      *
      * The `role` default repeats the column default from
      * `database/migrations/..._add_role_to_users_table.php` so an unsaved `new User` already reads
-     * back as a member instead of hitting the enum cast with a null.
+     * back as a member instead of hitting the enum cast with a null. `is_agent` is here for the same
+     * reason: without it `isAgent()` returns null out of a `bool` return type on an unsaved model.
      *
      * @var array<string, mixed>
      */
     protected $attributes = [
         'role' => UserRole::Member->value,
+        'is_agent' => false,
     ];
 
     /**
@@ -69,6 +72,38 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     public function isAdmin(): bool
     {
         return $this->role === UserRole::Admin;
+    }
+
+    /**
+     * Determine whether this account is driven by software rather than by a person.
+     *
+     * An agent account holds seats and plays the game like anybody else; what differs is how it
+     * authenticates. It has no usable password and no mailbox, and the four places a human could
+     * otherwise reach it — the login attempt, a password reset, impersonation, and a role change —
+     * all read this method. See `.ai/rules/agents.md`.
+     */
+    public function isAgent(): bool
+    {
+        return $this->is_agent;
+    }
+
+    /**
+     * Send the password reset notification, unless this is an agent account.
+     *
+     * Returning early is the reset half of the isolation described on `isAgent()`. Agent addresses
+     * are on the non-routable `.invalid` domain, so nothing would arrive anyway — but "the mailbox
+     * does not exist" is a happy accident rather than a control, and a reset that completed would
+     * hand a person a working password for an account whose orders the engine attributes to an agent.
+     *
+     * @param  string  $token
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        if ($this->isAgent()) {
+            return;
+        }
+
+        parent::sendPasswordResetNotification($token);
     }
 
     /**
@@ -119,6 +154,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'is_agent' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
         ];
     }

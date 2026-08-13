@@ -23,7 +23,13 @@ use Inertia\Response;
 class UserController extends Controller
 {
     /**
-     * List every account with the facts an administrator needs to judge it.
+     * List every account a person signs in to, with the facts an administrator needs to judge it.
+     *
+     * Agent accounts are excluded and listed on `admin/agents` instead. Every column here is about
+     * how a human reaches an account — verification, two-factor, live sessions — and every one of
+     * them reads as an alarming blank for an account that authenticates by bearer token. The two
+     * writes on this screen refuse an agent outright, so listing them would only be offering controls
+     * that 403.
      *
      * The session count comes from a `withCount`, so a screen listing a hundred accounts still
      * issues one query rather than a hundred.
@@ -33,6 +39,7 @@ class UserController extends Controller
         $currentUser = $this->authenticatedUser($request);
 
         $users = User::query()
+            ->where('is_agent', false)
             ->withCount('sessions')
             ->orderBy('name')
             ->get()
@@ -60,6 +67,15 @@ class UserController extends Controller
     public function updateRole(UserRoleUpdateRequest $request, User $user): RedirectResponse
     {
         $this->abortWhenTargetingSelf($request, $user);
+
+        /*
+         * An agent account is never promotable. It holds a bearer token that a sandbox somewhere else
+         * is authenticating with, so promoting it would turn a machine credential into an
+         * administrator's credential — and unlike a person's account, there is nobody to notice.
+         * `EnsureUserIsAdmin` would still refuse the *session*, because agents have none, but the
+         * account would be an administrator for anything that reads the column.
+         */
+        abort_if($user->isAgent(), 403);
 
         /*
          * `enum()` is nullable and the rules make it `required`, so the fallback is unreachable — it
