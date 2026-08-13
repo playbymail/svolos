@@ -84,7 +84,6 @@
         locations.some((location) => location.planet_count !== null),
     );
 
-
     let hovered = $state<number | null>(null);
 
     const byId = $derived(
