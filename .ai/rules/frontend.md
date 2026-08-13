@@ -148,6 +148,33 @@ not reformat it, and do not add a second component library. If one component fig
 hand-roll that single component instead. Icons come from `lucide-svelte`; toasts from `svelte-sonner`
 via `resources/js/lib/flash-toast.ts`.
 
+### A `Button` that navigates is `asChild` + `Link` — `href` on a `Button` is inert
+
+`Button.svelte` renders a `<button>` element unless `asChild` is set, and spreads every
+unrecognised prop onto it. `<Button href="/somewhere">` therefore produces
+`<button href="/somewhere">`, which navigates nowhere: the click does nothing at all — no request,
+no console error, no clue.
+
+Nothing catches it on the way in. The component's props end in `[key: string]: unknown`, so
+`svelte-check` accepts `href` happily, and with no jsdom here nothing renders the markup to find out
+(see [general.md](general.md)). It shipped once on the agents screen and was found by somebody
+clicking the button in production.
+
+Write it the way the rest of the application does — the button's classes reach the anchor through
+the snippet's `props.class`:
+
+```svelte
+<Button asChild>
+    {#snippet children(props)}
+        <Link href={toUrl(create())} class={props.class}>Create an agent</Link>
+    {/snippet}
+</Button>
+```
+
+`tests/Feature/ButtonNavigationTest.php` reads every `.svelte` outside `components/ui` and fails on
+an `href` inside a `<Button …>` tag, naming the file. It is a source assertion because it can only
+be one.
+
 ### `Checkbox`'s hidden input must stay inside the `checked` guard
 
 `Checkbox.svelte` is a `<button role="checkbox">`, so the hidden input it renders is the *only* thing

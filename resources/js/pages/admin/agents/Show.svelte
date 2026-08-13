@@ -21,7 +21,7 @@
 </script>
 
 <script lang="ts">
-    import { Form, page } from '@inertiajs/svelte';
+    import { Form, Link, page } from '@inertiajs/svelte';
     import KeyRound from 'lucide-svelte/icons/key-round';
     import RefreshCw from 'lucide-svelte/icons/refresh-cw';
     import Trash2 from 'lucide-svelte/icons/trash-2';
@@ -83,12 +83,16 @@
                     Open a game and add {agent.name} to its roster. You can issue
                     a token once it has a seat.
                 </p>
-                <Button
-                    href={toUrl(gamesIndex())}
-                    variant="secondary"
-                    class="mt-4"
-                >
-                    Go to games
+                <Button variant="secondary" asChild>
+                    {#snippet children(props)}
+                        <Link
+                            href={toUrl(gamesIndex())}
+                            class="{props.class} mt-4"
+                            data-test="go-to-games"
+                        >
+                            Go to games
+                        </Link>
+                    {/snippet}
                 </Button>
             </div>
         {:else}

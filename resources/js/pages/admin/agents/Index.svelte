@@ -42,9 +42,17 @@
     />
 
     <div>
-        <Button href={toUrl(create())} data-test="create-agent-button">
-            <BotMessageSquare class="h-4 w-4" aria-hidden="true" />
-            Create an agent
+        <Button asChild>
+            {#snippet children(props)}
+                <Link
+                    href={toUrl(create())}
+                    class={props.class}
+                    data-test="create-agent-button"
+                >
+                    <BotMessageSquare class="h-4 w-4" aria-hidden="true" />
+                    Create an agent
+                </Link>
+            {/snippet}
         </Button>
     </div>
 
