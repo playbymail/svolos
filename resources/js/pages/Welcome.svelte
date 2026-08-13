@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Link, page } from '@inertiajs/svelte';
+    import ArrowRight from 'lucide-svelte/icons/arrow-right';
     import Layers from 'lucide-svelte/icons/layers';
     import Users from 'lucide-svelte/icons/users';
     import Workflow from 'lucide-svelte/icons/workflow';
@@ -12,10 +13,15 @@
         CardTitle,
     } from '@/components/ui/card';
     import { toUrl } from '@/lib/utils';
-    import { dashboard, docs, login } from '@/routes';
+    import { dashboard, docs, login, story } from '@/routes';
 
-    const name = $derived(page.props.name);
     const user = $derived(page.props.auth.user);
+
+    const openingLines = [
+        'The klaxons wake you.',
+        'The chronometers say you have been asleep for decades.',
+        'The voyage was supposed to take months.',
+    ];
 
     const capabilities = [
         {
@@ -49,15 +55,43 @@
     </span>
 
     <h1
-        class="mt-6 text-4xl font-semibold tracking-tight text-balance sm:text-5xl"
+        class="mt-6 text-3xl font-semibold tracking-tight text-balance sm:text-4xl"
     >
-        The roster behind the game.
+        Your colony ship has finally reached its destination—but decades late,
+        crippled, and dying.
     </h1>
 
-    <p class="mt-5 text-lg text-muted-foreground">
-        {name} keeps the record for a play-by-mail strategy game: the games themselves,
-        the seats at each table, and the people holding them. The game engine takes
-        the turns; this is the registry it plays against.
+    <div class="mt-6 space-y-5 text-lg leading-8 text-muted-foreground">
+        <p>
+            The engines are burned out, critical systems are failing, and the
+            technology that carried you across the stars can no longer be
+            maintained. Thousands of colonists are awake, frightened, and
+            depending on you to get them safely to the surface.
+        </p>
+
+        <p>
+            The world below should have been ready. Advance expeditions
+            established mines, farms, factories, fuel stores, and supply depots
+            before your arrival. Their work remains. They do not. No
+            transmissions. No ships. No sign of the people who were supposed to
+            greet you. You have inherited their resources, their silence, and
+            whatever happened to them.
+        </p>
+
+        <p>
+            Now the colony is yours to command. Decide what to build, what to
+            mine, what to salvage, and what to sacrifice. Rebuild from the
+            wreckage, explore the unknown, and lead your people from survival
+            toward a new civilization among the stars.
+        </p>
+    </div>
+
+    <!--
+        The copy bolds this last sentence: it is the call to action, so it is set as one and put
+        against the buttons rather than left inside the paragraph above it.
+    -->
+    <p class="mt-6 text-xl font-medium tracking-tight text-balance sm:text-2xl">
+        Take command of your colony and begin the challenge.
     </p>
 
     <div class="mt-8 flex flex-wrap items-center gap-3">
@@ -81,6 +115,14 @@
 
         <Button variant="outline" asChild>
             {#snippet children(props)}
+                <Link href={toUrl(story())} class={props.class}>
+                    Read the story
+                </Link>
+            {/snippet}
+        </Button>
+
+        <Button variant="ghost" asChild>
+            {#snippet children(props)}
                 <Link href={toUrl(docs())} class={props.class}>
                     Read the docs
                 </Link>
@@ -94,6 +136,41 @@
             have been invited, the invitation carries its own link.
         </p>
     {/if}
+</section>
+
+<!--
+    The way into the backstory. A first-time visitor has nowhere else to go — there is no sign-up —
+    so the introduction is quoted here in the words it opens with, rather than named in a nav item
+    and hoped for.
+-->
+<section
+    class="mt-14 max-w-3xl rounded-xl border border-border bg-muted/40 p-6 sm:mt-16 sm:p-8"
+>
+    <span
+        class="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+    >
+        Player introduction
+    </span>
+
+    <div class="mt-4 space-y-2">
+        {#each openingLines as line (line)}
+            <p class="text-xl font-medium tracking-tight text-balance">
+                {line}
+            </p>
+        {/each}
+    </div>
+
+    <p class="mt-4 text-muted-foreground">
+        They prepared a world for you. And then they vanished.
+    </p>
+
+    <Link
+        href={toUrl(story())}
+        class="mt-6 inline-flex items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline"
+    >
+        Read the story
+        <ArrowRight class="size-4" aria-hidden="true" />
+    </Link>
 </section>
 
 <section class="mt-16 grid gap-4 sm:mt-20 md:grid-cols-3">

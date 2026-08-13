@@ -10,7 +10,7 @@ Inertia app, solve it idiomatically for Svelte rather than emulating the React s
 `resources/js/app.ts` passes a `layout` callback to `createInertiaApp` that maps page-name prefixes to
 layout components:
 
-- `Welcome`, `Docs` → `PublicLayout` (the signed-out marketing chrome: header, `Log in`, footer)
+- `Welcome`, `Docs`, `Story` → `PublicLayout` (the signed-out marketing chrome: header, `Log in`, footer)
 - `auth/*`, `invitations/*` → `AuthLayout`
 - `settings/*` → `[AppLayout, SettingsLayout]` (nested, outermost first)
 - everything else → `AppLayout`
@@ -60,10 +60,28 @@ whose layout data is fixed for the life of the page should stay declarative, in 
 
 ## The public pages must not link to a sign-up
 
-`PublicLayout.svelte`, `pages/Welcome.svelte` and `pages/Docs.svelte` are the signed-out surface.
+`PublicLayout.svelte`, `pages/Welcome.svelte`, `pages/Docs.svelte` and `pages/Story.svelte` are the
+signed-out surface.
 Registration does not exist (see [auth.md](auth.md)), so there is no `register` export in the
 generated `@/routes` and importing one breaks `npm run build`. The landing page says so in words —
 "accounts come from invitations" — rather than offering a link. Do not add one.
+
+## The player introduction lives in `pages/Story.svelte`, and stays guest-reachable
+
+`/story` is the game's backstory and the only long-form thing a first-time visitor comes here to
+read. It carries no `auth` and no `verified` — there is no public sign-up, so anything behind the
+sign-in is unreachable to the audience the page is written for, and
+`tests/Feature/StoryTest.php` asserts the absence of that middleware rather than only a 200.
+
+The prose is a `Passage[][]` inside the component and is the **only** copy of the text the
+application ships: `docs/player-copy.txt` is the author's draft, not a runtime source, and nothing
+reads it. Edit the component when the copy changes. The three opening lines are quoted again in
+`pages/Welcome.svelte`'s teaser block, which is the way into the page for someone who lands on `/`;
+`PublicLayout`'s header and footer carry the other two links.
+
+`beat` is a line the copy sets alone and the page sets to carry that weight, `stanza` is a run of
+them read as one cadence, and `prose` is a muted paragraph. That contrast is the page's whole design
+— flattening it into uniform paragraphs loses the rhythm the copy was written with.
 
 ## `Toaster` is mounted once at the app root, not per layout
 

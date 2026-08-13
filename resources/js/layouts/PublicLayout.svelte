@@ -4,7 +4,7 @@
     import AppLogoIcon from '@/components/AppLogoIcon.svelte';
     import { Button } from '@/components/ui/button';
     import { toUrl } from '@/lib/utils';
-    import { dashboard, docs, home, login } from '@/routes';
+    import { dashboard, docs, home, login, story } from '@/routes';
 
     let {
         children,
@@ -32,6 +32,14 @@
             </Link>
 
             <nav class="flex items-center gap-1" aria-label="Main">
+                <Button variant="ghost" size="sm" asChild>
+                    {#snippet children(props)}
+                        <Link href={toUrl(story())} class={props.class}>
+                            The story
+                        </Link>
+                    {/snippet}
+                </Button>
+
                 <Button variant="ghost" size="sm" asChild>
                     {#snippet children(props)}
                         <Link href={toUrl(docs())} class={props.class}>
@@ -70,12 +78,21 @@
             class="mx-auto flex w-full max-w-5xl flex-col gap-2 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
         >
             <p>{name} — access is by invitation only.</p>
-            <Link
-                href={toUrl(docs())}
-                class="underline-offset-4 transition-colors hover:text-foreground hover:underline"
-            >
-                Documentation
-            </Link>
+
+            <div class="flex items-center gap-4">
+                <Link
+                    href={toUrl(story())}
+                    class="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                >
+                    The story
+                </Link>
+                <Link
+                    href={toUrl(docs())}
+                    class="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                >
+                    Documentation
+                </Link>
+            </div>
         </div>
     </footer>
 </div>

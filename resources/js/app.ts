@@ -15,6 +15,7 @@ createInertiaApp({
         switch (true) {
             case name === 'Welcome':
             case name === 'Docs':
+            case name === 'Story':
                 return PublicLayout;
             /*
              * `invitations/*` shares AuthLayout with the Fortify screens. The invitation pages are

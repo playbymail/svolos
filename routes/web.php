@@ -17,6 +17,17 @@ Route::inertia('/', 'Welcome')->name('home');
 Route::inertia('docs', 'Docs')->name('docs');
 
 /*
+ * The player introduction — the game's backstory. It is public and guest-reachable on purpose: it is
+ * the thing a first-time visitor is here to read, and it must not sit behind the sign-in that only an
+ * invited account can pass. It is a page of its own rather than a band on the landing page because it
+ * is a thousand words of prose read end to end, and `/` answers what this application is in a screen.
+ *
+ * Static copy and no state, so `Route::inertia()` is the whole of it; the text lives in the page
+ * component, which is the only copy of it the application ships.
+ */
+Route::inertia('story', 'Story')->name('story');
+
+/*
  * Accepting an invitation is the only way an account is created, and it is guest-only: it creates a
  * new account and signs it in, so an authenticated visitor is on the wrong screen and `guest` sends
  * them to their dashboard instead of letting them consume the invitation from inside their session.
