@@ -17,6 +17,20 @@ use RuntimeException;
 class GenerationFailed extends RuntimeException
 {
     /**
+     * The field a gamemaster would have to change for this to succeed.
+     *
+     * `Gamemaster\GenerationController` turns this exception into a validation message rather than
+     * letting it 500, so the failure has to name a field the form actually has. **Which field is a
+     * property of the failure, not of the stage**: the same controller line serves every generator,
+     * and a `match` on the stage there would be a second copy of this knowledge sitting further from
+     * the thing that knows it.
+     *
+     * `seed` is the default because that is the only input every stage has, and a generator that fails
+     * for a reason nobody has thought of yet is at least telling somebody to try another number.
+     */
+    public string $field = 'seed';
+
+    /**
      * The generator ran out of attempts before it had placed everything it was asked to.
      */
     public static function attemptsExhausted(int $placed, int $wanted, int $attempts): self
@@ -25,6 +39,34 @@ class GenerationFailed extends RuntimeException
             "Placed only {$placed} of {$wanted} locations in {$attempts} attempts. "
             .'The cluster is too crowded for the requested count and separation.'
         );
+    }
+
+    /**
+     * No arrangement puts every player's home far enough from every other.
+     *
+     * **Unlike the two failures beside it, this one is reachable in ordinary use** — a gamemaster can
+     * ask for eight homes twelve hexes apart in a cluster that has nowhere to put them, and no seed
+     * will change that. So the sentence is written for them rather than for whoever is reading a stack
+     * trace: it names the separation, because that is the dial that moves.
+     */
+    public static function homesUnplaceable(int $homes, int $minimumSeparation, bool $inHexes, int $candidates): self
+    {
+        /*
+         * Said in the unit that was actually asked for, since that is the number on the form. A bare
+         * "5 apart" for the Euclidean case matches how the map's own readout words a distance, and
+         * the cluster's coordinates have no unit to name.
+         */
+        $separation = $inHexes ? "{$minimumSeparation} hexes apart" : "{$minimumSeparation} apart";
+
+        $failure = new self(
+            "No arrangement puts {$homes} home stellia at least {$separation} "
+            ."among the {$candidates} single-star systems in this cluster. "
+            .'Try a smaller minimum separation.'
+        );
+
+        $failure->field = 'minimum_separation';
+
+        return $failure;
     }
 
     /**

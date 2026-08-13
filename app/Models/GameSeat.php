@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -41,6 +42,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read Game $game
  * @property-read User $user
+ * @property-read HomeStellium|null $homeStellium
  */
 #[Fillable(['user_id', 'role'])]
 class GameSeat extends Model
@@ -82,6 +84,24 @@ class GameSeat extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get where this seat's player begins, once the home stellia stage has run.
+     *
+     * **The row belongs to a generation run, not to this seat**, which is why there is no
+     * `home_location_id` column here and why nothing on this model has to be cleared when a world is
+     * thrown away: starting the generation over deletes every run and the cascade takes the homes with
+     * it, so this relation simply stops finding one.
+     *
+     * Only ever one, because `home_stelliums` is unique on `(generation_run_id, game_seat_id)` and a
+     * game has at most one standing home stellia run — superseded runs have had their rows discarded.
+     *
+     * @return HasOne<HomeStellium, $this>
+     */
+    public function homeStellium(): HasOne
+    {
+        return $this->hasOne(HomeStellium::class);
     }
 
     /**

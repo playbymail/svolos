@@ -498,7 +498,13 @@ test('accepting the stelliums unlocks the planets rather than finishing the worl
     expect($game->generationStateFor(GenerationStage::Planets)->value)->toBe('ready');
 });
 
-test('accepting the planets completes the generation', function () {
+test('accepting the planets unlocks the home stellia, and does not complete the generation', function () {
+    /*
+     * This used to assert that the planets *finished* a game's world, and it is the test the
+     * `GenerationStage` docblock warns will change: a new stage makes every unfinished game incomplete
+     * again, deliberately, because a game missing a generation step is not ready to be played. The
+     * assertion that matters is not the count — it is that accepting one stage opens exactly the next.
+     */
     $game = Game::factory()->create();
     $gamemaster = withAcceptedStelliums($game);
 
@@ -510,8 +516,9 @@ test('accepting the planets completes the generation', function () {
 
     $game->load('generationRuns');
 
-    expect($game->isGenerationComplete())->toBeTrue();
-    expect($game->firstUnfinishedGenerationStage())->toBeNull();
+    expect($game->isGenerationComplete())->toBeFalse();
+    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::HomeStellia);
+    expect($game->generationStateFor(GenerationStage::HomeStellia)->value)->toBe('ready');
 });
 
 test('a gamemaster gives every star its planets', function () {
@@ -925,7 +932,12 @@ test('a game cannot become active until its world has been generated', function 
     $this->actingAs($gamemaster)
         ->put(route('gamemaster.games.update', ['game' => $game]), ['status' => GameStatus::Active->value])
         ->assertSessionHasErrors([
-            'status' => 'The stelliums stage has not been accepted yet, so this game cannot become active.',
+            /*
+             * "Stellia", not "stelliums": the refusal names the stage by its **label**, which is the
+             * Latin plural the game is played in. The enum case and its stored value stay `Stelliums`
+             * — see `GenerationStage::label()` for why only one of the two is free to change.
+             */
+            'status' => 'The stellia stage has not been accepted yet, so this game cannot become active.',
         ]);
 
     expect($game->fresh()?->status)->toBe(GameStatus::Setup);

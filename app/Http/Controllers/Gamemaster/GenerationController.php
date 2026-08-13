@@ -8,10 +8,13 @@ use App\Actions\Generation\RunGeneration;
 use App\Enums\GameStatus;
 use App\Enums\GenerationStage;
 use App\Enums\GenerationStageState;
+use App\Generation\GenerationFailed;
+use App\Generation\HomeStelliumGenerator;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Gamemaster\GenerationRunRequest;
 use App\Models\Game;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 /**
@@ -33,8 +36,10 @@ use Inertia\Inertia;
  * and no value the gamemaster could type would make them allowed — so they abort rather than fail
  * validation, and the screen simply does not render controls it knows the server will refuse.
  *
- * The one thing that *is* a validation message lives in `GenerationRunRequest`: the seed, which is a
- * field, and which has to differ from the one already on a pending run.
+ * The things that *are* validation messages are both fields. The seed lives in `GenerationRunRequest`
+ * and has to differ from the one already on a pending run; the minimum separation is refused here, in
+ * `store()`, when the generator reports that no arrangement of homes exists at it. Same line, either
+ * way: a route-bound model's state is a 403, a posted value is a message.
  */
 class GenerationController extends Controller
 {
@@ -56,12 +61,28 @@ class GenerationController extends Controller
     {
         $this->authorizeStage($game, $stage, [GenerationStageState::Ready, GenerationStageState::Review]);
 
-        $run = $this->runGeneration->handle(
-            $game,
-            $stage,
-            (int) $request->validated('seed'),
-            $request->boolean('traveler'),
-        );
+        try {
+            $run = $this->runGeneration->handle(
+                $game,
+                $stage,
+                (int) $request->validated('seed'),
+                $request->boolean('traveler'),
+                (int) $request->validated('minimum_separation', HomeStelliumGenerator::DEFAULT_MINIMUM_SEPARATION),
+                $request->boolean('separation_in_hexes'),
+            );
+        } catch (GenerationFailed $failure) {
+            /*
+             * **A generator that cannot produce what it was asked for is a rejected field, not a 500.**
+             * For the home stellia this is reachable from the screen in ordinary use — eight players
+             * twelve hexes apart is a request the cluster cannot satisfy, and no seed will change that
+             * — so the gamemaster is told which number to move rather than shown an error page. The
+             * transaction in `RunGeneration` has already rolled back, so nothing was written.
+             *
+             * The failure names its own field; there is deliberately no `match` on the stage here,
+             * which would be a second copy of knowledge the exception already carries.
+             */
+            throw ValidationException::withMessages([$failure->field => $failure->getMessage()]);
+        }
 
         Inertia::flash('toast', [
             'type' => 'success',

@@ -54,12 +54,16 @@ final readonly class StelliumPlan
     /**
      * Describe this plan for the run that produced it.
      *
-     * @return array{stelliums: int, stars: int, mix: array<int, int>}
+     * **The key is the label.** `GenerationStageCard` prints a summary's keys as they are, so `stellia`
+     * here is the word that reaches the screen — the Latin plural the game is played in, matching the
+     * stage's own label. The table and the model stay `stelliums`; only what a reader sees changes.
+     *
+     * @return array{stellia: int, stars: int, mix: array<int, int>}
      */
     public function summary(): array
     {
         return [
-            'stelliums' => $this->count(),
+            'stellia' => $this->count(),
             'stars' => $this->starTotal(),
             'mix' => $this->mix(),
         ];

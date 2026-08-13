@@ -21,6 +21,7 @@ class StageGenerationRegistry
         private readonly GenerateCluster $cluster,
         private readonly GenerateStelliums $stelliums,
         private readonly GeneratePlanets $planets,
+        private readonly GenerateHomeStellia $homeStellia,
     ) {}
 
     /**
@@ -32,6 +33,7 @@ class StageGenerationRegistry
             GenerationStage::Cluster => $this->cluster,
             GenerationStage::Stelliums => $this->stelliums,
             GenerationStage::Planets => $this->planets,
+            GenerationStage::HomeStellia => $this->homeStellia,
         };
     }
 }

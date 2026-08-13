@@ -62,7 +62,7 @@ class GameController extends Controller
         $game->loadCount(['seats', 'activeSeats']);
 
         $seats = $game->seats()
-            ->with('user')
+            ->with(['user', 'homeStellium.location'])
             ->get()
             ->sortBy([
                 /* Active seats first, then alphabetically, so the live roster reads as one block. */
@@ -252,6 +252,7 @@ class GameController extends Controller
      *     is_self: bool,
      *     can_retire: bool,
      *     can_change_role: bool,
+     *     home: array{location_id: int, ordinal: int, x: int, y: int, z: int}|null,
      *     created_at_diff: string|null,
      * }
      */
@@ -270,7 +271,39 @@ class GameController extends Controller
             'is_self' => $isSelf,
             'can_retire' => $seat->is_active && ! $isSelf,
             'can_change_role' => $seat->is_active && $seat->role !== GameRole::Gamemaster,
+            'home' => $this->presentHome($seat),
             'created_at_diff' => $seat->created_at?->diffForHumans(),
+        ];
+    }
+
+    /**
+     * Shape where a seat's player begins, if the home stellia stage has placed them.
+     *
+     * **One nullable object rather than four nullable fields**, and for the reason `can_change_role` is
+     * one flag rather than two: these five values are all present or all absent together, so four
+     * parallel nulls would be four things to keep in step and four chances for a screen to read one
+     * without the others. There is no `can_assign` or `can_clear` beside it, because a home is
+     * generated rather than chosen — the controls are the stage's, not the seat's.
+     *
+     * Null for a gamemaster and for a retired seat as a matter of course: `GenerateHomeStellia` places
+     * neither, so the roster's em dash is the truth about them rather than a gap.
+     *
+     * @return array{location_id: int, ordinal: int, x: int, y: int, z: int}|null
+     */
+    private function presentHome(GameSeat $seat): ?array
+    {
+        $location = $seat->homeStellium?->location;
+
+        if ($location === null) {
+            return null;
+        }
+
+        return [
+            'location_id' => $location->id,
+            'ordinal' => $location->ordinal,
+            'x' => $location->x,
+            'y' => $location->y,
+            'z' => $location->z,
         ];
     }
 }

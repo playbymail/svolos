@@ -3,6 +3,7 @@
     import Check from 'lucide-svelte/icons/check';
     import Dices from 'lucide-svelte/icons/dices';
     import Lock from 'lucide-svelte/icons/lock';
+    import Upload from 'lucide-svelte/icons/upload';
     import InputError from '@/components/InputError.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@
     import { Input } from '@/components/ui/input';
     import { Label } from '@/components/ui/label';
     import { Spinner } from '@/components/ui/spinner';
+    import { DEFAULT_MINIMUM_SEPARATION } from '@/types';
     import type { GenerationStageSummary } from '@/types';
     import type { RouteFormDefinition } from '@/wayfinder';
 
@@ -99,6 +101,19 @@
     }
 
     const entries = $derived(summaryEntries(stage.summary));
+
+    /*
+     * Which unit the home stellia form's separation is counted in, held here because the label beside
+     * the number has to change with it — a bare "5" means two different things and the reader must not
+     * have to look at the checkbox to find out which.
+     *
+     * A **writable** `$derived` off the server's value, the same pattern the status picker uses: it
+     * starts from the pending run's setting so trying again keeps the unit, and a refused submit snaps
+     * it back rather than leaving the box showing a mode the run does not have.
+     */
+    let separationInHexes = $derived(stage.separation_in_hexes ?? false);
+
+    const separationUnit = $derived(separationInHexes ? 'hexes' : 'distance');
 </script>
 
 <section
@@ -152,6 +167,23 @@
                     <dt class="text-muted-foreground">Traveler</dt>
                     <dd data-test="generation-traveler-{stage.stage}">
                         One system per hex
+                    </dd>
+                </div>
+            {/if}
+            {#if stage.stage === 'home_stellia'}
+                <!--
+                    Shown in **both** states, unlike the traveler flag above, because the numbers in
+                    the summary beside it are meaningless without it: "minimum separation 5" is two
+                    different arrangements depending on this, and the reader cannot tell which from
+                    the number. A flag that is only worth showing when set is one thing; a unit is
+                    never optional.
+                -->
+                <div>
+                    <dt class="text-muted-foreground">Separation counted in</dt>
+                    <dd data-test="generation-separation-unit-{stage.stage}">
+                        {stage.separation_in_hexes
+                            ? 'Hexes on the map'
+                            : 'Distance through space'}
                     </dd>
                 </div>
             {/if}
@@ -235,9 +267,24 @@
                         data-test="generation-seed-input-{stage.stage}"
                     />
                     <p class="text-xs text-muted-foreground">
-                        {stage.state === 'review'
-                            ? 'Generating again replaces what is here. It has to be a different seed — the same one would draw the same thing.'
-                            : 'The same seed always produces the same result, which is what makes a game reproducible.'}
+                        <!--
+                            The home stellia stage gets a sentence of its own because the usual one
+                            is false there: its stream is seeded with the seed *and* the attempt, so
+                            the same number really does produce a different arrangement, and the
+                            "choose a different seed" rule is switched off for it on the server too.
+                        -->
+                        {#if stage.state !== 'review'}
+                            The same seed always produces the same result, which
+                            is what makes a game reproducible.
+                        {:else if stage.stage === 'home_stellia'}
+                            Generating again replaces what is here. The same
+                            seed is fine — each attempt draws a different
+                            arrangement from it.
+                        {:else}
+                            Generating again replaces what is here. It has to be
+                            a different seed — the same one would draw the same
+                            thing.
+                        {/if}
                     </p>
                     <InputError message={errors.seed} />
                 </div>
@@ -256,9 +303,18 @@
                         {:else}
                             <Dices class="h-4 w-4" />
                         {/if}
-                        {stage.state === 'review'
-                            ? 'Try another seed'
-                            : 'Generate'}
+                        <!--
+                            "Try another seed" is the wrong label for the one stage where the seed
+                            need not change: there, regenerating is asking for another arrangement of
+                            the same world.
+                        -->
+                        {#if stage.state !== 'review'}
+                            Generate
+                        {:else if stage.stage === 'home_stellia'}
+                            Try another arrangement
+                        {:else}
+                            Try another seed
+                        {/if}
                     </Button>
                 </div>
 
@@ -289,8 +345,129 @@
                         <InputError message={errors.traveler} />
                     </div>
                 {/if}
+
+                {#if stage.stage === 'home_stellia'}
+                    <!--
+                        The home stellia stage's own input, and the counterpart of the traveler box
+                        above: the only stage that reads it, starting from the pending run's own
+                        setting so trying again keeps the value rather than reverting to the default.
+
+                        It is also where the "no arrangement exists" message lands. That failure is a
+                        rejected field rather than an error page precisely because this box is what
+                        has to change — see `Gamemaster\GenerationController::store()`.
+                    -->
+                    <div class="grid gap-2">
+                        <Label for="minimum-separation-{stage.stage}">
+                            Minimum separation ({separationUnit})
+                        </Label>
+                        <Input
+                            id="minimum-separation-{stage.stage}"
+                            type="number"
+                            name="minimum_separation"
+                            min={1}
+                            max={30}
+                            step={1}
+                            inputmode="numeric"
+                            autocomplete="off"
+                            class="sm:max-w-32"
+                            value={stage.minimum_separation ??
+                                DEFAULT_MINIMUM_SEPARATION}
+                            data-test="generation-separation-input-{stage.stage}"
+                        />
+                        <p class="text-xs text-muted-foreground">
+                            How far apart two homes must stand. Raise it for
+                            more room between players; lower it if there is
+                            nowhere left to put everybody.
+                        </p>
+                        <InputError message={errors.minimum_separation} />
+                    </div>
+
+                    <!--
+                        Which of two distances that number counts, and they answer different
+                        questions rather than being two scales of one — so this is a choice, not a
+                        conversion. Unticked is a straight line through space, the measure the
+                        cluster generator also uses. Ticked is steps on the map, which ignores
+                        height, so two systems sharing a hex are zero apart however far one is
+                        above the other.
+                    -->
+                    <div class="grid gap-2">
+                        <Label
+                            for="separation-in-hexes-{stage.stage}"
+                            class="flex items-center space-x-3"
+                        >
+                            <Checkbox
+                                id="separation-in-hexes-{stage.stage}"
+                                name="separation_in_hexes"
+                                bind:checked={separationInHexes}
+                                data-test="generation-separation-hexes-input-{stage.stage}"
+                            />
+                            <span>Count the separation in hexes</span>
+                        </Label>
+                        <p class="text-xs text-muted-foreground">
+                            {#if separationInHexes}
+                                Reach on the map: how many hexes lie between two
+                                players. Height plays no part, so two systems in
+                                the same hex are zero apart however far one is
+                                above the other.
+                            {:else}
+                                Distance through space, the straight line
+                                between two systems — the same measure the
+                                cluster itself was scattered by.
+                            {/if}
+                        </p>
+                        <InputError message={errors.separation_in_hexes} />
+                    </div>
+                {/if}
             {/snippet}
         </Form>
+    {/if}
+
+    {#if stage.stage === 'home_stellia' && canRun}
+        <!--
+            Not built yet, and shown anyway so the workflow reads honestly: placing homes from a
+            prepared file is how this stage is meant to work eventually, and generating them is the
+            interim. Inert in every sense — there is no route behind it, no controller method and no
+            column, and the gamemaster route sweep in `GameManagementTest` is what keeps it that way.
+        -->
+        <div
+            class="grid gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-4"
+            aria-disabled="true"
+            data-test="home-stellia-template-upload"
+        >
+            <div class="flex flex-wrap items-center gap-2">
+                <Label
+                    for="home-stellia-template"
+                    class="text-muted-foreground"
+                >
+                    Upload a home stellia template
+                </Label>
+                <Badge variant="outline">Future implementation</Badge>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <Input
+                    id="home-stellia-template"
+                    type="file"
+                    disabled
+                    tabindex={-1}
+                    data-test="home-stellia-template-input"
+                />
+                <Button
+                    type="button"
+                    variant="secondary"
+                    disabled
+                    tabindex={-1}
+                    data-test="home-stellia-template-button"
+                >
+                    <Upload class="h-4 w-4" />
+                    Upload
+                </Button>
+            </div>
+            <p class="text-xs text-muted-foreground">
+                A template will one day place every home from a prepared file,
+                for a game whose starting positions are decided in advance.
+                Generate them above for now.
+            </p>
+        </div>
     {/if}
 
     {#if stage.history.length > 0}

@@ -357,6 +357,9 @@
                             <th scope="col" class="px-4 py-3 font-medium">
                                 Game role
                             </th>
+                            <th scope="col" class="px-4 py-3 font-medium">
+                                Home
+                            </th>
                             <th scope="col" class="px-4 py-3 text-right">
                                 <span class="sr-only">Actions</span>
                             </th>
@@ -394,6 +397,37 @@
                                         {seat}
                                         {roles}
                                     />
+                                </td>
+                                <td class="px-4 py-3">
+                                    <!--
+                                        Read-only, and this screen's only sight of it: there is no
+                                        hex map here, because building a game's world is the
+                                        gamemaster's. It is worth carrying all the same, since the
+                                        status form above refuses to make a game active while a
+                                        player has nowhere to begin, and a screen that reported that
+                                        without being able to say who would be no help.
+                                    -->
+                                    {#if seat.home}
+                                        <span
+                                            class="font-medium"
+                                            data-test="seat-home-{seat.id}"
+                                        >
+                                            #{seat.home.ordinal}
+                                        </span>
+                                        <p
+                                            class="tabular-nums text-muted-foreground"
+                                        >
+                                            {seat.home.x}, {seat.home.y}, {seat
+                                                .home.z}
+                                        </p>
+                                    {:else}
+                                        <span
+                                            class="text-muted-foreground"
+                                            data-test="seat-home-{seat.id}"
+                                        >
+                                            —
+                                        </span>
+                                    {/if}
                                 </td>
                                 <td class="px-4 py-3">
                                     <div

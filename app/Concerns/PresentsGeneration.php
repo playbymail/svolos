@@ -114,6 +114,8 @@ trait PresentsGeneration
      *     radius: float,
      *     star_count: int|null,
      *     planet_count: int|null,
+     *     home_seat_id: int|null,
+     *     home_player_name: string|null,
      * }>
      */
     protected function presentLocations(Game $game): array
@@ -123,7 +125,15 @@ trait PresentsGeneration
         $planetsGenerated = $game->generationRunFor(GenerationStage::Planets) !== null;
 
         return $game->locations()
-            ->with(['stellium' => fn ($query) => $query->withCount(['stars', 'planets'])])
+            /*
+             * The home is eager-loaded through to the account, because the map names whose it is rather
+             * than only marking it — "somebody starts here" is not the useful half. Three levels deep
+             * and still one query per level, against a hundred locations.
+             */
+            ->with([
+                'stellium' => fn ($query) => $query->withCount(['stars', 'planets']),
+                'homeStellium.gameSeat.user',
+            ])
             ->get()
             ->map(fn (Location $location): array => [
                 'id' => $location->id,
@@ -134,6 +144,13 @@ trait PresentsGeneration
                 'radius' => round($location->radius(), 2),
                 'star_count' => $location->stellium?->stars_count,
                 'planet_count' => $planetsGenerated ? $location->stellium?->planets_count : null,
+                /*
+                 * Null here means "nobody begins at this system", which — unlike the two counts above —
+                 * is the ordinary answer rather than a stage that has not run: some ninety-odd
+                 * locations are nobody's home even after the stage is accepted.
+                 */
+                'home_seat_id' => $location->homeStellium?->game_seat_id,
+                'home_player_name' => $location->homeStellium?->gameSeat->user->name,
             ])
             ->values()
             ->all();
@@ -207,16 +224,33 @@ trait PresentsGeneration
     /**
      * Shape one stage: where it stands, what produced it, and what was tried before.
      *
-     * `suggested_seed` is a fresh draw on every render rather than a stored value, and only for the
-     * screen that can act on it. It is what the seed box starts with: the game's own base seed for a
-     * first run, since that is the number the administrator or gamemaster chose for this game, and a
-     * new random one for a regeneration, since regenerating with the same seed would redraw the same
-     * thing and is refused.
+     * `suggested_seed` is what the seed box starts with, computed on every render rather than stored,
+     * and only for the screen that can act on it. Three cases, and the third is easy to lose:
+     *
+     * - **no run yet** — the game's own base seed, since that is the number somebody chose for this
+     *   game;
+     * - **a regeneration** — a fresh random number, because regenerating with the seed already on the
+     *   pending run would redraw the same thing and is refused;
+     * - **a regeneration of the home stellia** — the pending run's **own** seed, unchanged. That stage
+     *   folds the attempt into its stream, so the same seed genuinely produces a different arrangement
+     *   and the refusal above does not apply to it. Suggesting a new number there would contradict the
+     *   form beside it, which says the same seed is fine and labels the button "try another
+     *   arrangement" — and it would quietly change the world the arrangement is drawn from, which is
+     *   the opposite of what the gamemaster asked for.
      *
      * `traveler` does double duty and is one field for that reason: it labels the run under review,
      * and it is what the cluster form's checkbox starts ticked from, so regenerating a stage keeps the
      * mode the last attempt used instead of silently reverting to the ordinary draw. It is null before
      * any run, which the screen reads as unticked — there is nothing to inherit yet.
+     *
+     * `minimum_separation` and `separation_in_hexes` are the home stellia stage's copy of exactly that,
+     * and read null the same way — the form then falls back to the generator's default and to the
+     * Euclidean measure. They travel as a **pair**, because the number means nothing without the unit:
+     * a screen that showed one without the other would be reporting "5" and letting the reader guess.
+     *
+     * All of them are sent for every stage rather than only the one that uses them: a run stores what
+     * it was asked, and a screen that had to know which fields applied to which stage would be a second
+     * copy of the registry.
      *
      * @return array<string, mixed>
      */
@@ -233,6 +267,8 @@ trait PresentsGeneration
             'state_label' => $state->label(),
             'seed' => $run?->seed,
             'traveler' => $run?->traveler,
+            'minimum_separation' => $run?->minimum_separation,
+            'separation_in_hexes' => $run?->separation_in_hexes,
             'attempt' => $run?->attempt,
             'summary' => $run?->summary,
             'generated_at_diff' => $run?->created_at?->diffForHumans(),
@@ -246,7 +282,11 @@ trait PresentsGeneration
 
         return [
             ...$presented,
-            'suggested_seed' => $run === null ? $game->seed : Game::randomSeed(),
+            'suggested_seed' => match (true) {
+                $run === null => $game->seed,
+                $stage === GenerationStage::HomeStellia => $run->seed,
+                default => Game::randomSeed(),
+            },
         ];
     }
 

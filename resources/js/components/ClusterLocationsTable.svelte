@@ -38,6 +38,14 @@
         locations.some((location) => location.planet_count !== null),
     );
 
+    /*
+     * The map glows the hexes players begin at, and this column is what keeps that from being carried
+     * by colour alone — the same reason the map's star-count legend is not optional.
+     */
+    const hasHomes = $derived(
+        locations.some((location) => location.home_seat_id !== null),
+    );
+
     const farthest = $derived(
         locations.reduce(
             (distance, location) => Math.max(distance, location.radius),
@@ -45,7 +53,9 @@
         ),
     );
 
-    const columns = $derived(5 + (hasStars ? 1 : 0) + (hasPlanets ? 1 : 0));
+    const columns = $derived(
+        5 + (hasStars ? 1 : 0) + (hasPlanets ? 1 : 0) + (hasHomes ? 1 : 0),
+    );
 </script>
 
 <div class="space-y-2">
@@ -75,6 +85,9 @@
                         <th scope="col" class="px-4 py-2 font-medium"
                             >Planets</th
                         >
+                    {/if}
+                    {#if hasHomes}
+                        <th scope="col" class="px-4 py-2 font-medium">Home</th>
                     {/if}
                 </tr>
             </thead>
@@ -129,6 +142,20 @@
                                 data-test="location-planets-{location.id}"
                             >
                                 {location.planet_count ?? '—'}
+                            </td>
+                        {/if}
+                        {#if hasHomes}
+                            <td
+                                class="px-4 py-1.5"
+                                data-test="location-home-{location.id}"
+                            >
+                                {#if location.home_player_name}
+                                    <span style:color="var(--home)">
+                                        {location.home_player_name}
+                                    </span>
+                                {:else}
+                                    <span class="text-muted-foreground">—</span>
+                                {/if}
                             </td>
                         {/if}
                     </tr>

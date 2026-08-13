@@ -62,12 +62,31 @@ export type AdminGame = {
 };
 
 /**
+ * Where one player's faction begins, as shaped by `presentSeat()` on either area's game controller.
+ *
+ * **One nullable object rather than four nullable fields**, because the five values are all present or
+ * all absent together — the same argument that makes `can_change_role` one flag rather than two.
+ */
+export type SeatHome = {
+    location_id: number;
+    ordinal: number;
+    x: number;
+    y: number;
+    z: number;
+};
+
+/**
  * One seat on a game's roster, as shaped by
  * `App\Http\Controllers\Admin\GameController::presentSeat()`.
  *
  * `is_active` is false for a **retired** seat. Retired seats stay on the roster because they are never
  * deleted — engine history keeps referring to them — so the screen offers reactivation rather than a
  * second seat, and there is deliberately no delete control to render.
+ *
+ * `home` is null for three different reasons that the roster does not distinguish, and does not need
+ * to: the home stellia stage has not run; this seat is a gamemaster's or a retired one, neither of
+ * which is ever placed; or the account was seated *after* the stage was accepted. Only the last is a
+ * problem, and it is the shared status rule that reports it — by refusing to make the game active.
  */
 export type AdminGameSeat = {
     id: number;
@@ -77,6 +96,7 @@ export type AdminGameSeat = {
     role: GameRole;
     role_label: string;
     is_active: boolean;
+    home: SeatHome | null;
     created_at_diff: string | null;
 };
 

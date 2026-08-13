@@ -81,4 +81,54 @@ final readonly class Coordinates
             + ($this->y - $other->y) ** 2
             + ($this->z - $other->z) ** 2;
     }
+
+    /**
+     * Count the hexes along the shortest path between this point's column and another's.
+     *
+     * **This is a different metric from everything else in this class, and mixing the two is the
+     * mistake to avoid.** The rest of it compares squared distances through all three dimensions,
+     * which is what the cluster generator's separation rule needs. This is the *map's* distance — how
+     * many hexes apart two systems are drawn — and it ignores `z` entirely, exactly as `hexDistance()`
+     * in `resources/js/lib/cluster-hex.ts` does. `HomeStelliumGenerator` can measure its separation in
+     * either of the two, and stores on the run which one a game was generated under — they answer
+     * different questions rather than being two scales of one, so neither is the "real" distance.
+     *
+     * This is the mirror of that TypeScript function and has to stay in step with it: the home stellia
+     * are placed here and drawn there, so a drift would put a glowing hex where the rule says none
+     * should be. `tests/Unit/CoordinatesTest.php` and `cluster-hex.test.ts` carry the same literal
+     * table of pairs for that reason.
+     *
+     * **`abs()` on the parity term is load-bearing in both languages.** `-3 % 2` is `-1` in PHP as it
+     * is in JavaScript, so the raw remainder shears the negative-`x` half of the map down a row:
+     * every distance *within* one half stays correct while every distance *across* the centre comes
+     * back wrong, which is exactly the failure a glance does not catch.
+     *
+     * `intdiv()` throughout, because this stays in exact integer arithmetic the way the squared
+     * comparisons above do — the row term's numerator is always even, and so is the sum of the three
+     * cube deltas.
+     */
+    public function hexDistanceTo(self $other): int
+    {
+        [$ax, $ay, $az] = $this->toCube();
+        [$bx, $by, $bz] = $other->toCube();
+
+        return intdiv(abs($ax - $bx) + abs($ay - $by) + abs($az - $bz), 2);
+    }
+
+    /**
+     * Convert this point's column and row to cube coordinates, the form hex distance is measured in.
+     *
+     * The three axes sum to zero. Offset coordinates tessellate nicely but cannot be subtracted; cube
+     * coordinates can, which is the whole reason for converting. `z` takes no part — a hex is one
+     * `(x, y)` pair, the same unit `sharesColumnWith()` compares.
+     *
+     * @return array{int, int, int}
+     */
+    private function toCube(): array
+    {
+        $column = $this->x;
+        $row = $this->y - intdiv($column - abs($column) % 2, 2);
+
+        return [$column, -$column - $row, $row];
+    }
 }

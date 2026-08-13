@@ -4,7 +4,9 @@ use App\Enums\GenerationRunStatus;
 use App\Enums\GenerationStage;
 use App\Enums\GenerationStageState;
 use App\Models\Game;
+use App\Models\GameSeat;
 use App\Models\GenerationRun;
+use App\Models\HomeStellium;
 use App\Models\Location;
 use App\Models\Planet;
 use App\Models\Star;
@@ -37,6 +39,12 @@ test('the inflector would put stelliums in the wrong table, which is why the mod
 
     expect((new Stellium)->getTable())->toBe('stelliums');
     expect(Stellium::query()->count())->toBe(0);
+
+    /* And the same trap, one word longer, for the table that says where each player begins. */
+    expect(Str::snake(Str::pluralStudly('HomeStellium')))->toBe('home_stellia');
+
+    expect((new HomeStellium)->getTable())->toBe('home_stelliums');
+    expect(HomeStellium::query()->count())->toBe(0);
 });
 
 test('a run status is derived from its timestamps', function () {
@@ -129,6 +137,12 @@ test('generation is complete only when every stage has been accepted', function 
     GenerationRun::factory()->for($game)->stage(GenerationStage::Planets)->accepted()->create();
     $game->load('generationRuns');
 
+    expect($game->isGenerationComplete())->toBeFalse();
+    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::HomeStellia);
+
+    GenerationRun::factory()->for($game)->stage(GenerationStage::HomeStellia)->accepted()->create();
+    $game->load('generationRuns');
+
     expect($game->isGenerationComplete())->toBeTrue();
     expect($game->firstUnfinishedGenerationStage())->toBeNull();
 });
@@ -193,6 +207,47 @@ test('discarding a run deletes what it produced, all the way down to the planets
     expect(Stellium::query()->count())->toBe(0);
     expect(Star::query()->count())->toBe(0);
     expect(Planet::query()->count())->toBe(0);
+});
+
+test('deleting a run frees every home standing on it, and keeps the seat', function () {
+    /*
+     * The home stellia are a **branch** off the same chain rather than a fifth level of it: they hang
+     * straight off the run, and off a seat that must survive them. Both halves are asserted together,
+     * because a mistaken `cascadeOnDelete()` on `game_seat_id` would satisfy the first on its own — by
+     * deleting the player's place at the game along with their starting system.
+     */
+    $game = Game::factory()->create();
+    $run = GenerationRun::factory()->for($game)->stage(GenerationStage::HomeStellia)->create();
+
+    $seat = GameSeat::factory()->for($game)->create();
+    $location = Location::factory()->for($game)->create(['generation_run_id' => $run->id]);
+
+    HomeStellium::factory()->create([
+        'generation_run_id' => $run->id,
+        'game_seat_id' => $seat->id,
+        'location_id' => $location->id,
+    ]);
+
+    expect(HomeStellium::query()->count())->toBe(1);
+
+    $run->delete();
+
+    expect(HomeStellium::query()->count())->toBe(0);
+    expect(GameSeat::query()->whereKey($seat->id)->exists())->toBeTrue();
+});
+
+test('a location knows how many hexes away another one is', function () {
+    /*
+     * The metric the home stellia are placed against, reachable from a row. Not `radius()`: these two
+     * share a column and are twenty apart in height, so they are the same hex and zero apart here.
+     */
+    $stacked = Location::factory()->at(3, -4, -10)->create();
+    $above = Location::factory()->at(3, -4, 10)->create();
+    $away = Location::factory()->at(-4, 2, 0)->create();
+
+    expect($stacked->hexDistanceTo($above))->toBe(0);
+    expect($stacked->hexDistanceTo($away))->toBe(9);
+    expect($away->hexDistanceTo($stacked))->toBe(9);
 });
 
 test('a location knows how far it is from the centre', function () {

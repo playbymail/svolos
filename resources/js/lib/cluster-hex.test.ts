@@ -45,6 +45,9 @@ function locationAt(
         radius: Math.sqrt(x ** 2 + y ** 2 + z ** 2),
         star_count: starCount,
         planet_count: null,
+        /* Nobody's home: the geometry here reads neither, and a fixture should not imply one. */
+        home_seat_id: null,
+        home_player_name: null,
     };
 }
 
@@ -141,6 +144,30 @@ describe('hexDistance', () => {
             expect(called.sort(byCell)).toEqual(touching.sort(byCell));
         }
     });
+
+    it.each([
+        [-1, -1, 0, 0, 1],
+        [-7, -2, 3, 1, 10],
+        [-3, 4, 3, -4, 11],
+        [-1, 0, 1, 0, 2],
+        [-5, -5, 5, 5, 15],
+        [0, 0, 0, 7, 7],
+        [-2, 3, -9, -3, 9],
+        [7, -6, -8, 2, 15],
+    ])(
+        'matches the table pinned in CoordinatesTest.php: (%i, %i) to (%i, %i) is %i hexes',
+        (ax, ay, bx, by, hexes) => {
+            /*
+             * **This table is duplicated verbatim in `tests/Unit/CoordinatesTest.php`, and the two
+             * move together.** `App\Generation\Coordinates::hexDistanceTo()` is a second
+             * implementation of this function, because the server places the home stellia against
+             * this metric and the map draws them — and the properties above only prove each
+             * implementation is internally sound, never that the two agree on a number. These pairs
+             * all straddle the parity boundary, which is where they would disagree first.
+             */
+            expect(hexDistance({ x: ax, y: ay }, { x: bx, y: by })).toBe(hexes);
+        },
+    );
 });
 
 describe('trueDistance', () => {

@@ -3,6 +3,7 @@
 namespace App\Actions\Generation;
 
 use App\Enums\GenerationStage;
+use App\Generation\HomeStelliumGenerator;
 use App\Models\Game;
 use App\Models\GenerationRun;
 use Illuminate\Support\Facades\DB;
@@ -35,14 +36,23 @@ class RunGeneration
     /**
      * Generate a stage for a game from a seed, replacing any pending attempt at it.
      *
-     * `$traveler` is stored on the run beside the seed and read only by the cluster stage, which draws
-     * one system per hex when it is set. It is recorded rather than acted on here for the same reason
-     * the seed is: the run is the record of what was asked, and the stage is what knows what to do
-     * with it.
+     * `$traveler`, `$minimumSeparation` and `$separationInHexes` are stored on the run beside the seed,
+     * and each is read by exactly one stage — the cluster draws one system per hex when the first is
+     * set, and the home stellia stand at least the second apart, counted in hexes when the third says
+     * so and as a straight-line distance otherwise. All three are recorded rather than acted on here
+     * for the same reason the seed is: the run is the record of what was asked, and the stage is what
+     * knows what to do with it. A run of a stage that ignores one still stores it, which is why none of
+     * them has a validation rule tying it to a stage.
      */
-    public function handle(Game $game, GenerationStage $stage, int $seed, bool $traveler = false): GenerationRun
-    {
-        return DB::transaction(function () use ($game, $stage, $seed, $traveler): GenerationRun {
+    public function handle(
+        Game $game,
+        GenerationStage $stage,
+        int $seed,
+        bool $traveler = false,
+        int $minimumSeparation = HomeStelliumGenerator::DEFAULT_MINIMUM_SEPARATION,
+        bool $separationInHexes = false,
+    ): GenerationRun {
+        return DB::transaction(function () use ($game, $stage, $seed, $traveler, $minimumSeparation, $separationInHexes): GenerationRun {
             $game->load('generationRuns');
 
             $generation = $this->registry->for($stage);
@@ -60,6 +70,8 @@ class RunGeneration
             $run->stage = $stage;
             $run->seed = $seed;
             $run->traveler = $traveler;
+            $run->minimum_separation = $minimumSeparation;
+            $run->separation_in_hexes = $separationInHexes;
             $run->attempt = $game->nextGenerationAttemptFor($stage);
             $run->save();
 

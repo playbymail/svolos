@@ -5,7 +5,17 @@
  * been accepted. Nothing on the client re-implements that — `GenerationStageSummary.state` is the
  * server's answer.
  */
-export type GenerationStage = 'cluster' | 'stelliums' | 'planets';
+export type GenerationStage =
+    'cluster' | 'stelliums' | 'planets' | 'home_stellia';
+
+/**
+ * How many hexes apart two home stellia stand when nobody has said otherwise.
+ *
+ * Mirrors `App\Generation\HomeStelliumGenerator::DEFAULT_MINIMUM_SEPARATION`. It is here only because
+ * the form needs something to start from before a run exists — every decision made *with* the number
+ * is made on the server, and the run that gets written stores what was actually posted.
+ */
+export const DEFAULT_MINIMUM_SEPARATION = 5;
 
 /**
  * Mirrors the `App\Enums\PlanetType` backed enum.
@@ -52,6 +62,16 @@ export type GenerationAttempt = {
  * `traveler` is the cluster's other input, and null means "no run yet" rather than false — the same
  * distinction the location counts make. The cluster form's checkbox starts from it, so regenerating
  * keeps the mode the last attempt used.
+ *
+ * `minimum_separation` and `separation_in_hexes` are the home stellia stage's copy of exactly that,
+ * and they are a **pair**: the number means nothing without the unit. Unset — and null, before any run
+ * — the separation is a straight-line distance through all three dimensions; set, it is a count of
+ * hexes on the map, which ignores height. Every label that prints the number has to print the unit
+ * with it.
+ *
+ * All of these arrive for every stage rather than only the one that reads them, because a run stores
+ * what it was asked and a screen that had to know which input belonged to which stage would be a
+ * second copy of the server's registry.
  */
 export type GenerationStageSummary = {
     stage: GenerationStage;
@@ -61,6 +81,8 @@ export type GenerationStageSummary = {
     state_label: string;
     seed: number | null;
     traveler: boolean | null;
+    minimum_separation: number | null;
+    separation_in_hexes: boolean | null;
     attempt: number | null;
     summary: Record<string, unknown> | null;
     generated_at_diff: string | null;
@@ -91,6 +113,11 @@ export type GenerationSummary = {
  * sky here". `planet_count` means the same thing and is decided differently on the server — a stellium
  * exists before its planets do, so its count really is zero at that point and the server has to look
  * at the run rather than at the number. Nothing on the client re-derives either.
+ *
+ * The two `home_*` fields are a **third** kind of null and are not one of those two: most locations
+ * are nobody's home even after the stage has been accepted, so null here is an ordinary answer rather
+ * than a stage that has not run. They are always both set or both null — a home is a seat and an
+ * account together, and the map names whose it is rather than only marking that it is somebody's.
  */
 export type ClusterLocation = {
     id: number;
@@ -101,6 +128,8 @@ export type ClusterLocation = {
     radius: number;
     star_count: number | null;
     planet_count: number | null;
+    home_seat_id: number | null;
+    home_player_name: string | null;
 };
 
 /**

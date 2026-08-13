@@ -126,6 +126,14 @@ already been drawn from cannot be edited into meaning something else. Starting t
 opens it again. See [generation.md](generation.md), which also covers the rule that a game cannot
 become `Active` until its world exists.
 
+**That `Active` rule has two halves and they are not redundant.** `gameStatusRules()` refuses the
+status until every generation stage is accepted *and* until every active player has a home stellium.
+The second is not the first restated: accepting the home stellia stage places everybody seated at the
+time, so seating somebody **afterwards** leaves them with nowhere to begin and no way to get one short
+of starting the world over — which a check that reads runs cannot see. The stage check is reported
+first, because a game with no cluster has nowhere to put a home and naming the unplaced players there
+would name the symptom. See [home-stellia.md](home-stellia.md).
+
 `can_change_seed` on the payload is presentation, like the gamemaster screen's per-seat flags: it
 decides whether `GameSeedForm.svelte` renders an input or the number as text. The one component
 serves both screens, taking its endpoint as an `action` prop exactly as `GameSeatRoleForm.svelte`

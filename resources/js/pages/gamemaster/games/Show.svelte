@@ -332,7 +332,7 @@
         {#if generation.can_start_over}
             <!--
                 The only way past an accepted stage, and deliberately all-or-nothing: a cluster and
-                the stelliums standing on it are one world, so there is no rewinding a single step.
+                the stellia standing on it are one world, so there is no rewinding a single step.
             -->
             <Dialog>
                 <DialogTrigger asChild>
@@ -359,11 +359,18 @@
                         {#snippet children({ processing })}
                             <DialogTitle>Start the generation over?</DialogTitle
                             >
+                            <!--
+                                The sentence *is* the confirmation, so it has to enumerate
+                                everything that goes — the home stellia included, since they are
+                                rows on the runs being deleted and a gamemaster who was told only
+                                about the cluster would be surprised to find the roster emptied.
+                            -->
                             <DialogDescription>
                                 Everything generated for {game.name} is deleted —
-                                the cluster, the stelliums and their stars, and the
-                                record of which seeds produced them. Nothing else
-                                about the game changes. This cannot be undone.
+                                the cluster, the stellia and their stars, the planets
+                                around them, where each player begins, and the record
+                                of which seeds produced it all. The roster itself
+                                is untouched. This cannot be undone.
                             </DialogDescription>
 
                             <DialogFooter class="gap-2">
@@ -514,6 +521,9 @@
                             <th scope="col" class="px-4 py-3 font-medium">
                                 Game role
                             </th>
+                            <th scope="col" class="px-4 py-3 font-medium">
+                                Home
+                            </th>
                             <th scope="col" class="px-4 py-3 text-right">
                                 <span class="sr-only">Actions</span>
                             </th>
@@ -589,6 +599,38 @@
                                                 ? 'Only an administrator can change this.'
                                                 : 'Reactivate the seat to change this.'}
                                         </p>
+                                    {/if}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <!--
+                                        Where this player begins, once the home stellia stage has
+                                        run. An em dash covers three different reasons and does not
+                                        try to tell them apart: the stage has not run, this seat is
+                                        a gamemaster's or retired and is never placed, or the
+                                        account was seated after the arrangement was accepted. Only
+                                        the last is a problem, and the status form is what reports
+                                        it — by refusing to make the game active.
+                                    -->
+                                    {#if seat.home}
+                                        <span
+                                            class="font-medium"
+                                            data-test="seat-home-{seat.id}"
+                                        >
+                                            #{seat.home.ordinal}
+                                        </span>
+                                        <p
+                                            class="tabular-nums text-muted-foreground"
+                                        >
+                                            {seat.home.x}, {seat.home.y}, {seat
+                                                .home.z}
+                                        </p>
+                                    {:else}
+                                        <span
+                                            class="text-muted-foreground"
+                                            data-test="seat-home-{seat.id}"
+                                        >
+                                            —
+                                        </span>
                                     {/if}
                                 </td>
                                 <td class="px-4 py-3">

@@ -111,17 +111,28 @@ trait GameValidationRules
     /**
      * Get the validation rules used to validate a game's status.
      *
-     * Any status may be chosen with one exception: **a game cannot become `Active` until every
-     * generation stage has been accepted.** An active game is one being played, and a game whose
-     * cluster does not exist has nowhere for that to happen — so this is refused where a gamemaster or
-     * an administrator can see why, rather than discovered later as an empty universe.
+     * Any status may be chosen with two exceptions, and **a game cannot become `Active` until it can be
+     * played**: until every generation stage has been accepted, and until every player has somewhere to
+     * begin. An active game is one being played, and a game whose cluster does not exist has nowhere for
+     * that to happen — so this is refused where a gamemaster or an administrator can see why, rather
+     * than discovered later as an empty universe.
+     *
+     * **The two checks are not redundant, and the second is not the first restated.** Accepting the home
+     * stellia stage places every player seated at the time; seating somebody *afterwards* leaves them
+     * with no home and no way to get one short of starting the whole world over. The stage check cannot
+     * see that — it reads runs — so the second check is the one that catches the case that actually
+     * happens.
+     *
+     * They are ordered stage-first because a world with no cluster has nowhere to put a home: reporting
+     * the unplaced players to somebody who has not generated anything would name the symptom.
      *
      * Only `Active` is gated. Archiving a half-built game is ordinary housekeeping, and pausing or
      * completing one is somebody's business but not this rule's.
      *
      * The message names the stage that is missing, because "finish generating" is not an instruction —
-     * "the cluster stage has not been accepted yet" is. A null `$game` is the stricter branch, as
-     * everywhere else in this trait: with no game to inspect, the status is refused.
+     * "the cluster stage has not been accepted yet" is, and "two players have no home stellium yet" is.
+     * A null `$game` is the stricter branch, as everywhere else in this trait: with no game to inspect,
+     * the status is refused.
      *
      * The rule is a closure rather than a `Rule::prohibitedIf`, because it refuses one *value* of the
      * field rather than the field itself — every other status stays perfectly postable.
@@ -140,13 +151,23 @@ trait GameValidationRules
 
                 $unfinished = $game?->firstUnfinishedGenerationStage();
 
-                if ($game !== null && $unfinished === null) {
+                if ($game === null || $unfinished !== null) {
+                    $fail(__('The :stage stage has not been accepted yet, so this game cannot become active.', [
+                        'stage' => mb_strtolower(($unfinished ?? GenerationStage::cases()[0])->label()),
+                    ]));
+
                     return;
                 }
 
-                $fail(__('The :stage stage has not been accepted yet, so this game cannot become active.', [
-                    'stage' => mb_strtolower(($unfinished ?? GenerationStage::cases()[0])->label()),
-                ]));
+                $unplaced = $game->playersWithoutHomeStellium();
+
+                if ($unplaced > 0) {
+                    $fail(trans_choice(
+                        '{1} One player has no home stellium yet, so this game cannot become active.'
+                        .'|[2,*] :count players have no home stellium yet, so this game cannot become active.',
+                        $unplaced,
+                    ));
+                }
             },
         ];
     }

@@ -14,10 +14,12 @@ Globs: `app/Generation/**`, `app/Actions/Generation/**`, `app/Enums/Generation*.
 `tests/Feature/Gamemaster/GenerationTest.php`, `tests/Feature/GenerationModelTest.php`
 
 A game's world is built in **stages**, by its gamemaster, while the game is in `Setup`: generate from
-a seed, review, then accept or try another seed. Accepting unlocks the next stage. There are three —
-`Cluster` (100 locations), `Stelliums` (one star group per location, 141 stars in all) and `Planets`
-(one to ten around every star). Read [games.md](games.md) for the seed itself and
-[gamemaster.md](gamemaster.md) for the area's gate.
+a seed, review, then accept or try another seed. Accepting unlocks the next stage. There are four —
+`Cluster` (100 locations), `Stelliums` (one star group per location, 141 stars in all), `Planets`
+(one to ten around every star) and `HomeStellia` (one starting system per player). Read
+[games.md](games.md) for the seed itself, [gamemaster.md](gamemaster.md) for the area's gate, and
+[home-stellia.md](home-stellia.md) for the last stage, which is unlike the other three in three ways
+and adds no routes at all.
 
 ## A generator draws from its seed and from **nothing** else
 
@@ -103,7 +105,10 @@ Two consequences worth not re-deriving:
 
 `RestartGeneration` deletes every run for the game, and the cascade takes locations, stelliums, stars
 and planets with it — four levels deep now, which is why `GenerationModelTest` asserts the chain
-reaches the end rather than stopping at the stars. There is deliberately no per-stage rewind: a cluster and the stelliums standing on it
+reaches the end rather than stopping at the stars. The **home stellia** come off the same delete as a
+*branch* rather than a fifth level: they hang straight off the run, and off a `game_seats` row that
+must survive them. The dialog on the gamemaster's screen enumerates all of it, home stellia included —
+that sentence *is* the confirmation, so it cannot be left describing only the cluster. There is deliberately no per-stage rewind: a cluster and the stelliums standing on it
 are one world, so re-opening the cluster while its stelliums survived would leave stars at locations
 that no longer exist, and a per-stage rewind would need a second copy of the stage ordering to know
 what to destroy. It is a `POST`, not a `DELETE`, because no route in the gamemaster area accepts
@@ -121,6 +126,22 @@ Laravel's inflector pluralises `Stellium` to **`Stellia`** — the `medium`/`med
 
 `tests/Feature/GenerationModelTest.php` asserts both the hazard and the override, so the day an
 upstream fix makes the override unnecessary, somebody removes it deliberately rather than by accident.
+
+**The screen says "stellia" and the code says "stelliums", and that is not a drift to fix.** The
+inflector is *right* about the word — `stellia` is the Latin plural, and it is what the game is played
+in — so `GenerationStage::Stelliums->label()` returns `'Stellia'`, and with it every heading, accept
+button, toast and status refusal on the gamemaster's screen. `StelliumPlan::summary()`'s key is
+`stellia` for the same reason: `GenerationStageCard` prints a summary's keys verbatim, so that key *is*
+a label.
+
+What stays `stelliums` is everything that is an **identifier** rather than a word:
+
+- the enum **case** and its backed value, because the value is stored in `generation_runs.stage` and is
+  a route parameter — renaming it would orphan every stored run and break saved URLs;
+- the table, the model, the relations and `Game::stelliums()`, per the override above.
+
+Label is display, value is identity, and only one of the two is free. A test pins the refusal sentence
+("the stellia stage has not been accepted yet") so changing the label back is a deliberate act.
 
 ## The algorithms, and the numbers behind them
 
@@ -302,7 +323,16 @@ Three smaller things that are load-bearing:
   `locationDetail` prop comes back, so two owners would fetch over each other; the map and the table
   are two views of one open location. That is also why `ClusterLocationsTable` now takes `expanded`,
   `loading` and `onToggle` as props instead of holding them.
-- **The map's palette is read as `var(--space)` / `var(--stellium-N)`, never `var(--color-*)`.**
+- **A hex's marks are judged over *all* its occupants, never `hex.locations[0]`.** The home glow is the
+  live case: the primary is merely the lowest ordinal, so keying off it would leave a home unlit
+  whenever another system shares its hex — right on ninety-odd hexes and quietly wrong on the rest,
+  which is the failure this section is about. `some()` over `hex.locations`.
+- **The centre hex's filter is now `cluster-hex-glow` and is shared.** A `<filter>` is a reusable
+  resource — `filterUnits` defaults to `objectBoundingBox`, so the region is measured against whichever
+  element references it — which is why one definition serves the centre and every home hex, and why it
+  must stay outside the `{#each}`, where the id would stop being unique.
+- **The map's palette is read as `var(--space)` / `var(--stellium-N)` / `var(--home)`, never
+  `var(--color-*)`.**
   `@theme inline` *inlines* a token into the utilities Tailwind generates rather than emitting a
   `--color-*` custom property, so a hand-written `var(--color-stellium-3)` in an SVG resolves to
   nothing and the mark paints black. Those tokens are also deliberately **not** overridden in `.dark`:

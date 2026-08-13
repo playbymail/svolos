@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\GameRole;
 use App\Enums\GameStatus;
 use App\Enums\GenerationStage;
 use App\Enums\GenerationStageState;
@@ -285,6 +286,30 @@ class Game extends Model
     public function isGenerationComplete(): bool
     {
         return $this->firstUnfinishedGenerationStage() === null;
+    }
+
+    /**
+     * Count the active players who have nowhere to begin.
+     *
+     * Zero for a game whose home stellia stage has been accepted — that stage places every player
+     * seated at the time — and non-zero exactly when somebody has been **seated since**, which is the
+     * one way a fully generated game can still have a player with no home. `GameValidationRules` uses
+     * it to keep such a game out of `GameStatus::Active`.
+     *
+     * A live query rather than a read of `activeSeats`, because the callers are validation rules that
+     * run against whatever the database says now, and because loading every seat with its home to count
+     * the ones missing would be the expensive way round.
+     *
+     * Gamemasters and retired seats are not counted, for the same reason `GenerateHomeStellia` does not
+     * place them: a gamemaster runs the game rather than playing it, and somebody who has left has
+     * nowhere to need.
+     */
+    public function playersWithoutHomeStellium(): int
+    {
+        return $this->activeSeats()
+            ->where('role', GameRole::Player)
+            ->whereDoesntHave('homeStellium')
+            ->count();
     }
 
     /**

@@ -34,6 +34,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $game_id
  * @property GenerationStage $stage
  * @property int $seed
+ * @property bool $traveler
+ * @property int $minimum_separation
+ * @property bool $separation_in_hexes
  * @property int $attempt
  * @property array<string, mixed>|null $summary
  * @property CarbonImmutable|null $accepted_at
@@ -44,6 +47,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, Location> $locations
  * @property-read Collection<int, Stellium> $stelliums
  * @property-read Collection<int, Planet> $planets
+ * @property-read Collection<int, HomeStellium> $homeStelliums
  */
 class GenerationRun extends Model
 {
@@ -88,6 +92,20 @@ class GenerationRun extends Model
     public function planets(): HasMany
     {
         return $this->hasMany(Planet::class);
+    }
+
+    /**
+     * Get the home stellia this run chose, if it was a home stellia run that is still standing.
+     *
+     * The one set of artefacts here that pairs a generated thing to a *seat* rather than standing on
+     * the stage before it. It hangs off the run all the same, and for the same reason: an arrangement
+     * belongs to the attempt that produced it, so regenerating drops it and starting over deletes it.
+     *
+     * @return HasMany<HomeStellium, $this>
+     */
+    public function homeStelliums(): HasMany
+    {
+        return $this->hasMany(HomeStellium::class);
     }
 
     /**
@@ -147,6 +165,8 @@ class GenerationRun extends Model
             'stage' => GenerationStage::class,
             'seed' => 'integer',
             'traveler' => 'boolean',
+            'minimum_separation' => 'integer',
+            'separation_in_hexes' => 'boolean',
             'attempt' => 'integer',
             'summary' => 'array',
             'accepted_at' => 'datetime',

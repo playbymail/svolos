@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Generation\Coordinates;
 use Carbon\CarbonImmutable;
 use Database\Factories\LocationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -32,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property-read Game $game
  * @property-read GenerationRun $generationRun
  * @property-read Stellium|null $stellium
+ * @property-read HomeStellium|null $homeStellium
  */
 class Location extends Model
 {
@@ -72,6 +74,19 @@ class Location extends Model
     }
 
     /**
+     * Get the home stellium standing at this location, if a player begins here.
+     *
+     * Nullable twice over, and the two nulls mean different things: most locations are nobody's home,
+     * and *every* location is nobody's home until the home stellia stage has run.
+     *
+     * @return HasOne<HomeStellium, $this>
+     */
+    public function homeStellium(): HasOne
+    {
+        return $this->hasOne(HomeStellium::class);
+    }
+
+    /**
      * Get this location's distance from the centre of the cluster.
      *
      * Presented rather than stored: it is a function of three columns that never change once written,
@@ -80,6 +95,29 @@ class Location extends Model
     public function radius(): float
     {
         return sqrt($this->x ** 2 + $this->y ** 2 + $this->z ** 2);
+    }
+
+    /**
+     * Get this location as the plain integer point the generators work in.
+     *
+     * `App\Generation\Coordinates` is deliberately not a model — the cluster generator builds a
+     * hundred of them before any row exists — so this is the one place the two representations meet.
+     */
+    public function coordinates(): Coordinates
+    {
+        return new Coordinates($this->x, $this->y, $this->z);
+    }
+
+    /**
+     * Count the hexes between this location and another, the way the map draws them.
+     *
+     * Height plays no part: a hex is one `(x, y)` pair, so two systems thirty apart in `z` share a hex
+     * and are zero from each other by this measure. See `Coordinates::hexDistanceTo()` for why that is
+     * a different question from `radius()` and from the generator's separation rule.
+     */
+    public function hexDistanceTo(self $other): int
+    {
+        return $this->coordinates()->hexDistanceTo($other->coordinates());
     }
 
     /**

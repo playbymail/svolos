@@ -122,6 +122,26 @@
      */
     const centrePath = hexPath({ x: 0, y: 0 }, HEX_SIZE);
 
+    /*
+     * The hexes somebody begins at, lit the same way the centre is.
+     *
+     * **`some()` over a hex's occupants, never `hex.locations[0]`.** A hex holds up to four systems
+     * and the primary is merely the lowest ordinal, so a home sitting behind another system would go
+     * unlit — right on ninety-odd hexes and quietly wrong on the rest, which is the failure this map
+     * exists to keep avoiding.
+     */
+    const homeHexes = $derived(
+        systems
+            .filter((hex) =>
+                hex.locations.some(
+                    (location) => location.home_seat_id !== null,
+                ),
+            )
+            .map((hex) => hexPath(hex.cell, HEX_SIZE)),
+    );
+
+    const hasHomes = $derived(homeHexes.length > 0);
+
     function fillFor(location: ClusterLocation): string {
         if (location.star_count === null) {
             return 'var(--space-ink)';
@@ -193,7 +213,7 @@
         {#if hasStars}
             Brighter and larger means more stars.
         {:else}
-            Star counts appear once the stelliums stage has run.
+            Star counts appear once the stellia stage has run.
         {/if}
     </p>
 
@@ -222,22 +242,22 @@
             />
 
             <!--
-                The middle hex, lit rather than labelled.
+                A lit hex outline: a blurred copy under a crisper one, which is what makes it bloom
+                instead of merely being a thicker border.
 
-                It used to carry a crosshair and the word "centre", which put text into the picture at
-                the one place systems cluster most densely — the label collided with a neighbouring
-                system's height caption. A glow says "here" without competing for the same space, and
-                it says nothing that has to be read.
+                **One `<filter>` serves every hex that uses it.** `filterUnits` defaults to
+                `objectBoundingBox`, so the `-50%/200%` region is measured against whichever element
+                references it — the definition must therefore stay out of the `{#each}` below, both
+                because the id has to be unique in the document and because there is nothing
+                per-hex about it.
 
-                The glow is a blurred copy of the outline under a crisper one, which is what makes it
-                bloom instead of merely being a thicker border. `--space-ink` is the map's own light,
-                the same token the marks use; the palette is read as `var(--space*)` and never as
-                `var(--color-*)`, since `@theme inline` leaves no custom property behind for the
-                latter and the stroke would resolve to nothing.
+                The palette is read as `var(--space*)` / `var(--home)` and never as `var(--color-*)`:
+                `@theme inline` leaves no custom property behind for the latter, and the stroke would
+                resolve to nothing.
             -->
             <defs>
                 <filter
-                    id="cluster-centre-glow"
+                    id="cluster-hex-glow"
                     x="-50%"
                     y="-50%"
                     width="200%"
@@ -246,13 +266,22 @@
                     <feGaussianBlur stdDeviation="1.4" />
                 </filter>
             </defs>
+
+            <!--
+                The middle hex, lit rather than labelled.
+
+                It used to carry a crosshair and the word "centre", which put text into the picture at
+                the one place systems cluster most densely — the label collided with a neighbouring
+                system's height caption. A glow says "here" without competing for the same space, and
+                it says nothing that has to be read.
+            -->
             <path
                 d={centrePath}
                 fill="none"
                 stroke="var(--space-ink)"
                 stroke-width="1.1"
                 opacity="0.5"
-                filter="url(#cluster-centre-glow)"
+                filter="url(#cluster-hex-glow)"
             />
             <path
                 d={centrePath}
@@ -261,6 +290,33 @@
                 stroke-width="0.6"
                 opacity="0.3"
             />
+
+            <!--
+                The hexes players begin at, lit the same way and in a different colour.
+
+                Same treatment as the centre because it means the same thing — "this hex matters,
+                nothing here to read" — and a different hue because a home is not a landmark: the
+                centre is where distances are measured from, a home is somebody's. Drawn under the
+                systems so a mark is never obscured by the border around it, and brighter than the
+                centre because it is the thing worth finding.
+            -->
+            {#each homeHexes as home (home)}
+                <path
+                    d={home}
+                    fill="none"
+                    stroke="var(--home)"
+                    stroke-width="1.4"
+                    opacity="0.55"
+                    filter="url(#cluster-hex-glow)"
+                />
+                <path
+                    d={home}
+                    fill="none"
+                    stroke="var(--home)"
+                    stroke-width="0.7"
+                    opacity="0.85"
+                />
+            {/each}
 
             {#each systems as hex (hex.key)}
                 {@const primary = hex.locations[0]}
@@ -281,7 +337,9 @@
                         ? `, sharing a hex with ${hex.locations.length - 1} more`
                         : ''}{primary.star_count === null
                         ? ''
-                        : `, ${primary.star_count} stars`}"
+                        : `, ${primary.star_count} stars`}{primary.home_player_name
+                        ? `, home of ${primary.home_player_name}`
+                        : ''}"
                     onclick={() => open(hex)}
                     onkeydown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
@@ -380,6 +438,20 @@
                         planets{/if}
                 </span>
             {/if}
+            {#if readout.home_player_name}
+                <!--
+                    Named rather than merely marked. "Somebody starts here" is the answer to a
+                    question nobody asked — which of the players is the useful half, and it is also
+                    the relief channel for the glow: the border must never be the only way to know.
+                -->
+                <span
+                    class="font-medium"
+                    style:color="var(--home)"
+                    data-test="cluster-hex-home"
+                >
+                    Home of {readout.home_player_name}
+                </span>
+            {/if}
             {#if measured}
                 <span class="tabular-nums" data-test="cluster-hex-measure">
                     {measured.hexes}
@@ -420,6 +492,27 @@
                     {count === 1 ? 'star' : 'stars'}
                 </li>
             {/each}
+            {#if hasHomes}
+                <!--
+                    Part of the same legend rather than a second one: the glow is a mark on the map
+                    like the others and needs saying once, beside them.
+                -->
+                <li class="flex items-center gap-1.5">
+                    <svg
+                        viewBox="-6 -6 12 12"
+                        class="h-3 w-3"
+                        aria-hidden="true"
+                    >
+                        <circle
+                            r="4.4"
+                            fill="none"
+                            stroke="var(--home)"
+                            stroke-width="1.4"
+                        />
+                    </svg>
+                    a player's home
+                </li>
+            {/if}
         </ul>
     {/if}
 </div>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Generation\ClusterGenerator;
+use App\Generation\HomeStelliumGenerator;
 use App\Generation\PlanetGenerator;
 use App\Generation\SeededRandomizer;
 use App\Generation\StelliumGenerator;
@@ -30,7 +31,17 @@ use App\Models\Game;
  */
 function seededGenerators(): array
 {
-    return [ClusterGenerator::class, StelliumGenerator::class, PlanetGenerator::class];
+    return [
+        ClusterGenerator::class,
+        StelliumGenerator::class,
+        PlanetGenerator::class,
+        /*
+         * The one where the temptation is sharpest: choosing homes from a candidate list is exactly
+         * the shape somebody reaches for `shuffle()` or `Arr::random()` to solve, and an arrangement
+         * drawn that way honours every separation and simply lands somewhere else next time.
+         */
+        HomeStelliumGenerator::class,
+    ];
 }
 
 /**

@@ -1,10 +1,14 @@
 <?php
 
+use App\Enums\GameRole;
 use App\Enums\GenerationStage;
 use App\Models\Game;
 use App\Models\GameSeat;
 use App\Models\GenerationRun;
+use App\Models\HomeStellium;
 use App\Models\Invitation;
+use App\Models\Location;
+use App\Models\Stellium;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Transport\ArrayTransport;
@@ -119,6 +123,54 @@ function withCompletedGeneration(Game $game): Game
 {
     foreach (GenerationStage::cases() as $stage) {
         GenerationRun::factory()->for($game)->stage($stage)->accepted()->create();
+    }
+
+    return $game->load('generationRuns');
+}
+
+/**
+ * Give every active player at a game somewhere to begin, so it can become `GameStatus::Active`.
+ *
+ * The companion to `withCompletedGeneration()` above, and needed *beside* it rather than folded into
+ * it: that helper fabricates accepted runs with **no rows**, so a game it prepares is "generated" in
+ * the sense the stage machine cares about while still having nowhere for anybody to start.
+ * `GameValidationRules::gameStatusRules()` checks both, and this is the second half.
+ *
+ * The locations are spaced 10 apart in `x` so they satisfy any sane minimum separation, and each gets
+ * a single-star stellium — not because this helper places anything (it writes the homes directly), but
+ * so the rows it leaves behind describe a world the real generator could have produced.
+ *
+ * Reuses the game's accepted home stellia run when it already has one, so calling this after
+ * `withCompletedGeneration()` does not leave two standing runs for the same stage — which
+ * `Game::generationRunFor()` would then have to choose between.
+ */
+function withPlacedHomes(Game $game): Game
+{
+    $run = $game->generationRuns()
+        ->where('stage', GenerationStage::HomeStellia)
+        ->whereNull('superseded_at')
+        ->first()
+        ?? GenerationRun::factory()->for($game)->stage(GenerationStage::HomeStellia)->accepted()->create();
+
+    $column = 0;
+
+    foreach ($game->activeSeats()->where('role', GameRole::Player)->get() as $seat) {
+        $location = Location::factory()
+            ->for($game)
+            ->create(['generation_run_id' => $run->id, 'x' => $column, 'y' => 0, 'z' => 0]);
+
+        Stellium::factory()
+            ->for($location)
+            ->withStars(1)
+            ->create(['generation_run_id' => $run->id]);
+
+        HomeStellium::factory()->create([
+            'generation_run_id' => $run->id,
+            'game_seat_id' => $seat->id,
+            'location_id' => $location->id,
+        ]);
+
+        $column += 10;
     }
 
     return $game->load('generationRuns');

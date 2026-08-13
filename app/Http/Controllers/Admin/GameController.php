@@ -95,7 +95,7 @@ class GameController extends Controller
         $game->loadCount(['seats', 'activeSeats']);
 
         $seats = $game->seats()
-            ->with('user')
+            ->with(['user', 'homeStellium.location'])
             ->get()
             ->sortBy([
                 /* Active seats first, then alphabetically, so the live roster reads as one block. */
@@ -276,6 +276,12 @@ class GameController extends Controller
     /**
      * Shape one seat for the roster.
      *
+     * `home` is where the seat's player begins, and it is here even though this screen carries no hex
+     * map to point at: the roster is the **only** place an administrator can see it, and the shared
+     * `GameValidationRules::gameStatusRules()` will refuse them an `Active` game while a player has
+     * none — so a screen that could not say which players those were would report a problem it could
+     * not help with.
+     *
      * @return array{
      *     id: int,
      *     user_id: int,
@@ -284,11 +290,14 @@ class GameController extends Controller
      *     role: string,
      *     role_label: string,
      *     is_active: bool,
+     *     home: array{location_id: int, ordinal: int, x: int, y: int, z: int}|null,
      *     created_at_diff: string|null,
      * }
      */
     private function presentSeat(GameSeat $seat): array
     {
+        $home = $seat->homeStellium?->location;
+
         return [
             'id' => $seat->id,
             'user_id' => $seat->user_id,
@@ -297,6 +306,13 @@ class GameController extends Controller
             'role' => $seat->role->value,
             'role_label' => $seat->role->label(),
             'is_active' => $seat->is_active,
+            'home' => $home === null ? null : [
+                'location_id' => $home->id,
+                'ordinal' => $home->ordinal,
+                'x' => $home->x,
+                'y' => $home->y,
+                'z' => $home->z,
+            ],
             'created_at_diff' => $seat->created_at?->diffForHumans(),
         ];
     }
