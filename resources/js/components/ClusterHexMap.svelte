@@ -84,6 +84,7 @@
         locations.some((location) => location.planet_count !== null),
     );
 
+
     let hovered = $state<number | null>(null);
 
     const byId = $derived(
@@ -115,7 +116,12 @@
             : null,
     );
 
-    const origin = hexCentre({ x: 0, y: 0 }, HEX_SIZE);
+    /*
+     * The middle hex's own outline, drawn over the grid so it can be lit slightly brighter than its
+     * neighbours. It is the map's one fixed landmark — every distance in the readout is measured from
+     * it — so it has to be findable, but it carries no reading of its own and gets no caption.
+     */
+    const centrePath = hexPath({ x: 0, y: 0 }, HEX_SIZE);
 
     function fillFor(location: ClusterLocation): string {
         if (location.star_count === null) {
@@ -184,7 +190,7 @@
     <p class="text-sm text-muted-foreground">
         {locations.length} systems on the plane, each in the hex its X and Y fall
         into, labelled with its Z — the height above or below it. Count hexes for
-        reach; the centre hex is always empty.
+        reach.
         {#if hasStars}
             Brighter and larger means more stars.
         {:else}
@@ -217,24 +223,45 @@
             />
 
             <!--
-                The centre is empty in every game — the generator rejects the origin outright — so it
-                is marked rather than left as one more blank hex among seven hundred.
+                The middle hex, lit rather than labelled.
+
+                It used to carry a crosshair and the word "centre", which put text into the picture at
+                the one place systems cluster most densely — the label collided with a neighbouring
+                system's height caption. A glow says "here" without competing for the same space, and
+                it says nothing that has to be read.
+
+                The glow is a blurred copy of the outline under a crisper one, which is what makes it
+                bloom instead of merely being a thicker border. `--space-ink` is the map's own light,
+                the same token the marks use; the palette is read as `var(--space*)` and never as
+                `var(--color-*)`, since `@theme inline` leaves no custom property behind for the
+                latter and the stroke would resolve to nothing.
             -->
-            <g style:fill="var(--space-ink)" opacity="0.45">
-                <path
-                    d="M{origin.cx -
-                        2.6},{origin.cy} h5.2 M{origin.cx},{origin.cy -
-                        2.6} v5.2"
-                    stroke="var(--space-ink)"
-                    stroke-width="0.8"
-                />
-                <text
-                    x={origin.cx}
-                    y={origin.cy + 8.5}
-                    text-anchor="middle"
-                    font-size="4.4">centre</text
+            <defs>
+                <filter
+                    id="cluster-centre-glow"
+                    x="-50%"
+                    y="-50%"
+                    width="200%"
+                    height="200%"
                 >
-            </g>
+                    <feGaussianBlur stdDeviation="1.4" />
+                </filter>
+            </defs>
+            <path
+                d={centrePath}
+                fill="none"
+                stroke="var(--space-ink)"
+                stroke-width="1.1"
+                opacity="0.5"
+                filter="url(#cluster-centre-glow)"
+            />
+            <path
+                d={centrePath}
+                fill="none"
+                stroke="var(--space-ink)"
+                stroke-width="0.6"
+                opacity="0.3"
+            />
 
             {#each systems as hex (hex.key)}
                 {@const primary = hex.locations[0]}

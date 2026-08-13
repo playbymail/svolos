@@ -137,6 +137,55 @@ points still legal, and no failures in 2,000 seeds. `MAXIMUM_ATTEMPTS` (100,000)
 `GenerationFailed` rather than spin. The O(n²) separation check is ~12,000 integer comparisons; a
 spatial index would be pure cost.
 
+*Traveler mode is **two more rejections**, not a second algorithm.* `generate($seed, traveler: true)`
+also refuses a candidate sharing an `(x, y)` pair with one already placed. Separation cannot deliver
+that and never could: two systems thirty apart in `z` are as far apart as the cluster gets and still
+stand in the same column — which the hex map draws as one hex, since a cell *is* an `(x, y)` pair with
+no binning step. So the constraint is exactly "one system per hex". 709 columns exist inside the
+outline for 100 locations; measured over 300 seeds it never failed and took 191–301 attempts, a median
+of 248 against the ordinary 235.
+
+**The second rejection is the centre column, and `isOrigin()` is not it.** `(0, 0, -10)` is thirty
+units from the middle of the cluster and is not the origin, but it shares the origin's `(x, y)`, so
+the map draws it in the middle hex — the one presented as the cluster's empty centre. "One system per
+hex" has to include the centre hex or the map contradicts itself, which is how this was found: seed
+3332012312 put system #53 exactly there. `Coordinates::isInCentreColumn()` is the wider test, and
+`ClusterGeneratorTest` keeps that seed as a named case beside the sweep.
+
+**An ordinary cluster still occupies the centre hex about one game in six** — measured at 17.8% over
+400 seeds — because only the origin *point* is refused without the flag. That is a live disagreement
+with what a reader expects, and it is left alone on purpose: widening the rejection to every cluster
+would change the draw for that share of seeds and break the clusters they are stored to reproduce.
+
+So **the map says nothing about the centre at all**, in either direction. Its caption used to read
+"the centre hex is always empty", which was wrong that often. Replacing it with a sentence that
+reported which of the two it was is the obvious repair and was rejected: it spends a line of prose on
+something the picture already shows, and the reader has to hold a claim in mind to check it. The
+locations table's "The centre itself is always empty" is a **different and correct** claim — that one
+is about the origin *point* — so it stays.
+
+**Two invariants keep every already-accepted seed replayable, and both are easy to break:**
+
+- **The three `getInt` calls stay unconditional and in order.** Every rejection is a bare `continue`
+  with nothing drawn between, so with the flag off the candidate stream is the one the generator has
+  always produced. `ClusterGeneratorTest` pins seed 4242's first three coordinates and its 253 attempts
+  as **literals** for this reason — comparing two runs of the same code cannot catch a shifted stream,
+  because it agrees with itself perfectly while every stored cluster quietly renumbers. Drawing a
+  coordinate only once an earlier one passed is the tempting optimisation and is the bug.
+- **The order of the rejections cannot change the output**, for the same reason: no test consumes a
+  draw. The column test is placed ahead of the separation scan purely because it is cheaper.
+
+The flag lives on the **run**, beside the seed, because it is an input to that attempt: a gamemaster
+can try one seed both ways and the accepted run is the record of which cluster the game got. Only the
+cluster stage reads it; a run of another stage stores what was asked and ignores it, which is why
+there is no validation rule tying it to a stage — no value of it is ever wrong.
+
+*`occupied_hexes` is a measurement, not an echo of the flag.* `LocationSet` counts the distinct
+`(x, y)` pairs the way it measures the realised `minimum_separation` — after the fact, from the points
+— so the summary states what the cluster *is* rather than what the generator was told to do, and the
+two can never drift apart. It reads 100 beside `locations 100` under traveler and about 95 without.
+The mode itself is shown from the run's own `traveler`, so nothing is stored twice.
+
 **Stelliums.** The 70/20/9/1 distribution is a **quota, not a probability**: every game gets exactly
 70 singles, 20 doubles, 9 triples and one quadruple, and the seed decides only which location gets
 which. Rolling each stellium independently is the obvious alternative and is worse — the counts drift,
@@ -211,6 +260,12 @@ actually changes with the seed is **where the rare stelliums landed and what is 
 — so the rare stelliums are made findable by size and colour, and selecting a system turns the readout
 into a rangefinder.
 
+**The middle hex is lit, not labelled.** It carried a crosshair and the word "centre" until that text
+was seen colliding with a neighbouring system's height caption — the middle of the map is where
+systems crowd most, so it is the worst place to put a word. It is now a blurred copy of the hex
+outline under a crisper one, in `--space-ink`: findable at a glance, nothing to read, nothing to
+overlap. It is worth marking at all only because every distance in the readout is measured from it.
+
 **The caption under a hex is the system's height and nothing else.** The ordinal is an identifier
 rather than a measurement — it says nothing about where a system sits — and the readout already gives
 it on hover or focus. An earlier version printed `#51 (+12)` for triples and the quadruple while
@@ -226,6 +281,14 @@ returns a *list* per hex, a stacked hex draws an offset outline with a `2×` cap
 steps through its occupants because no click position can distinguish them. Collapsing this to one
 system per hex is the tempting simplification, and it would look right on ninety-odd hexes while
 silently hiding the rest.
+
+**Traveler mode is not a reason to revisit that.** A cluster generated with the flag really does put
+one system in every hex, so a traveler game exercises none of the stacking code — but the flag is
+**off by default and per run**, so ordinary clusters are still the common case and still stack. A map
+rewritten around traveler clusters would be wrong for every other game, and wrong in the quiet way:
+right on ninety-five hexes, hiding five. `ClusterGeneratorTest` keeps a test asserting that an
+ordinary cluster occupies *fewer* hexes than it has locations, so the day that stops being true is a
+deliberate discovery rather than a stale assumption.
 
 Three smaller things that are load-bearing:
 

@@ -33,11 +33,14 @@ class GenerateCluster implements StageGeneration
     /**
      * Scatter this run's cluster and write it.
      *
+     * The run carries both of the generator's inputs — its seed, and whether the traveler constraint
+     * applies — so nothing about the cluster arrives here from anywhere but the row.
+     *
      * @return array<string, mixed>
      */
     public function handle(GenerationRun $run): array
     {
-        $cluster = $this->generator->generate($run->seed);
+        $cluster = $this->generator->generate($run->seed, $run->traveler);
 
         $now = now();
 

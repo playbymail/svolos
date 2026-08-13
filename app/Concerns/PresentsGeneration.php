@@ -213,6 +213,11 @@ trait PresentsGeneration
      * new random one for a regeneration, since regenerating with the same seed would redraw the same
      * thing and is refused.
      *
+     * `traveler` does double duty and is one field for that reason: it labels the run under review,
+     * and it is what the cluster form's checkbox starts ticked from, so regenerating a stage keeps the
+     * mode the last attempt used instead of silently reverting to the ordinary draw. It is null before
+     * any run, which the screen reads as unticked — there is nothing to inherit yet.
+     *
      * @return array<string, mixed>
      */
     private function presentStage(Game $game, GenerationStage $stage, bool $withSuggestions): array
@@ -227,6 +232,7 @@ trait PresentsGeneration
             'state' => $state->value,
             'state_label' => $state->label(),
             'seed' => $run?->seed,
+            'traveler' => $run?->traveler,
             'attempt' => $run?->attempt,
             'summary' => $run?->summary,
             'generated_at_diff' => $run?->created_at?->diffForHumans(),

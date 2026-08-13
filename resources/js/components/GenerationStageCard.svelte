@@ -6,6 +6,7 @@
     import InputError from '@/components/InputError.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
+    import { Checkbox } from '@/components/ui/checkbox';
     import { Input } from '@/components/ui/input';
     import { Label } from '@/components/ui/label';
     import { Spinner } from '@/components/ui/spinner';
@@ -141,6 +142,19 @@
                 <dt class="text-muted-foreground">Attempt</dt>
                 <dd>{stage.attempt}</dd>
             </div>
+            {#if stage.traveler}
+                <!--
+                    Shown only when it is on, because "Traveler no" would be noise on every ordinary
+                    run and on the two stages that do not read the flag at all. What it changed is
+                    visible in the summary beside it: occupied hexes equal to the location count.
+                -->
+                <div>
+                    <dt class="text-muted-foreground">Traveler</dt>
+                    <dd data-test="generation-traveler-{stage.stage}">
+                        One system per hex
+                    </dd>
+                </div>
+            {/if}
             <div>
                 <dt class="text-muted-foreground">Generated</dt>
                 <dd>{stage.generated_at_diff ?? '—'}</dd>
@@ -247,6 +261,34 @@
                             : 'Generate'}
                     </Button>
                 </div>
+
+                {#if stage.stage === 'cluster'}
+                    <!--
+                        Only the cluster stage places coordinates, so it is the only one with this to
+                        offer. The box starts from the pending run's own setting, so trying another
+                        seed keeps the mode rather than quietly reverting to the ordinary draw.
+                    -->
+                    <div class="grid gap-2">
+                        <Label
+                            for="traveler-{stage.stage}"
+                            class="flex items-center space-x-3"
+                        >
+                            <Checkbox
+                                id="traveler-{stage.stage}"
+                                name="traveler"
+                                checked={stage.traveler ?? false}
+                                data-test="generation-traveler-input-{stage.stage}"
+                            />
+                            <span>Traveler mode</span>
+                        </Label>
+                        <p class="text-xs text-muted-foreground">
+                            Give every system a hex of its own. Ordinarily a few
+                            share one — same column, different height — and the
+                            map stacks them.
+                        </p>
+                        <InputError message={errors.traveler} />
+                    </div>
+                {/if}
             {/snippet}
         </Form>
     {/if}

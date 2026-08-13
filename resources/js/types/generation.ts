@@ -48,6 +48,10 @@ export type GenerationAttempt = {
  * `suggested_seed` is only present on the gamemaster's screen, which is the only one that can act on
  * it: the game's base seed before a stage has ever run, and a fresh random number afterwards, because
  * regenerating with the seed already on the pending run is refused.
+ *
+ * `traveler` is the cluster's other input, and null means "no run yet" rather than false — the same
+ * distinction the location counts make. The cluster form's checkbox starts from it, so regenerating
+ * keeps the mode the last attempt used.
  */
 export type GenerationStageSummary = {
     stage: GenerationStage;
@@ -56,6 +60,7 @@ export type GenerationStageSummary = {
     state: GenerationStageState;
     state_label: string;
     seed: number | null;
+    traveler: boolean | null;
     attempt: number | null;
     summary: Record<string, unknown> | null;
     generated_at_diff: string | null;

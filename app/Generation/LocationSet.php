@@ -55,6 +55,29 @@ final readonly class LocationSet
     }
 
     /**
+     * Get how many distinct `(x, y)` pairs the cluster occupies.
+     *
+     * One such pair is one hex of the map — `ClusterHexMap` places a system by its `x, y` and prints
+     * `z` beside it — so this is the number of hexes the cluster will fill, and the count falls short
+     * of `count()` by however many systems ended up stacked. It is the measurement that says at a
+     * glance which way a run was drawn: equal to the location count under the traveler constraint,
+     * usually seven or so below it without.
+     *
+     * Measured from the points rather than reported by the generator, for the same reason
+     * `minimumSeparation()` is: what the cluster *is* outranks what the generator meant to do.
+     */
+    public function occupiedHexes(): int
+    {
+        $hexes = [];
+
+        foreach ($this->coordinates as $coordinates) {
+            $hexes["{$coordinates->x},{$coordinates->y}"] = true;
+        }
+
+        return count($hexes);
+    }
+
+    /**
      * Get the distance from the centre to the outermost location.
      */
     public function maximumRadius(): float
@@ -67,12 +90,13 @@ final readonly class LocationSet
     /**
      * Describe this cluster for the run that produced it.
      *
-     * @return array{locations: int, attempts: int, minimum_separation: float, maximum_radius: float}
+     * @return array{locations: int, occupied_hexes: int, attempts: int, minimum_separation: float, maximum_radius: float}
      */
     public function summary(): array
     {
         return [
             'locations' => $this->count(),
+            'occupied_hexes' => $this->occupiedHexes(),
             'attempts' => $this->attempts,
             'minimum_separation' => round($this->minimumSeparation(), 3),
             'maximum_radius' => round($this->maximumRadius(), 3),

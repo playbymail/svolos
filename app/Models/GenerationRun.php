@@ -146,6 +146,7 @@ class GenerationRun extends Model
         return [
             'stage' => GenerationStage::class,
             'seed' => 'integer',
+            'traveler' => 'boolean',
             'attempt' => 'integer',
             'summary' => 'array',
             'accepted_at' => 'datetime',

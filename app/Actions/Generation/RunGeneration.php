@@ -34,10 +34,15 @@ class RunGeneration
 
     /**
      * Generate a stage for a game from a seed, replacing any pending attempt at it.
+     *
+     * `$traveler` is stored on the run beside the seed and read only by the cluster stage, which draws
+     * one system per hex when it is set. It is recorded rather than acted on here for the same reason
+     * the seed is: the run is the record of what was asked, and the stage is what knows what to do
+     * with it.
      */
-    public function handle(Game $game, GenerationStage $stage, int $seed): GenerationRun
+    public function handle(Game $game, GenerationStage $stage, int $seed, bool $traveler = false): GenerationRun
     {
-        return DB::transaction(function () use ($game, $stage, $seed): GenerationRun {
+        return DB::transaction(function () use ($game, $stage, $seed, $traveler): GenerationRun {
             $game->load('generationRuns');
 
             $generation = $this->registry->for($stage);
@@ -54,6 +59,7 @@ class RunGeneration
             $run->game_id = $game->getKey();
             $run->stage = $stage;
             $run->seed = $seed;
+            $run->traveler = $traveler;
             $run->attempt = $game->nextGenerationAttemptFor($stage);
             $run->save();
 

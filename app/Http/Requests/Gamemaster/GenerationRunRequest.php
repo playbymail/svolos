@@ -10,7 +10,8 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * The seed handed to a generator, whether it is the first run of a stage or a replacement for one.
+ * What a generator is handed: the seed, and whether the cluster is drawn under the traveler
+ * constraint — whether this is the first run of a stage or a replacement for one.
  *
  * ## Regenerating requires a *different* seed, and that is a validation rule
  *
@@ -34,6 +35,11 @@ class GenerationRunRequest extends FormRequest
      * `bail` stops at the first failure, so a seed that is both out of range and unchanged produces one
      * message rather than two for the same number.
      *
+     * `traveler` is optional because an unchecked checkbox posts nothing at all, which is the state it
+     * means. It is not validated against the stage: only the cluster stage reads it, and a run of
+     * another stage recording that it was asked for is both harmless and true. There is no seed-like
+     * refusal to make here, because no value of it is ever wrong.
+     *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
@@ -46,7 +52,10 @@ class GenerationRunRequest extends FormRequest
             $rules[] = Rule::notIn([$pending]);
         }
 
-        return ['seed' => $rules];
+        return [
+            'seed' => $rules,
+            'traveler' => ['sometimes', 'boolean'],
+        ];
     }
 
     /**

@@ -36,12 +36,15 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 /**
  * Generate a stage as a gamemaster, and hand back the response.
+ *
+ * `$traveler` is posted only when it is set, because that is what an unticked checkbox does — sending
+ * `traveler=0` would exercise a shape the screen never produces.
  */
-function generateStage(User $gamemaster, Game $game, GenerationStage $stage, int $seed): TestResponse
+function generateStage(User $gamemaster, Game $game, GenerationStage $stage, int $seed, bool $traveler = false): TestResponse
 {
     return test()->actingAs($gamemaster)->post(
         route('gamemaster.games.generation.store', ['game' => $game, 'stage' => $stage->value]),
-        ['seed' => $seed],
+        $traveler ? ['seed' => $seed, 'traveler' => '1'] : ['seed' => $seed],
     );
 }
 
@@ -188,6 +191,98 @@ test('a gamemaster generates a cluster of a hundred locations from a seed', func
     expect($run->attempt)->toBe(1);
     expect($run->isPending())->toBeTrue();
     expect($run->summary['locations'] ?? null)->toBe(ClusterGenerator::LOCATION_COUNT);
+
+    /* Traveler mode is off unless it was asked for, and an ordinary cluster stacks a few systems. */
+    expect($run->traveler)->toBeFalse();
+    expect($run->summary['occupied_hexes'])->toBeLessThan(ClusterGenerator::LOCATION_COUNT);
+});
+
+test('a gamemaster generates a traveler cluster, and no two systems share a hex', function () {
+    /*
+     * The end of the constraint that starts in `ClusterGenerator`: what is asked for on the form has
+     * to survive as far as the rows, because the hex map reads `(x, y)` off them and nothing else.
+     */
+    $game = Game::factory()->create();
+    $gamemaster = gamemasterOf($game);
+
+    generateStage($gamemaster, $game, GenerationStage::Cluster, 4242, traveler: true);
+
+    $run = GenerationRun::query()->sole();
+
+    expect($run->traveler)->toBeTrue();
+    expect($run->summary['occupied_hexes'])->toBe(ClusterGenerator::LOCATION_COUNT);
+
+    $columns = $game->locations()
+        ->get()
+        ->map(fn (Location $location): string => "{$location->x},{$location->y}")
+        ->all();
+
+    expect($game->locations()->count())->toBe(ClusterGenerator::LOCATION_COUNT);
+    expect(array_unique($columns))->toHaveCount(ClusterGenerator::LOCATION_COUNT);
+
+    /* And the centre hex is clear, which the origin check alone does not deliver — `(0, 0, z)`. */
+    expect($game->locations()->where('x', 0)->where('y', 0)->exists())->toBeFalse();
+});
+
+test('the same seed draws a different cluster with traveler mode on', function () {
+    /*
+     * Two games rather than a regeneration, so the seed can be held still: the flag has to be what
+     * makes the difference, not the seed the regeneration rule would force to change.
+     */
+    $ordinary = Game::factory()->create();
+    generateStage(gamemasterOf($ordinary), $ordinary, GenerationStage::Cluster, 4242);
+
+    $traveler = Game::factory()->create();
+    generateStage(gamemasterOf($traveler), $traveler, GenerationStage::Cluster, 4242, traveler: true);
+
+    $pointsOf = fn (Game $game): array => $game->locations()
+        ->orderBy('ordinal')
+        ->get()
+        ->map(fn (Location $location): string => "{$location->x},{$location->y},{$location->z}")
+        ->all();
+
+    expect($pointsOf($traveler))->not->toBe($pointsOf($ordinary));
+});
+
+test('the screen carries the traveler setting, so trying another seed keeps the mode', function () {
+    /*
+     * The checkbox starts from this rather than from unticked, so a gamemaster regenerating a traveler
+     * cluster gets another traveler cluster instead of silently dropping back to the ordinary draw.
+     */
+    $game = Game::factory()->create();
+    $gamemaster = gamemasterOf($game);
+
+    generateStage($gamemaster, $game, GenerationStage::Cluster, 4242, traveler: true);
+
+    $this->actingAs($gamemaster)
+        ->get(route('gamemaster.games.show', ['game' => $game]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('generation.stages.0', fn (Assert $stage) => $stage
+                ->where('stage', 'cluster')
+                ->where('traveler', true)
+                ->etc(),
+            )
+            /* Null before a run, which the screen reads as unticked: there is nothing to inherit yet. */
+            ->has('generation.stages.1', fn (Assert $stage) => $stage
+                ->where('traveler', null)
+                ->etc(),
+            ),
+        );
+});
+
+test('a traveler setting that is not a boolean is refused', function () {
+    $game = Game::factory()->create();
+    $gamemaster = gamemasterOf($game);
+
+    $this->actingAs($gamemaster)
+        ->post(
+            route('gamemaster.games.generation.store', ['game' => $game, 'stage' => 'cluster']),
+            ['seed' => 4242, 'traveler' => 'maybe'],
+        )
+        ->assertInvalid('traveler');
+
+    expect($game->generationRuns()->count())->toBe(0);
 });
 
 test('the stored cluster is exactly what the generator produces from the stored seed', function () {

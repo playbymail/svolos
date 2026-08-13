@@ -56,7 +56,12 @@ class GenerationController extends Controller
     {
         $this->authorizeStage($game, $stage, [GenerationStageState::Ready, GenerationStageState::Review]);
 
-        $run = $this->runGeneration->handle($game, $stage, (int) $request->validated('seed'));
+        $run = $this->runGeneration->handle(
+            $game,
+            $stage,
+            (int) $request->validated('seed'),
+            $request->boolean('traveler'),
+        );
 
         Inertia::flash('toast', [
             'type' => 'success',
