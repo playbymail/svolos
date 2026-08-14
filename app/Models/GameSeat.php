@@ -5,9 +5,11 @@ namespace App\Models;
 use App\Enums\GameRole;
 use Database\Factories\GameSeatFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
@@ -44,6 +46,7 @@ use Illuminate\Support\Carbon;
  * @property-read User $user
  * @property-read HomeStellium|null $homeStellium
  * @property-read AgentCredential|null $agentCredential
+ * @property-read Collection<int, Entity> $entities
  */
 #[Fillable(['user_id', 'role'])]
 class GameSeat extends Model
@@ -121,6 +124,21 @@ class GameSeat extends Model
     public function agentCredential(): HasOne
     {
         return $this->hasOne(AgentCredential::class);
+    }
+
+    /**
+     * Get everything this seat controls: its colonies and its ships.
+     *
+     * The one relation on this model that is about playing the game rather than about holding a place
+     * at it, and it is here because a seat is where control lives — an entity accepts orders from the
+     * seat that controls it and from nowhere else. Retiring a seat leaves them standing, which is the
+     * point of retiring rather than deleting.
+     *
+     * @return HasMany<Entity, $this>
+     */
+    public function entities(): HasMany
+    {
+        return $this->hasMany(Entity::class);
     }
 
     /**

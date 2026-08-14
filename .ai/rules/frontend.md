@@ -129,6 +129,50 @@ user collapses or expands (including via `cmd/ctrl+b`). Both `appearance` and `s
 the `encryptCookies(except: ...)` list in `bootstrap/app.php` — they have to be readable by JS and
 by Blade, so do not remove them from it.
 
+## A keyed `{#each}` must be given a key that *cannot* repeat
+
+Svelte throws `each_key_duplicate` when a keyed `{#each}` sees the same key twice, and the whole
+subtree stops rendering. There is nothing on the screen to say so — a panel that was showing its
+loading skeleton simply keeps showing it, and the only trace is
+`Uncaught Error: https://svelte.dev/e/each_key_duplicate` in the console (and in
+`storage/logs/browser.log`, which Boost collects).
+
+A row id from the database cannot repeat. **A key computed from the data can**, and that is the case
+to be careful with: grouping a list by neighbour and keying on the group makes an unordered payload a
+blank screen. Group by looking up the value across the whole accumulator instead, so one group per
+value is a property of the code rather than a hope about the server —
+`resources/js/components/LocationSystemPanel.svelte` does exactly this, and
+[assets.md](assets.md) has the whole story.
+
+Note that `svelte/prefer-svelte-reactivity` fails the lint on a bare `new Map()`, even a local one
+thrown away at the end of a function, and pushes you towards `SvelteMap`. For a handful of groups a
+plain array and `find()` is the better answer than either.
+
+Reach for `storage/logs/browser.log` early when a screen is stuck rather than wrong: a server payload
+that is correct when you dump it, next to a screen that never renders it, is this shape of bug.
+
+**And check the aftermath, not just the console.** A throw part way through an update leaves the
+*previous* render in the DOM, so the screen afterwards shows real data in the wrong place rather than
+nothing — which reads as a second, unrelated bug and gets reported as one. A refresh distinguishes
+them.
+
+## One optional prop shared by a screen belongs only under the row it answers
+
+There is a single `locationDetail` for the whole game screen, and rows are opened one at a time. So
+between opening a row and its answer landing, what is in hand is the *previous* row's system —
+`ClusterLocationsTable` therefore passes it on only when `detail.id` matches the row, and shows the
+loading skeleton otherwise. Without that check every way a reload can fail to land (an error, a
+dropped connection, a render that throws mid-swap) puts one system's data under another's heading,
+which is wrong in the one way nobody questions: it looks exactly like an answer.
+
+Note the null: `null` means "this location has no stellium" and carries no id, so it is passed
+straight through — only the open row is ever asked, so a null in hand is always this row's answer.
+
+This is component behaviour and so is covered by neither runner — Vitest is the *pure* front end and
+Pest sees the payload, not the render (see [general.md](general.md)). Extracting a predicate into
+`lib/` to get it under Vitest would widen that line rather than extend it; the guard is small and
+commented at the point of use instead.
+
 ## Wayfinder must be regenerated through Vite, not artisan
 
 `resources/js/actions`, `resources/js/routes`, and `resources/js/wayfinder` are generated and

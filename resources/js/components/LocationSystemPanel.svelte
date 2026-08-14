@@ -1,5 +1,10 @@
 <script lang="ts">
-    import type { LocationDetail, SystemPlanet } from '@/types';
+    import type {
+        AssetAssignment,
+        LocationDetail,
+        SystemAsset,
+        SystemEntity,
+    } from '@/types';
 
     /*
      * One location's stars and the planets around them, shown under the row that was expanded.
@@ -16,11 +21,64 @@
         loading?: boolean;
     } = $props();
 
-    const deposits: { key: keyof SystemPlanet; label: string }[] = [
+    const deposits: {
+        key: 'fuel' | 'metals' | 'minerals';
+        label: string;
+    }[] = [
         { key: 'fuel', label: 'Fuel' },
         { key: 'metals', label: 'Metals' },
         { key: 'minerals', label: 'Minerals' },
     ];
+
+    /* Orbit, type, habitability, then one column a deposit. */
+    const planetColumns = 3 + deposits.length;
+
+    /**
+     * Split an entity's assets into the assignments it has any of.
+     *
+     * An asset joins the group **that already has its assignment**, wherever that group is in the
+     * list, so one assignment can only ever produce one group. That is not tidiness: the group is the
+     * key of a `{#each}`, and Svelte throws `each_key_duplicate` on a repeat — which stops the whole
+     * panel rendering and leaves it showing its loading skeleton for ever, with nothing on the screen
+     * to say why. Grouping by *neighbour* was the first version of this, and it turned an unordered
+     * payload into a fatal error one file away from where the ordering was decided.
+     *
+     * A linear `find` rather than a keyed lookup because there are three assignments and never more:
+     * a `Map` here is both heavier to read and, under `svelte/prefer-svelte-reactivity`, an invitation
+     * to reach for `SvelteMap` for a local that is thrown away at the end of the call.
+     *
+     * Order still comes from the server, by first appearance, so there is no second ordering here to
+     * disagree with `PresentsGeneration::presentEntities()`.
+     */
+    function holdings(
+        entity: SystemEntity,
+    ): { assignment: AssetAssignment; label: string; assets: SystemAsset[] }[] {
+        const groups: {
+            assignment: AssetAssignment;
+            label: string;
+            assets: SystemAsset[];
+        }[] = [];
+
+        for (const asset of entity.assets) {
+            const group = groups.find(
+                (candidate) => candidate.assignment === asset.assignment,
+            );
+
+            if (group) {
+                group.assets.push(asset);
+
+                continue;
+            }
+
+            groups.push({
+                assignment: asset.assignment,
+                label: asset.assignment_label,
+                assets: [asset],
+            });
+        }
+
+        return groups;
+    }
 </script>
 
 <div class="bg-muted/40 px-4 py-3">
@@ -98,6 +156,48 @@
                                             </td>
                                         {/each}
                                     </tr>
+
+                                    <!--
+                                        Attached to the world rather than listed under the star: what
+                                        is standing at a planet is a fact about that planet, and on
+                                        all but a handful of worlds there is nothing here at all.
+                                    -->
+                                    {#each planet.entities as entity (entity.id)}
+                                        <tr data-test="entity-{entity.id}">
+                                            <td
+                                                class="pb-1 pl-3"
+                                                colspan={planetColumns}
+                                            >
+                                                <span class="font-medium">
+                                                    {entity.type_label}
+                                                </span>
+                                                <span
+                                                    class="text-muted-foreground"
+                                                >
+                                                    · {entity.player_name}
+                                                </span>
+
+                                                {#each holdings(entity) as group (group.assignment)}
+                                                    <div
+                                                        class="text-muted-foreground"
+                                                    >
+                                                        <span
+                                                            class="font-medium"
+                                                            >{group.label}</span
+                                                        >
+                                                        {#each group.assets as asset, index (asset.id)}{index >
+                                                            0
+                                                                ? ', '
+                                                                : ' '}{asset.type_label}
+                                                            <span
+                                                                class="tabular-nums"
+                                                                >{asset.quantity}</span
+                                                            >{/each}
+                                                    </div>
+                                                {/each}
+                                            </td>
+                                        </tr>
+                                    {/each}
                                 {/each}
                             </tbody>
                         </table>

@@ -364,13 +364,18 @@
                                 everything that goes — the home stellia included, since they are
                                 rows on the runs being deleted and a gamemaster who was told only
                                 about the cluster would be surprised to find the roster emptied.
+
+                                The colonies and ships are named for the same reason, and they are
+                                the half a gamemaster is most likely to think of as theirs rather
+                                than as generated: they are rows on these runs too, and they go.
                             -->
                             <DialogDescription>
                                 Everything generated for {game.name} is deleted —
                                 the cluster, the stellia and their stars, the planets
-                                around them, where each player begins, and the record
-                                of which seeds produced it all. The roster itself
-                                is untouched. This cannot be undone.
+                                around them, where each player begins, the colonies
+                                and ships they begin with, and the record of which
+                                seeds produced it all. The roster itself is untouched.
+                                This cannot be undone.
                             </DialogDescription>
 
                             <DialogFooter class="gap-2">

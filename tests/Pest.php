@@ -15,6 +15,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Mail\Transport\ArrayTransport;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Testing\TestResponse;
+use Inertia\Inertia;
 use Tests\TestCase;
 
 /*
@@ -258,6 +259,34 @@ function generateStage(User $gamemaster, Game $game, GenerationStage $stage, int
 }
 
 /**
+ * Ask the gamemaster's game screen for one location's system, the way the browser does.
+ *
+ * `locationDetail` is an optional prop, so it only arrives on a partial reload — and the response is
+ * JSON with no view at all, which is why the tests that use this assert on `props.*` paths rather than
+ * through `assertInertia`.
+ *
+ * The version header has to be the real one: Inertia answers a mismatched version with a 409 telling
+ * the client to reload, so a hardcoded value here would fail every one of these tests for a reason
+ * that has nothing to do with what they assert.
+ *
+ * It lives here rather than in a test file because two files need it now — the planets are reviewed
+ * through this prop and so is the opening position — and a helper declared in a test file is only
+ * loaded when that file is, which a `--filter` run need not do.
+ */
+function reloadLocationDetail(User $gamemaster, Game $game, int $locationId): TestResponse
+{
+    return test()->actingAs($gamemaster)->get(
+        route('gamemaster.games.show', ['game' => $game, 'location' => $locationId]),
+        [
+            'X-Inertia' => 'true',
+            'X-Inertia-Version' => Inertia::getVersion(),
+            'X-Inertia-Partial-Component' => 'gamemaster/games/Show',
+            'X-Inertia-Partial-Data' => 'locationDetail',
+        ],
+    );
+}
+
+/**
  * Take a game as far as an accepted cluster, and hand back its gamemaster.
  */
 function withAcceptedCluster(Game $game, int $seed = 4242): User
@@ -374,6 +403,44 @@ function withAcceptedHomeStellia(Game $game, int $seed = 3): User
 
     test()->actingAs($gamemaster)->post(
         route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'home_stellia'])
+    );
+
+    return $gamemaster;
+}
+
+/**
+ * Take a game as far as accepted planets, and hand back its gamemaster.
+ *
+ * The setup for every assets test, and the first link in this chain that walks the *whole* world into
+ * existence: after this a game has somewhere for everybody to stand.
+ */
+function withAcceptedPlanets(Game $game, int $seed = 5): User
+{
+    $gamemaster = withAcceptedHomeStellia($game);
+
+    generateStage($gamemaster, $game, GenerationStage::Planets, $seed);
+
+    test()->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'planets'])
+    );
+
+    return $gamemaster;
+}
+
+/**
+ * Take a game all the way to an accepted opening position, and hand back its gamemaster.
+ *
+ * The end of the chain: a game past this is fully generated, and `Game::isGenerationComplete()` is
+ * true of it.
+ */
+function withAcceptedAssets(Game $game, int $seed = 9): User
+{
+    $gamemaster = withAcceptedPlanets($game);
+
+    generateStage($gamemaster, $game, GenerationStage::Assets, $seed);
+
+    test()->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'assets'])
     );
 
     return $gamemaster;

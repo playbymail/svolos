@@ -233,5 +233,8 @@ one that drifts is the one nobody is looking at. `AgentSession::seat()` exists s
 **seat** rather than `$request->user()`: the account is one game wider than the token is scoped to,
 and it is the reading that breaks first when delegation arrives.
 
-Entities and orders do not exist yet. This rule is here so the engine work inherits it rather than
-rediscovering it.
+**Entities exist now; orders still do not.** `App\Models\Entity` arrived with the assets generation
+stage and took the shape this file argued for — one non-nullable `game_seat_id`, no arc — so the
+paragraph above is no longer advice about a table somebody might build. See [assets.md](assets.md).
+What is still owed is the order itself and the domain action that answers *does this seat control this
+entity*, which is the half that must not end up in a controller.

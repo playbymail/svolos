@@ -143,11 +143,58 @@ export type ClusterLocation = {
 };
 
 /**
+ * Where an asset sits: what the entity is made of, what it is carrying, and what it is using.
+ *
+ * Mirrors `App\Enums\AssetAssignment`, and the order is that enum's declaration order — the panel
+ * sorts by it so infrastructure, the part that says what a thing *is*, reads first.
+ */
+export type AssetAssignment = 'infrastructure' | 'cargo' | 'operational';
+
+/**
+ * The two kinds of thing that accept orders, mirroring `App\Enums\EntityType`.
+ */
+export type EntityType = 'colony' | 'ship';
+
+/**
+ * A quantity of one kind of asset, in one assignment.
+ *
+ * There is no `mass` or `volume` here: both are functions of the kind and the quantity, and shipping
+ * them would be a second copy of `App\Enums\AssetType` that could disagree with the first.
+ */
+export type SystemAsset = {
+    id: number;
+    type: string;
+    type_label: string;
+    assignment: AssetAssignment;
+    assignment_label: string;
+    quantity: number;
+};
+
+/**
+ * One colony or ship standing at a planet, with everything it holds.
+ *
+ * `seat_id` rather than a user id, because control is a seat: an entity belongs to a place at a game
+ * rather than to a person across all of them. `player_name` rides beside it for the reason the cluster
+ * map carries one — "somebody is here" is not the useful half.
+ */
+export type SystemEntity = {
+    id: number;
+    type: EntityType;
+    type_label: string;
+    seat_id: number;
+    player_name: string;
+    assets: SystemAsset[];
+};
+
+/**
  * One planet of an expanded location, as shaped by
  * `App\Concerns\PresentsGeneration::presentLocationDetail()`.
  *
  * `ordinal` is the orbit, counting outward from 1, and together with the star it is the planet's whole
  * name — there is nothing else to call it by.
+ *
+ * `entities` is empty for all but a handful of worlds in a game: only a home world has anybody at it
+ * until people start building, and only then once the assets stage has run.
  */
 export type SystemPlanet = {
     id: number;
@@ -158,6 +205,7 @@ export type SystemPlanet = {
     fuel: number;
     metals: number;
     minerals: number;
+    entities: SystemEntity[];
 };
 
 /**

@@ -5,9 +5,11 @@ namespace App\Models;
 use App\Enums\PlanetType;
 use Carbon\CarbonImmutable;
 use Database\Factories\PlanetFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * One planet in orbit around one star.
@@ -37,6 +39,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $updated_at
  * @property-read Star $star
  * @property-read GenerationRun $generationRun
+ * @property-read Collection<int, Entity> $entities
  */
 class Planet extends Model
 {
@@ -61,6 +64,19 @@ class Planet extends Model
     public function generationRun(): BelongsTo
     {
         return $this->belongsTo(GenerationRun::class);
+    }
+
+    /**
+     * Get the colonies standing on this planet and the ships in orbit above it.
+     *
+     * One relation for both, because position is a planet whichever kind an entity is — `type` is what
+     * says whether it is on the ground.
+     *
+     * @return HasMany<Entity, $this>
+     */
+    public function entities(): HasMany
+    {
+        return $this->hasMany(Entity::class);
     }
 
     /**

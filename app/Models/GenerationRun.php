@@ -57,6 +57,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, Stellium> $stelliums
  * @property-read Collection<int, Planet> $planets
  * @property-read Collection<int, HomeStellium> $homeStelliums
+ * @property-read Collection<int, Entity> $entities
  */
 class GenerationRun extends Model
 {
@@ -115,6 +116,20 @@ class GenerationRun extends Model
     public function homeStelliums(): HasMany
     {
         return $this->hasMany(HomeStellium::class);
+    }
+
+    /**
+     * Get the entities this run placed, if it was an assets run that is still standing.
+     *
+     * The one artefact relation whose foreign key is **nullable**, because an entity built during play
+     * belongs to no run. That does not change what this relation means — it finds what this run put
+     * there, and `GenerateAssets::discard()` deletes exactly that.
+     *
+     * @return HasMany<Entity, $this>
+     */
+    public function entities(): HasMany
+    {
+        return $this->hasMany(Entity::class);
     }
 
     /**

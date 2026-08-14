@@ -12,8 +12,6 @@ use App\Models\Star;
 use App\Models\Stellium;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Testing\TestResponse;
-use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -33,26 +31,6 @@ use Inertia\Testing\AssertableInertia as Assert;
 | so the cluster in them is one the application would really produce.
 |
 */
-
-/**
- * Ask the gamemaster's game screen for one optional prop, the way the browser does.
- *
- * The version header has to be the real one: Inertia answers a mismatched version with a 409 telling
- * the client to reload, so a hardcoded value here would fail every one of these tests for a reason
- * that has nothing to do with what they assert.
- */
-function reloadLocationDetail(User $gamemaster, Game $game, int $locationId): TestResponse
-{
-    return test()->actingAs($gamemaster)->get(
-        route('gamemaster.games.show', ['game' => $game, 'location' => $locationId]),
-        [
-            'X-Inertia' => 'true',
-            'X-Inertia-Version' => Inertia::getVersion(),
-            'X-Inertia-Partial-Component' => 'gamemaster/games/Show',
-            'X-Inertia-Partial-Data' => 'locationDetail',
-        ],
-    );
-}
 
 test('a guest is redirected to login from every generation route', function () {
     $game = Game::factory()->create();
@@ -462,7 +440,7 @@ test('the stages unlock one another in the order the enum declares them', functi
     foreach (GenerationStage::cases() as $position => $stage) {
         expect($game->fresh()?->load('generationRuns')->firstUnfinishedGenerationStage())->toBe($stage);
 
-        $seeds = [4242, 7, 11, 3, 88_213];
+        $seeds = [4242, 7, 11, 3, 88_213, 9];
 
         $stage === GenerationStage::HomeStelliaTemplate
             ? generateTemplate($gamemaster, $game, $seeds[$position])
@@ -837,7 +815,11 @@ test('a location\'s planets are fetched a row at a time, not shipped with the sc
     $response->assertJsonStructure([
         'props' => ['locationDetail' => ['stars' => [
             ['id', 'label', 'planets' => [
-                ['id', 'ordinal', 'type', 'type_label', 'habitability', 'fuel', 'metals', 'minerals'],
+                /*
+                 * `entities` is present and empty here: the assets stage has not run, and a world
+                 * nobody is standing on ships the same shape as one somebody is.
+                 */
+                ['id', 'ordinal', 'type', 'type_label', 'habitability', 'fuel', 'metals', 'minerals', 'entities'],
             ]],
         ]]],
     ]);

@@ -29,6 +29,11 @@ use Illuminate\Validation\Rule;
  * that stage exists for. Keeping the rule would forbid it, and dropping the rule everywhere would let a
  * gamemaster press a button that genuinely does nothing on the other three stages.
  *
+ * **The assets stage is exempt for the opposite reason**, and the two are worth telling apart. There
+ * the same seed does not redraw the same thing because the seed is not in the stream; here the seed is
+ * not in the stream at all, so *every* seed produces the same kit. Regenerating it is about a roster
+ * that has changed, and asking for a different number first would be asking about the wrong thing.
+ *
  * Whether the stage may be run at all is **not** decided here. That is a 403 in
  * `Gamemaster\GenerationController` — the game is not in setup, or the stage before it has not been
  * accepted — because there is no field to attach it to and no seed that would make it allowed. This
@@ -68,7 +73,11 @@ class GenerationRunRequest extends FormRequest
 
         $pending = $this->pendingSeed();
 
-        if ($pending !== null && ! $this->redrawsFromTheAttempt() && ! $this->templateDecidedByADocument()) {
+        if ($pending !== null
+            && ! $this->redrawsFromTheAttempt()
+            && ! $this->templateDecidedByADocument()
+            && ! $this->ignoresTheSeedEntirely()
+        ) {
             $rules[] = Rule::notIn([$pending]);
         }
 
@@ -141,6 +150,23 @@ class GenerationRunRequest extends FormRequest
     private function redrawsFromTheAttempt(): bool
     {
         return $this->route('stage') === GenerationStage::HomeStellia;
+    }
+
+    /**
+     * Determine whether this stage reads the seed at all.
+     *
+     * False for four of the five stages and true for the assets, which draws nothing: every player is
+     * given the same kit, so no seed produces a different result and `App\Actions\Generation\GenerateAssets`
+     * never opens a stream. The rule above would then be demanding a change to a number nothing reads,
+     * to permit a regeneration that is not about the seed in the first place — it is how a player
+     * seated since the stage ran is given somewhere to begin.
+     *
+     * The stage still *records* a seed, the way a run records `traveler` on a stage that never reads
+     * it. A run stores what it was asked for; this asks whether the answer changes anything.
+     */
+    private function ignoresTheSeedEntirely(): bool
+    {
+        return $this->route('stage') === GenerationStage::Assets;
     }
 
     /**

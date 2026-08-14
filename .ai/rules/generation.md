@@ -15,7 +15,7 @@ Globs: `app/Generation/**`, `app/Actions/Generation/**`, `app/Enums/Generation*.
 `tests/Pest.php`
 
 A game's world is built in **stages**, by its gamemaster, while the game is in `Setup`: generate from
-a seed, review, then accept or try another seed. Accepting unlocks the next stage. There are five, in
+a seed, review, then accept or try another seed. Accepting unlocks the next stage. There are six, in
 this order:
 
 1. `Cluster` — 100 locations;
@@ -23,15 +23,19 @@ this order:
 3. `HomeStelliaTemplate` — the home system every player will begin in;
 4. `HomeStellia` — which systems those are, one per player;
 5. `Planets` — one to ten around every star, **except** a home system, which is copied from the
-   template.
+   template;
+6. `Assets` — a colony on every player's home world and a ship above it, with what each begins
+   holding.
 
 Read [games.md](games.md) for the seed itself, [gamemaster.md](gamemaster.md) for the area's gate,
-[home-template.md](home-template.md) for the third stage and [home-stellia.md](home-stellia.md) for
-the fourth.
+[home-template.md](home-template.md) for the third stage, [home-stellia.md](home-stellia.md) for the
+fourth and [assets.md](assets.md) for the sixth.
 
-**The last three are in that order because of a dependency, not a preference.** The planets stage used
-to run third and draw every star alike; it now runs last because a home system is *copied* rather than
-drawn, so it needs both the template to copy and the arrangement that says where to copy it. Anyone
+**The last four are in that order because of a dependency, not a preference.** The planets stage used
+to run third and draw every star alike; it moved because a home system is *copied* rather than drawn,
+so it needs both the template to copy and the arrangement that says where to copy it. The assets stage
+is behind it for the same kind of reason one step further on: a home stellium says which *system*
+somebody begins at, and the world they stand on does not exist until the planets are written. Anyone
 tempted to move the planets back should read the top of `GeneratePlanets` first.
 
 ## A generator draws from its seed and from **nothing** else
@@ -128,8 +132,13 @@ Two consequences worth not re-deriving:
 and planets with it — four levels deep now, which is why `GenerationModelTest` asserts the chain
 reaches the end rather than stopping at the stars. The **home stellia** come off the same delete as a
 *branch* rather than a fifth level: they hang straight off the run, and off a `game_seats` row that
-must survive them. The dialog on the gamemaster's screen enumerates all of it, home stellia included —
-that sentence *is* the confirmation, so it cannot be left describing only the cluster. There is deliberately no per-stage rewind: a cluster and the stelliums standing on it
+must survive them. The **entities** are a second such branch, one level deeper — they hang off the run
+and off both a seat and a planet, and their assets cascade from them, which is what
+`GenerationModelTest` pins along with the fact that neither the seat nor the planet goes with them.
+The dialog on the gamemaster's screen enumerates all of it, home stellia and the colonies and ships
+included — that sentence *is* the confirmation, so it cannot be left describing only the cluster, and
+what a gamemaster thinks of as *theirs* rather than as generated is the half most worth naming.
+There is deliberately no per-stage rewind: a cluster and the stelliums standing on it
 are one world, so re-opening the cluster while its stelliums survived would leave stars at locations
 that no longer exist, and a per-stage rewind would need a second copy of the stage ordering to know
 what to destroy. It is a `POST`, not a `DELETE`, because no route in the gamemaster area accepts

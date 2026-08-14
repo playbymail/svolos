@@ -2,8 +2,12 @@
 
 namespace App\Concerns;
 
+use App\Enums\AssetAssignment;
+use App\Enums\AssetType;
 use App\Enums\GameStatus;
 use App\Enums\GenerationStage;
+use App\Models\Asset;
+use App\Models\Entity;
 use App\Models\Game;
 use App\Models\GenerationRun;
 use App\Models\Location;
@@ -169,6 +173,12 @@ trait PresentsGeneration
      * the scoping is the same rule `Route::scopeBindings()` enforces on seat routes, done by hand here
      * because the location arrives as a query parameter rather than as a route parameter.
      *
+     * **It is also the review surface for the assets stage**, which is why each planet carries the
+     * entities standing at it and what each of those holds. Nothing else on the screen could show it:
+     * the cluster table has a row per system rather than per world, and only a handful of the hundred
+     * locations have anybody at them. It rides here rather than in a panel of its own because "what is
+     * at this system" and "what is orbiting in it" are one question asked once.
+     *
      * @return array{
      *     id: int,
      *     ordinal: int,
@@ -187,7 +197,12 @@ trait PresentsGeneration
 
         $location = $game->locations()
             ->whereKey($locationId)
-            ->with(['stellium.stars.planets'])
+            /*
+             * Four levels for the planets and three more past them for what is standing there. Deep,
+             * and still one query per level against a single system — the alternative is a lazy load
+             * per planet, which is ten queries for a system nobody has settled.
+             */
+            ->with(['stellium.stars.planets.entities.gameSeat.user', 'stellium.stars.planets.entities.assets'])
             ->first();
 
         if ($location?->stellium === null) {
@@ -212,6 +227,7 @@ trait PresentsGeneration
                             'fuel' => $planet->fuel,
                             'metals' => $planet->metals,
                             'minerals' => $planet->minerals,
+                            'entities' => $this->presentEntities($planet),
                         ])
                         ->values()
                         ->all(),
@@ -219,6 +235,62 @@ trait PresentsGeneration
                 ->values()
                 ->all(),
         ];
+    }
+
+    /**
+     * Shape what is standing at one planet, and what each of those things holds.
+     *
+     * The player's name rides along for the reason the cluster map carries it rather than only marking
+     * a home: "somebody is here" is not the useful half. It reaches through the seat rather than
+     * through the account directly, because control is a seat — an entity belongs to a place at a
+     * game, not to a person across all of them.
+     *
+     * Assets are ordered by assignment and then by kind, so the same entity reads the same way every
+     * time and the infrastructure — the part that says what the thing *is* — comes first.
+     *
+     * **One closure returning a tuple, never an array of closures.** `sortBy([$a, $b])` looks like two
+     * key extractors and is not: given an array of comparisons, Laravel calls a callable one as a full
+     * comparator, `$prop($a, $b)`. A single-parameter closure then silently takes the first argument,
+     * ignores the second and returns a position as though it were a comparison result — which sorts
+     * nothing and interleaves the assignments. That is invisible here and fatal one file away, because
+     * `LocationSystemPanel` groups the list it is handed.
+     *
+     * @return array<int, array{
+     *     id: int,
+     *     type: string,
+     *     type_label: string,
+     *     seat_id: int,
+     *     player_name: string,
+     *     assets: array<int, array<string, mixed>>,
+     * }>
+     */
+    private function presentEntities(Planet $planet): array
+    {
+        return $planet->entities
+            ->map(fn (Entity $entity): array => [
+                'id' => $entity->id,
+                'type' => $entity->type->value,
+                'type_label' => $entity->type->label(),
+                'seat_id' => $entity->game_seat_id,
+                'player_name' => $entity->gameSeat->user->name,
+                'assets' => $entity->assets
+                    ->sortBy(fn (Asset $asset): array => [
+                        (int) array_search($asset->assignment, AssetAssignment::cases(), true),
+                        (int) array_search($asset->type, AssetType::cases(), true),
+                    ])
+                    ->map(fn (Asset $asset): array => [
+                        'id' => $asset->id,
+                        'type' => $asset->type->value,
+                        'type_label' => $asset->type->label(),
+                        'assignment' => $asset->assignment->value,
+                        'assignment_label' => $asset->assignment->label(),
+                        'quantity' => $asset->quantity,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
