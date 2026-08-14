@@ -6,8 +6,11 @@ use App\Models\AgentCredential;
 use App\Models\Game;
 use App\Models\GameSeat;
 use App\Models\User;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -141,15 +144,84 @@ test('a deleted agent account takes its credential with it', function () {
     $this->withToken($token)->getJson(route('api.v1.me'))->assertUnauthorized();
 });
 
-test('every route on the agent surface is behind the agent middleware', function () {
+test('every route on the agent surface is behind the agent middleware and a throttle', function () {
     $apiRoutes = collect(Route::getRoutes()->getRoutes())
         ->filter(fn (RoutingRoute $route): bool => str_starts_with((string) $route->getName(), 'api.'));
 
     expect($apiRoutes)->not->toBeEmpty();
 
     $apiRoutes->each(function (RoutingRoute $route): void {
-        expect($route->gatherMiddleware())->toContain('agent');
+        $middleware = $route->gatherMiddleware();
+
+        expect($middleware)->toContain('agent')->toContain('throttle:agent');
+
+        /*
+         * The throttle has to come first, or a flood is rate-limited only after each request has
+         * already cost a database lookup — which is the resource the limit exists to protect.
+         */
+        expect(array_search('throttle:agent', $middleware, true))
+            ->toBeLessThan(array_search('agent', $middleware, true));
     });
+});
+
+test('the agent limiter bounds both the address and the token', function () {
+    /*
+     * The policy itself, asserted by invoking the registered limiter rather than by sending three
+     * hundred requests. Two limits, because either alone is porous: a caller rotating a made-up token
+     * gets a fresh token bucket every request, so only the address limit sees the flood; and one
+     * runaway agent must not be able to spend the whole address budget of a NAT it shares.
+     */
+    $limiter = RateLimiter::limiter('agent');
+
+    expect($limiter)->not->toBeNull();
+
+    $request = Request::create('/api/v1/me');
+    $request->headers->set('Authorization', 'Bearer svl_agent_example');
+    $request->server->set('REMOTE_ADDR', '203.0.113.7');
+
+    $limits = collect($limiter($request));
+
+    expect($limits)->toHaveCount(2)
+        ->and($limits->pluck('maxAttempts')->all())->toBe([300, 120]);
+
+    /* The raw token must never become a cache key — the key holds a digest of it. */
+    $keys = $limits->pluck('key')->all();
+
+    expect($keys[0])->toBe('agent-ip:203.0.113.7')
+        ->and($keys[1])->toBe('agent-token:'.hash('sha256', 'svl_agent_example'))
+        ->and($keys[1])->not->toContain('svl_agent_example');
+});
+
+test('an agent that goes over the limit is turned away before the token is read', function () {
+    /*
+     * The wiring, proved with a limit of one rather than by replaying the real numbers. What matters
+     * is that `throttle:agent` is genuinely mounted on the route and answers 429 — the size of the
+     * bucket is the policy test above.
+     *
+     * The token is deliberately a bad one: a 429 rather than a 401 is what shows the throttle running
+     * ahead of `AuthenticateAgent`, which is the ordering the database lookup is protected by.
+     */
+    RateLimiter::for('agent', fn (): Limit => Limit::perMinute(1)->by('test'));
+
+    $this->withToken('svl_agent_wrong')->getJson(route('api.v1.me'))->assertUnauthorized();
+
+    $this->withToken('svl_agent_wrong')
+        ->getJson(route('api.v1.me'))
+        ->assertStatus(429)
+        ->assertHeader('Retry-After');
+});
+
+test('a throttled response is still json', function () {
+    RateLimiter::for('agent', fn (): Limit => Limit::perMinute(1)->by('test'));
+
+    [, $token] = agentWithToken();
+
+    $this->withToken($token)->getJson(route('api.v1.me'))->assertOk();
+
+    $this->withToken($token)
+        ->getJson(route('api.v1.me'))
+        ->assertStatus(429)
+        ->assertJsonStructure(['message']);
 });
 
 test('the agent surface carries no session middleware', function () {

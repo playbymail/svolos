@@ -151,8 +151,30 @@ credential and `AuthenticateAgent` would never see the difference.
   That caller has already proved it holds a live credential, so there is nothing left to leak — and
   the distinction is what stops an operator rotating a token that was never the problem.
 
-`AgentApiTest` sweeps every route named `api.*` for the `agent` middleware, the way `AdminAccessTest`
-sweeps `admin.*`. A route added without it is an unauthenticated window into a game.
+`AgentApiTest` sweeps every route named `api.*` for **both** `throttle:agent` and `agent`, the way
+`AdminAccessTest` sweeps `admin.*`, and asserts the throttle comes first. A route added without them
+is an unauthenticated, unbounded window into a game.
+
+### The throttle is two limits, and it is written on the route group
+
+`api/*` is the only surface a stranger can reach that inspects a credential, and unlike the login
+form it has no session and no CSRF token slowing anything down. It shipped without a limit; a
+production check found 80 bad-token requests answered 80 times with no 429.
+
+The risk is the **worker pool, not the token** — 48 characters of base62 is not brute-forceable, so
+nobody guesses their way in. What an unlimited endpoint offers is a database query per request
+against a PHP-FPM pool of ten children.
+
+So `AppServiceProvider::configureRateLimiting()` registers two limits and both are needed:
+
+- **by address** (300/min) is what stops a flood. A caller rotating a made-up token gets a fresh
+  token bucket every request, so a per-token limit would never see the same key twice;
+- **by token** (120/min) so one runaway agent cannot spend the whole address budget of a NAT it
+  shares. The token is **hashed into the key**, so the cache never holds a usable credential.
+
+It is written on the group in `routes/api.php` rather than folded into the `api` middleware group,
+because `gatherMiddleware()` reports a group by name and not by contents — a limit the sweep cannot
+see is a limit nothing will notice losing.
 
 The `v1` prefix is not decoration: agents are deployed where this application cannot reach them, so a
 payload change cannot ship to both at the same moment.
