@@ -87,7 +87,14 @@
                 <tbody>
                     {#each agents as agent (agent.id)}
                         <tr class="border-b border-border last:border-b-0">
-                            <td class="px-4 py-3 font-medium">{agent.name}</td>
+                            <td class="px-4 py-3 font-medium">
+                                <Link
+                                    href={toUrl(show(agent.id))}
+                                    class="hover:underline"
+                                >
+                                    {agent.name}
+                                </Link>
+                            </td>
                             <td
                                 class="px-4 py-3 font-mono text-xs text-muted-foreground"
                                 >{agent.email}</td
@@ -112,7 +119,9 @@
                                         class="inline-flex items-center gap-1 text-sm font-medium hover:underline"
                                         data-test="show-agent-{agent.id}"
                                     >
-                                        Manage
+                                        {agent.active_seats_count === 0
+                                            ? 'Seat and issue a token'
+                                            : 'Seats and tokens'}
                                         <ChevronRight
                                             class="h-4 w-4"
                                             aria-hidden="true"

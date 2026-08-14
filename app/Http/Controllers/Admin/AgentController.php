@@ -6,6 +6,7 @@ use App\Actions\Agents\CreateAgent;
 use App\Concerns\PresentsAgents;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AgentStoreRequest;
+use App\Models\Game;
 use App\Models\GameSeat;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -104,6 +105,41 @@ class AgentController extends Controller
                 ->map(fn (GameSeat $seat): array => $this->presentSeat($seat))
                 ->values()
                 ->all(),
+            'assignableGames' => $this->assignableGames($user),
         ]);
+    }
+
+    /**
+     * List the games this agent could still be seated at.
+     *
+     * The mirror of `Admin\GameController::assignableAccounts()`, and it excludes seats **retired** as
+     * well as active for the same reason: an account that left a game owns the row that occupies its
+     * place in the unique index on `(game_id, user_id)`, and the way back in is to reactivate that
+     * seat rather than to create a second one. Offering the game here would produce a validation
+     * error instead of a seat.
+     *
+     * Archived games are left out as well. An archived game drops out of the lists that assume a game
+     * is still in play, and `AuthenticateAgent` refuses a token for one anyway, so offering it would
+     * be offering a seat that cannot act.
+     *
+     * @return array<int, array{id: int, name: string, short_name: string}>
+     */
+    private function assignableGames(User $agent): array
+    {
+        return Game::query()
+            ->unarchived()
+            ->whereNotIn(
+                'id',
+                GameSeat::query()->select('game_id')->where('user_id', $agent->getKey()),
+            )
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Game $game): array => [
+                'id' => $game->id,
+                'name' => $game->name,
+                'short_name' => $game->short_name,
+            ])
+            ->values()
+            ->all();
     }
 }

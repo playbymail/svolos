@@ -231,6 +231,32 @@ trait GameValidationRules
     }
 
     /**
+     * Get the validation rules used to pick the **game** a known account is being seated at.
+     *
+     * The same constraint as `gameSeatUserRules()`, asked from the other end. The roster screens pick an
+     * account for a game they already know; the agents screen picks a game for an agent it already knows
+     * (`App\Http\Controllers\Admin\AgentSeatController`), so the uniqueness has to be expressed as
+     * "one seat per game for this account" rather than the reverse. It is the same unique index either
+     * way, and it counts **retired** seats for the same reason — see `gameSeatUserRules()` for the
+     * argument in full, which applies here unchanged.
+     *
+     * A null `$userId` is the stricter branch, matching its sibling: without an account to scope by, the
+     * rule refuses any game that has a seat at all rather than creating an unscoped one.
+     *
+     * @return array<int, ValidationRule|array<mixed>|string>
+     */
+    protected function gameSeatGameRules(?int $userId = null): array
+    {
+        $unique = Rule::unique(GameSeat::class, 'game_id');
+
+        if ($userId !== null) {
+            $unique->where('user_id', $userId);
+        }
+
+        return ['required', 'integer', Rule::exists(Game::class, 'id'), $unique];
+    }
+
+    /**
      * Get the validation rules used to validate the game role a seat holds.
      *
      * Only the role is ever accepted alongside this. `is_active` is not validated anywhere and never
@@ -263,6 +289,15 @@ trait GameValidationRules
         return [
             'user_id.unique' => __('That account already has a seat in this game.'),
             'user_id.exists' => __('That account no longer exists.'),
+
+            /*
+             * The same two facts reached from the other end, for the screen that picks a game rather
+             * than an account (`gameSeatGameRules()`). The duplicate message is worded identically
+             * because it describes the same situation, and somebody who hit it needs to be told to
+             * reactivate the existing seat either way.
+             */
+            'game_id.unique' => __('That account already has a seat in this game.'),
+            'game_id.exists' => __('That game no longer exists.'),
         ];
     }
 

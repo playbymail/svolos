@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Agents\CreateAgent;
+use App\Enums\GameRole;
 use App\Models\Game;
 use App\Models\GameSeat;
 use App\Models\User;
@@ -188,6 +189,140 @@ test('a person account is not addressable as an agent', function () {
     $this->actingAs(User::factory()->admin()->create())
         ->get(route('admin.agents.show', $person))
         ->assertNotFound();
+});
+
+test('an agent is offered as an assignable account on a game roster', function () {
+    /*
+     * Seating is what turns a new agent into something that can hold a token, and it happens on the
+     * game's roster rather than anywhere in `/admin/agents`. That makes this list the joint between
+     * the two screens: an agent missing from it is an agent that can never be issued a credential,
+     * and nothing else in either test file would notice.
+     */
+    $agent = User::factory()->agent()->create(['name' => 'Cartographer']);
+    $game = Game::factory()->create();
+
+    $response = $this->actingAs(User::factory()->admin()->create())
+        ->get(route('admin.games.show', $game));
+
+    $response->assertOk();
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('assignableAccounts', fn (Collection $accounts): bool => $accounts
+            ->pluck('id')
+            ->contains($agent->id))
+    );
+});
+
+test('an agent can be seated through the ordinary roster endpoint', function () {
+    $agent = User::factory()->agent()->create();
+    $game = Game::factory()->create();
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->post(route('admin.games.seats.store', $game), [
+            'user_id' => $agent->id,
+            'role' => GameRole::Player->value,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($agent->fresh()?->gameSeats()->count())->toBe(1);
+});
+
+test('an agent can be seated from its own screen', function () {
+    /*
+     * The workflow this exists for: a token belongs to a seat, so a newly created agent cannot be
+     * issued one until it has a seat, and making an administrator leave for a game's roster to finish
+     * creating an agent made the token look impossible to issue.
+     */
+    $agent = User::factory()->agent()->create(['name' => 'Cartographer']);
+    $game = Game::factory()->create(['name' => 'First Contact']);
+
+    $response = $this->actingAs(User::factory()->admin()->create())
+        ->post(route('admin.agents.seats.store', $agent), ['game_id' => $game->id]);
+
+    $response->assertRedirect(route('admin.agents.show', $agent));
+    $response->assertInertiaFlash('toast', [
+        'type' => 'success',
+        'message' => 'Cartographer joined First Contact as a player. Issue a token to let it act there.',
+    ]);
+
+    $seat = $agent->gameSeats()->sole();
+
+    expect($seat->game_id)->toBe($game->id)
+        ->and($seat->role)->toBe(GameRole::Player)
+        ->and($seat->is_active)->toBeTrue();
+});
+
+test('a game the agent already sits at is not offered and is refused', function () {
+    $agent = User::factory()->agent()->create();
+    $game = Game::factory()->create();
+
+    /*
+     * Retired rather than active, which is the case worth pinning: the seat still owns this account's
+     * place in the unique index on `(game_id, user_id)`, so the way back in is to reactivate it. The
+     * screen must not offer the game, and a hand-made post must be refused with the message that says
+     * so rather than a database error.
+     */
+    GameSeat::factory()->for($game)->for($agent)->retired()->create();
+
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->get(route('admin.agents.show', $agent))
+        ->assertInertia(fn (Assert $page) => $page->where('assignableGames', []));
+
+    $this->actingAs($admin)
+        ->post(route('admin.agents.seats.store', $agent), ['game_id' => $game->id])
+        ->assertSessionHasErrors(['game_id' => 'That account already has a seat in this game.']);
+
+    expect($agent->gameSeats()->count())->toBe(1);
+});
+
+test('an archived game is not offered', function () {
+    $agent = User::factory()->agent()->create();
+    Game::factory()->archived()->create();
+    $playable = Game::factory()->create();
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->get(route('admin.agents.show', $agent))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('assignableGames', 1)
+            ->where('assignableGames.0.id', $playable->id)
+        );
+});
+
+test('a person cannot be seated through the agent endpoint', function () {
+    /*
+     * The agent screens are not a second roster. A person is seated from the game screen, where the
+     * whole roster is visible and a gamemaster is allowed to do it.
+     */
+    $person = User::factory()->create();
+    $game = Game::factory()->create();
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->post(route('admin.agents.seats.store', $person), ['game_id' => $game->id])
+        ->assertNotFound();
+
+    expect($person->gameSeats()->count())->toBe(0);
+});
+
+test('seating an agent then issuing a token is the whole flow', function () {
+    $agent = User::factory()->agent()->create();
+    $game = Game::factory()->create();
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->post(route('admin.agents.seats.store', $agent), ['game_id' => $game->id])
+        ->assertRedirect();
+
+    $seat = $agent->gameSeats()->sole();
+
+    $this->actingAs($admin)
+        ->post(route('admin.agents.credential.store', [$agent, $seat]))
+        ->assertRedirect(route('admin.agents.show', $agent))
+        ->assertInertiaFlash('agentToken');
+
+    expect($seat->fresh()?->agentCredential)->not->toBeNull();
 });
 
 test('an agent detail screen lists its seats', function () {

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AgentController;
 use App\Http\Controllers\Admin\AgentCredentialController;
+use App\Http\Controllers\Admin\AgentSeatController;
 use App\Http\Controllers\Admin\GameController;
 use App\Http\Controllers\Admin\GameSeatController;
 use App\Http\Controllers\Admin\InvitationController;
@@ -204,6 +205,19 @@ Route::middleware(['auth', 'verified', 'admin'])
         Route::get('agents/create', [AgentController::class, 'create'])->name('agents.create');
         Route::post('agents', [AgentController::class, 'store'])->middleware('throttle:6,1')->name('agents.store');
         Route::get('agents/{user}', [AgentController::class, 'show'])->name('agents.show');
+
+        /*
+         * Seating an agent from its own screen. The same act as `admin.games.seats.store` approached
+         * from the other end, and it exists because a token belongs to a seat: without this, finishing
+         * a newly created agent meant leaving for a game's roster and coming back.
+         *
+         * It is not a second roster. `AgentSeatController` refuses a non-agent account and seats as a
+         * player only, so people are still added where the whole roster is visible and a gamemaster
+         * can do it.
+         */
+        Route::post('agents/{user}/seats', [AgentSeatController::class, 'store'])
+            ->middleware('throttle:20,1')
+            ->name('agents.seats.store');
 
         Route::scopeBindings()->middleware('throttle:6,1')->group(function () {
             Route::post('agents/{user}/credentials/{gameSeat}', [AgentCredentialController::class, 'store'])

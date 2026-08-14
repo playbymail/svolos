@@ -52,6 +52,20 @@ export type AgentSeat = {
 };
 
 /**
+ * A game an agent could still be seated at, shaped by
+ * `App\Http\Controllers\Admin\AgentController::assignableGames()`.
+ *
+ * Excludes games the agent already has a seat at — **retired seats included**, because a retired
+ * seat still owns the account's place in the unique index and the way back in is to reactivate it —
+ * and excludes archived games, whose tokens `AuthenticateAgent` refuses anyway.
+ */
+export type AssignableGame = {
+    id: number;
+    name: string;
+    short_name: string;
+};
+
+/**
  * A freshly minted agent token, carried once in the page object's flash bag.
  *
  * This is the only time the plain text is ever readable: the server stores a hash of it and keeps no

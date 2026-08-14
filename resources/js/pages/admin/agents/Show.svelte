@@ -25,10 +25,13 @@
     import KeyRound from 'lucide-svelte/icons/key-round';
     import RefreshCw from 'lucide-svelte/icons/refresh-cw';
     import Trash2 from 'lucide-svelte/icons/trash-2';
+    import UserPlus from 'lucide-svelte/icons/user-plus';
     import AgentCredentialController from '@/actions/App/Http/Controllers/Admin/AgentCredentialController';
+    import AgentSeatController from '@/actions/App/Http/Controllers/Admin/AgentSeatController';
     import AgentTokenPanel from '@/components/AgentTokenPanel.svelte';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';
+    import InputError from '@/components/InputError.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
     import {
@@ -40,11 +43,35 @@
         DialogTitle,
         DialogTrigger,
     } from '@/components/ui/dialog';
+    import { Label } from '@/components/ui/label';
+    import {
+        Select,
+        SelectContent,
+        SelectItem,
+        SelectTrigger,
+    } from '@/components/ui/select';
+    import { Spinner } from '@/components/ui/spinner';
     import { toUrl } from '@/lib/utils';
     import { index as gamesIndex } from '@/routes/admin/games';
-    import type { Agent, AgentSeat } from '@/types';
+    import type { Agent, AgentSeat, AssignableGame } from '@/types';
 
-    let { agent, seats }: { agent: Agent; seats: AgentSeat[] } = $props();
+    let {
+        agent,
+        seats,
+        assignableGames,
+    }: {
+        agent: Agent;
+        seats: AgentSeat[];
+        assignableGames: AssignableGame[];
+    } = $props();
+
+    /* Bound to the game picker, which renders the hidden `game_id` input the form posts. */
+    let gameId = $state<string>('');
+
+    const selectedGameLabel = $derived(
+        assignableGames.find((game) => String(game.id) === gameId)?.name ??
+            'Choose a game',
+    );
 
     /*
      * The one moment a minted token is readable. It rides on the page object rather than in props,
@@ -73,15 +100,70 @@
         <Heading
             variant="small"
             title="Seats"
-            description="A token belongs to one seat, so it only ever works in that seat's game. Seats are assigned from each game's roster."
+            description="A token belongs to one seat, so it only ever works in that seat's game. Seat {agent.name} at a game here, then issue it a token."
         />
+
+        {#if assignableGames.length > 0}
+            <Form
+                {...AgentSeatController.store.form(agent.id)}
+                options={{ preserveScroll: true }}
+                onSuccess={() => (gameId = '')}
+                class="grid gap-4 rounded-lg border border-border p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+            >
+                {#snippet children({ errors, processing })}
+                    <div class="grid gap-2">
+                        <Label for="game_id">Seat at a game</Label>
+                        <Select
+                            type="single"
+                            name="game_id"
+                            bind:value={gameId}
+                        >
+                            <SelectTrigger id="game_id" class="w-full">
+                                {selectedGameLabel}
+                            </SelectTrigger>
+                            <SelectContent>
+                                {#each assignableGames as game (game.id)}
+                                    <SelectItem
+                                        value={String(game.id)}
+                                        label="{game.name} ({game.short_name})"
+                                    />
+                                {/each}
+                            </SelectContent>
+                        </Select>
+                        <p class="text-sm text-muted-foreground">
+                            Joins as a player. Make it a gamemaster from that
+                            game's roster if you need to.
+                        </p>
+                        <InputError message={errors.game_id} />
+                    </div>
+
+                    <Button
+                        type="submit"
+                        disabled={processing || gameId === ''}
+                        data-test="seat-agent-button"
+                    >
+                        {#if processing}
+                            <Spinner />
+                        {:else}
+                            <UserPlus class="h-4 w-4" aria-hidden="true" />
+                        {/if}
+                        Add seat
+                    </Button>
+                {/snippet}
+            </Form>
+        {/if}
 
         {#if seats.length === 0}
             <div class="rounded-lg border border-border p-8 text-center">
                 <p class="font-medium">Not seated anywhere yet</p>
                 <p class="mt-1 text-sm text-muted-foreground">
-                    Open a game and add {agent.name} to its roster. You can issue
-                    a token once it has a seat.
+                    {#if assignableGames.length > 0}
+                        Pick a game above. You can issue a token once {agent.name}
+                        has a seat.
+                    {:else}
+                        There is no game to seat {agent.name} at — every game either
+                        has it already or is archived.
+                    {/if}
                 </p>
                 <Button variant="secondary" asChild>
                     {#snippet children(props)}

@@ -88,9 +88,27 @@ missing on the following request. Never render it from a prop, and never log it.
 
 ## Seating is a gamemaster's; minting is an administrator's
 
-An agent is added to a roster through the **game's own seat screens**, like any other account,
-because a roster is one game's business. Issuing its credential is on `/admin/agents` behind `admin`,
-because a bearer token is an account-level secret rather than a decision about one game.
+A **person** is added to a roster through the game's own seat screens, like any other account,
+because a roster is one game's business and a gamemaster runs it. Issuing a credential is on
+`/admin/agents` behind `admin`, because a bearer token is an account-level secret rather than a
+decision about one game.
+
+An **agent** can also be seated from its own screen, through `AgentSeatController`. That is a
+workflow concession, not a change of ownership, and it exists because the first version without it
+was unusable: a token belongs to a seat, so a newly created agent had nowhere to hang one, and
+finishing the job meant leaving for a game's roster and coming back. From the index the token column
+simply read "None" with no way to act on it.
+
+Three things keep it from becoming a second roster, and all three are asserted:
+
+- it **refuses a non-agent account** with a 404, so people are still seated where the whole roster is
+  visible;
+- it seats as a **player** and offers no role choice — who runs a game is a decision about the game,
+  and it stays with `GameSeatRoleForm` on the roster;
+- its uniqueness comes from `GameValidationRules::gameSeatGameRules()`, the mirror of
+  `gameSeatUserRules()` in the same trait, so the rule that counts **retired** seats is stated once.
+  `AgentController::assignableGames()` agrees with it rather than restating it, and leaves out
+  archived games as well since `AuthenticateAgent` refuses their tokens anyway.
 
 The credential routes are `admin/agents/{user}/credentials/{gameSeat}`, and both parts of that path
 are load-bearing:
