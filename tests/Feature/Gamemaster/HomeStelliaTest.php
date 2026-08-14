@@ -276,12 +276,17 @@ test('a game with no players generates an empty arrangement and is still accepta
     expect($game->generationStateFor(GenerationStage::Planets)->value)->toBe('ready');
 });
 
-test('a game is not complete until the planets are drawn over the homes', function () {
+test('the planets are drawn over the homes, and the world is finished after them', function () {
     /*
      * This stage used to be the one that finished a world, and it is no longer: the planets follow it,
      * because a home system is copied from the template rather than drawn and this is what decides
      * which systems those are. Asserted from here as well as from `GenerationTest` because the order
      * of these two in particular is the whole reason the workflow was rearranged.
+     *
+     * The planets no longer finish it either — the assets stage puts everybody on the board after
+     * them — so the chain is walked one link further rather than stopping where it used to. What is
+     * being pinned here is still the ordering of *these two*; the last link is here so that the test
+     * says what "complete" means today instead of asserting it of a stage that is no longer last.
      */
     $game = Game::factory()->create();
     $gamemaster = withAcceptedTemplate($game);
@@ -302,6 +307,15 @@ test('a game is not complete until the planets are drawn over the homes', functi
 
     $this->actingAs($gamemaster)->post(
         route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'planets'])
+    )->assertRedirect();
+
+    expect($game->load('generationRuns')->isGenerationComplete())->toBeFalse();
+    expect($game->firstUnfinishedGenerationStage())->toBe(GenerationStage::Assets);
+
+    generateStage($gamemaster, $game, GenerationStage::Assets, 9);
+
+    $this->actingAs($gamemaster)->post(
+        route('gamemaster.games.generation.accept', ['game' => $game, 'stage' => 'assets'])
     )->assertRedirect();
 
     expect($game->load('generationRuns')->isGenerationComplete())->toBeTrue();

@@ -26,6 +26,17 @@ clone or CI runner has no manifest until the build runs. `.github/workflows/test
 `composer test` is not weaker than the gate. `ci:check` calls `artisan test` directly instead of
 `@test` so nothing runs twice. Do not drop a step to make the gate green.
 
+### A green gate says nothing about `database/database.sqlite`
+
+**A change that adds a migration is not finished until `php artisan migrate` has been run.** The gate
+cannot catch a missing one: `phpunit.xml` points the suite at `:memory:` and `RefreshDatabase`
+migrates it from nothing on every run, so a new table exists for all 900-odd tests and still does not
+exist in the file Herd serves from. The symptom is a 500 on the one screen the work was about —
+`SQLSTATE[HY000]: General error: 1 no such table: …` — after a gate that passed completely.
+
+It is worth doing even when nothing is going to be clicked, because the next person to open
+`svolos.test` inherits the broken database rather than the failing test.
+
 ## Vitest covers the *pure* front end, and nothing else
 
 There are two test runners and they do not overlap. **Pest** answers everything that reaches the

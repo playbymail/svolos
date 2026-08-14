@@ -163,8 +163,27 @@
                     {#if expanded === location.id}
                         <tr class="border-b border-border last:border-b-0">
                             <td colspan={columns} class="p-0">
+                                <!--
+                                    **The detail is only shown under the row it is the detail of.**
+                                    One `locationDetail` comes back for the whole screen, so what is
+                                    in hand between one row being opened and the next answer landing
+                                    is the *previous* system — and a table of somebody else's planets
+                                    under this row is wrong in the one way nobody would question,
+                                    since it looks exactly like an answer. Anything that leaves the
+                                    prop behind puts it there: a reload that fails, a dropped
+                                    connection, a render that throws part way through the swap.
+
+                                    Falling back to `undefined` shows the skeleton, which reads as
+                                    "not here yet" — the truth. `null` is passed straight through:
+                                    it means "this location has no stellium", and only the open row
+                                    is ever asked, so a null in hand is always this row's answer.
+                                -->
                                 <LocationSystemPanel
-                                    detail={loading ? undefined : detail}
+                                    detail={loading ||
+                                    (detail != null &&
+                                        detail.id !== location.id)
+                                        ? undefined
+                                        : detail}
                                     {loading}
                                 />
                             </td>

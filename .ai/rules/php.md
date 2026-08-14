@@ -42,6 +42,29 @@ exactly two sanctioned ways to read it, and which one to use is decided by what 
 Never reach level 8 with a suppression: no baseline, no `ignoreErrors`, no `@phpstan-ignore`, no
 inline `@var`, no `assert()`, and no widening a parameter or return type to make an error go away.
 
+## `sortBy()` on more than one key takes **one** closure returning a tuple
+
+`$collection->sortBy([$a, $b])` reads like two key extractors and is not. Given an *array* of
+comparisons, Laravel treats a callable one as a full **comparator** and calls it `$prop($a, $b)`; the
+array form's key-extractor shape is `[['column', 'asc'], …]`, with strings. So a single-parameter
+closure quietly takes the first argument, ignores the second, and returns a position as though it
+were a comparison result — and the collection comes back in an arbitrary order.
+
+Sort on several keys like this instead:
+
+```php
+->sortBy(fn (Asset $asset): array => [$assignmentIndex, $typeIndex])
+```
+
+One callable is a value retriever, and PHP compares equal-length arrays element by element, so the
+tuple orders by the first key and then the second.
+
+**Nothing type-checks this and nothing throws.** PHPStan sees a valid call, and PHP does not object
+to extra arguments passed to a userland closure, so the only symptom is order — which a test
+asserting the *first* element passes straight through. Assert the whole sequence, or the property the
+reader actually depends on. It has already cost once: an interleaved list reached a keyed Svelte
+`{#each}` and blanked a panel (see [assets.md](assets.md)).
+
 ## Testing
 
 - Every change is programmatically tested. Pest feature tests by default; unit tests only where

@@ -35,6 +35,15 @@ enum GenerationStage: string
      */
     case HomeStellia = 'home_stellia';
     case Planets = 'planets';
+    /*
+     * The one stage that puts something on the map rather than drawing the map: every player's colony
+     * on their home world, and the ship that carried them there in orbit above it, each with the
+     * assets it begins holding. It is last because it needs somewhere to stand — a home says *which*
+     * system, and the planets stage is what turns that system into worlds one of which is the home
+     * world. It is also the only stage that draws nothing at all: the kit is the same for every
+     * player, which is a fairness rule rather than an oversight. See `App\Generation\StartingAssets`.
+     */
+    case Assets = 'assets';
 
     /**
      * Get the human readable label for the stage.
@@ -56,6 +65,7 @@ enum GenerationStage: string
             self::HomeStelliaTemplate => 'Home stellia template',
             self::HomeStellia => 'Home stellia',
             self::Planets => 'Planets',
+            self::Assets => 'Assets',
         };
     }
 
@@ -71,6 +81,8 @@ enum GenerationStage: string
             /* No unit named here: the separation is counted in hexes or through space, and the form says which. */
             self::HomeStellia => 'Gives every player a home to begin from: a single-star system, kept clear of every other.',
             self::Planets => 'Gives every star one to ten planets, ordered outward, each with its habitability and its deposits. A home system is copied from the template instead.',
+            /* No seed named here: this stage draws nothing, and every player is given the same kit. */
+            self::Assets => 'Settles every player on their home world: a colony on the ground, the ship that brought them in orbit above it, and what each begins holding.',
         };
     }
 
