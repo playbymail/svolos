@@ -19,6 +19,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Rate Limiter Store
+    |--------------------------------------------------------------------------
+    |
+    | Rate limiting must not write to the game database. The default store is
+    | `database`, and on SQLite that means every throttled request performs an
+    | `update` on the `cache` table in the same file the games live in — which
+    | under concurrent requests raises `database is locked` and answers 500.
+    | That is not hypothetical: it is what a burst against `api/*` did, four
+    | times out of a hundred and forty, the first time the agent throttle shipped.
+    |
+    | A counter that resets every minute has no business contending for a write
+    | lock with a turn report, so it lives on its own store. `file` is the right
+    | one for a single server: its locking blocks rather than failing, and the
+    | data is worthless if lost. On more than one server this becomes a per-server
+    | limit, which is a reason to move it to Redis rather than back to the
+    | database.
+    |
+    */
+
+    'limiter' => env('CACHE_LIMITER_STORE', 'file'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------
     |

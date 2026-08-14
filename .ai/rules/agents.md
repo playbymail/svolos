@@ -176,6 +176,15 @@ It is written on the group in `routes/api.php` rather than folded into the `api`
 because `gatherMiddleware()` reports a group by name and not by contents — a limit the sweep cannot
 see is a limit nothing will notice losing.
 
+**The counters must not live in the game database.** `cache.limiter` is `file`, not the default
+store, and that is not tidiness. With the default, every throttled request runs an `update` on the
+`cache` table inside the same SQLite file the games are in; a concurrent burst raises
+`database is locked` and answers **500**. That happened — four times in a hundred and forty requests,
+against production, the first time this throttle shipped. A counter that resets every minute has no
+business contending for a write lock with a turn report. `AgentApiTest` asserts the limiter's store
+is not the database one, against the store itself rather than the config name so it survives a move
+to Redis.
+
 The `v1` prefix is not decoration: agents are deployed where this application cannot reach them, so a
 payload change cannot ship to both at the same moment.
 

@@ -6,7 +6,10 @@ use App\Models\AgentCredential;
 use App\Models\Game;
 use App\Models\GameSeat;
 use App\Models\User;
+use Illuminate\Cache\DatabaseStore;
+use Illuminate\Cache\RateLimiter as RateLimiterService;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Session\Middleware\StartSession;
@@ -190,6 +193,24 @@ test('the agent limiter bounds both the address and the token', function () {
     expect($keys[0])->toBe('agent-ip:203.0.113.7')
         ->and($keys[1])->toBe('agent-token:'.hash('sha256', 'svl_agent_example'))
         ->and($keys[1])->not->toContain('svl_agent_example');
+});
+
+test('rate limiting does not write to the game database', function () {
+    /*
+     * The counters must not live in the SQLite file the games live in. With the default store, every
+     * throttled request runs an `update` on the `cache` table, and concurrent requests raise
+     * `database is locked` — which a burst against production did, four times in a hundred and forty,
+     * the first time this throttle shipped. See `config/cache.php`.
+     *
+     * Asserted against the limiter's own store rather than against the config value, so it holds
+     * whatever the store is called, and stays true if somebody moves it to Redis.
+     */
+    $limiter = app(RateLimiterService::class);
+
+    $cache = (new ReflectionProperty($limiter, 'cache'))->getValue($limiter);
+
+    expect($cache)->toBeInstanceOf(Repository::class)
+        ->and($cache->getStore())->not->toBeInstanceOf(DatabaseStore::class);
 });
 
 test('an agent that goes over the limit is turned away before the token is read', function () {
