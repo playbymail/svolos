@@ -92,6 +92,24 @@ and env), so it is a separate piece of work rather than a follow-on to this one.
 
 ## Databases
 
+**SQLite runs in WAL with a busy timeout, and the two are a pair.** The default rollback journal
+takes an exclusive lock for a whole write, so a second writer fails instantly with
+`SQLSTATE[HY000]: General error: 5 database is locked` — a 500 rather than a wait. A concurrent burst
+against `api/*` produced four of them, and every signed-in request writes `sessions` on the same
+file. `journal_mode=WAL` stops readers and the writer blocking each other; `busy_timeout=5000` turns
+the remaining writer-against-writer case into a short wait. WAL alone still fails the instant two
+writers collide, and a busy timeout alone would make every reader queue behind a writer, so do not
+keep one without the other.
+
+Two consequences worth knowing. WAL keeps `-wal` and `-shm` files beside the database, so the
+*directory* must be writable and not merely the file. And a WAL database **cannot be backed up by
+copying the file** — the recent commits live in the `-wal`; `scripts/deploy.sh` uses `sqlite3
+.backup`, the online backup API, which reads through it. `synchronous` is deliberately left at
+SQLite's `FULL` default: `NORMAL` is the usual WAL companion and is faster, but it trades durability
+across an OS crash, which is its own decision. `tests/Feature/DatabaseConfigurationTest.php` asserts
+all of this against a real file database, because the suite runs on `:memory:`, which reports
+`memory` whatever is asked of it.
+
 SQLite everywhere: `DB_CONNECTION=sqlite` locally, `:memory:` in `phpunit.xml`. Sessions use the
 `database` driver in `.env.example` and `array` in tests. The `sessions` table is created inside
 `database/migrations/0001_01_01_000000_create_users_table.php` (not a separate migration) — the

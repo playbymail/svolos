@@ -38,9 +38,36 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
+
+            /*
+             * SQLite's default rollback journal takes an exclusive lock for the whole of a write, so a
+             * second connection writing at the same moment fails immediately with
+             * `SQLSTATE[HY000]: General error: 5 database is locked` — a 500, not a wait. That is not
+             * theoretical here: a burst against `api/*` produced four of them, and the sessions table
+             * is written by every signed-in request on the same file.
+             *
+             * WAL changes the shape of the problem. Readers no longer block the writer and the writer
+             * no longer blocks readers, so the only remaining contention is writer-against-writer, and
+             * `busy_timeout` turns that from an instant failure into a wait of up to five seconds —
+             * far longer than any write here takes. The two go together: WAL alone still fails
+             * instantly when two writers collide, and a busy timeout alone would make every reader
+             * queue behind a writer.
+             *
+             * Two things this relies on, both already true. WAL keeps `-wal` and `-shm` files beside
+             * the database, so its directory has to be writable by the process and not merely the file
+             * — `/srv/svolos-data` is owned by `deploy`. And a WAL database cannot be backed up by
+             * copying the file, because the recent commits are in the `-wal`; `scripts/deploy.sh` uses
+             * `sqlite3 .backup`, the online backup API, which reads through it correctly.
+             *
+             * `synchronous` is deliberately left alone. SQLite defaults to `FULL`, which fsyncs every
+             * commit; `NORMAL` is the usual companion to WAL and is faster, but it trades away
+             * durability across an OS crash or power loss, and that is a separate decision from
+             * fixing lock errors.
+             */
+            'busy_timeout' => env('DB_BUSY_TIMEOUT', 5000),
+            'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
             'synchronous' => null,
+
             'transaction_mode' => 'DEFERRED',
         ],
 
