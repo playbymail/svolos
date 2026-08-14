@@ -8,7 +8,7 @@ Globs: `app/Actions/Agents/**`, `app/Models/AgentCredential.php`,
 `database/migrations/*_create_agent_credentials_table.php`,
 `database/factories/AgentCredentialFactory.php`, `resources/js/pages/admin/agents/**`,
 `resources/js/components/AgentTokenPanel.svelte`, `resources/js/types/agents.ts`,
-`tests/Feature/Agents/**`, `tests/Feature/Admin/Agent*Test.php`
+`tests/Feature/Agents/**`, `tests/Feature/Admin/Agent*Test.php`, `docs/agent-api.md`
 
 An **agent** is an account played by software rather than by a person. It holds seats, takes a game
 role, and will have its orders attributed to a seat exactly as anybody else does. The only thing that
@@ -187,6 +187,38 @@ to Redis.
 
 The `v1` prefix is not decoration: agents are deployed where this application cannot reach them, so a
 payload change cannot ship to both at the same moment.
+
+## `docs/agent-api.md` is the published contract — change it with the API
+
+That file is what somebody writes an agent against, and its readers are outside this repository and
+cannot be redeployed with it. Treat it as part of the API surface: a change to a route, a payload
+field, a status code, a message string or a rate limit is not finished until the document says so.
+
+It is **reference** in the Diataxis sense — it describes and does not explain. Reasoning belongs
+here, in this file, and the document links to it rather than repeating it. Its code examples are
+extracted verbatim from the file and run against production before it ships; keep that true, and note
+that the shell one avoids a variable named `status` because that identifier is read-only in zsh.
+
+It documents `~/.config/svolos/agents.json` as where an agent finds its token, because agents are run
+from a workstation that has it — not from the production server. An agent is given a **base URL, a
+name and a game**, and those three index the registry directly:
+`registry[base_url][agent]["seats"][game]["token"]`. The registry is keyed rather than a list of
+arrays so that resolution is one subscript chain instead of two linear scans — for an agent
+generating throwaway code, traversal loops are places to get it wrong. The top-level key carries the
+scheme and is used as given. `seats` keeps that name rather than becoming `games` because the value
+is a credential for a **seat**, which is the unit this whole system is built on and what an order is
+attributed to; the key alongside it is the game's short name. Each entry also carries its `seat` id,
+which lets an agent name itself in a log without a request — a convenience, never a credential. The document tells it to read only its own
+entry and to stop rather than fall back to another agent's, since acting as somebody else is worse
+than not acting.
+
+**Never put a real token in the document.** The repository is public and tokens do not expire, so one
+that reaches a commit is live until somebody notices, and the history keeps it afterwards. The first
+draft illustrated the `Authorization` header with a token copied out of a real registry while the
+examples were being written; it was caught before the file was committed.
+`tests/Feature/Agents/NoCommittedTokensTest.php` is what makes that catch repeatable — it matches the
+real shape (the prefix plus exactly 48 characters of the generator's alphabet) and allows only
+placeholders spelling `EXAMPLE`.
 
 ## Only entities accept orders — and that check does not live in a controller
 
