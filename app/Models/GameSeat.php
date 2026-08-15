@@ -35,9 +35,23 @@ use Illuminate\Support\Carbon;
  * `App\Enums\GameRole`. `is_active` is kept out of `#[Fillable]` so it can only change through the
  * retire and reactivate endpoints, never as a side effect of a write that was about something else.
  *
+ * ## The player's own three columns
+ *
+ * `number`, `empire_name` and `email_notifications` are what the player configures about themselves
+ * at this game, and they are here rather than in a table of their own because this row already *is*
+ * the account-at-a-game row.
+ *
+ * `number` is the empire number and is the third column kept out of `#[Fillable]`, with the strictest
+ * reason of the three: it is assigned once, by `booted()`, and never posted by anybody. It counts
+ * retired seats and is never reused, which follows directly from the rule above — a seat that outlives
+ * its holder's time in the game has to keep the number the engine already called them by.
+ *
  * @property int $id
  * @property int $game_id
  * @property int $user_id
+ * @property int $number
+ * @property string|null $empire_name
+ * @property bool $email_notifications
  * @property GameRole $role
  * @property bool $is_active
  * @property Carbon|null $created_at
@@ -48,24 +62,108 @@ use Illuminate\Support\Carbon;
  * @property-read AgentCredential|null $agentCredential
  * @property-read Collection<int, Entity> $entities
  */
-#[Fillable(['user_id', 'role'])]
+#[Fillable(['user_id', 'role', 'empire_name', 'email_notifications'])]
 class GameSeat extends Model
 {
     /** @use HasFactory<GameSeatFactory> */
     use HasFactory;
 
     /**
+     * The longest an empire name may be.
+     *
+     * Matches the column width in `..._add_player_profile_to_game_seats_table.php`, and lives on the
+     * model for the reason `Game::SHORT_NAME_MAX_LENGTH` does: the validation rule and the tests need
+     * one place to agree on. Sixty characters is a limit on the name's *purpose* rather than on the
+     * column's capacity — an empire name is read in a list beside other empires, so it has to stay
+     * short enough to sit on one line next to them.
+     */
+    public const int EMPIRE_NAME_MAX_LENGTH = 60;
+
+    /**
      * The model's default attribute values.
      *
-     * Both repeat column defaults from `..._create_game_seats_table.php` so an unsaved `new GameSeat`
-     * reads back as an active player instead of hitting the enum cast with a null.
+     * All three repeat column defaults from the migrations so an unsaved `new GameSeat` reads back as
+     * an active player who has not asked to be mailed, instead of hitting the enum cast with a null.
+     *
+     * `number` is deliberately **not** here, for the reason `Game` keeps `seed` out of its own list: a
+     * per-row value is not a default, and a fixed one would be worse than none — every seat would read
+     * as empire 1 until somebody noticed. `booted()` assigns it.
      *
      * @var array<string, mixed>
      */
     protected $attributes = [
         'role' => GameRole::Player->value,
         'is_active' => true,
+        'email_notifications' => false,
     ];
+
+    /**
+     * Register the model's lifecycle hooks.
+     *
+     * Every seat gets its empire number at creation, wherever it is created from — the administrator's
+     * roster, the gamemaster's, a factory, a seeder. Assigning it in the two seat controllers instead
+     * would leave every other path writing a seat with no number, which the non-nullable column would
+     * then refuse with a database error rather than a message. This is the same arrangement, and the
+     * same reasoning, as `Game::booted()` assigning a seed.
+     *
+     * The next number is the highest this **game** has ever handed out plus one, read across every seat
+     * rather than the active ones: a number is not returned to the pool when its seat is retired, so
+     * counting only live seats would hand the next arrival a number somebody in the game's history is
+     * already known by.
+     *
+     * A number supplied on purpose survives, so a test can pin one. The attribute is read with
+     * `getAttribute()` rather than `$seat->number` because the declared `@property int $number` is the
+     * truth for a *saved* seat and a null-coalesce against it would read as dead code.
+     *
+     * Two seats created at the same instant would compute the same number; the unique index on
+     * `(game_id, number)` is what refuses the second, rather than this hook trying to be atomic. Seats
+     * are added one at a time by a person looking at a roster, so the collision is a database error on
+     * a race nobody has, not a case worth serialising every seat creation for.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (GameSeat $seat): void {
+            if ($seat->getAttribute('number') === null) {
+                $seat->number = (int) static::query()
+                    ->where('game_id', $seat->game_id)
+                    ->max('number') + 1;
+            }
+        });
+    }
+
+    /**
+     * Get the name an empire that has not been named goes by.
+     *
+     * "Game ACME Seat 3" — deliberately dull, because a player reading it on their own screen should
+     * want to replace it.
+     *
+     * It is computed here rather than written into the column when the seat is created. Two reasons,
+     * and the second is the one that matters: a stored copy would go stale the moment an administrator
+     * renamed the game, and a null column is the only honest record that this player has not chosen a
+     * name yet. The screen prefills its input with this and still knows the difference, which is why
+     * this is separate from `empireName()` rather than folded into it.
+     *
+     * Reads `$this->game`, so a caller that already has the game in hand should hand it over with
+     * `setRelation('game', $game)` rather than pay for a lazy load — `Player\GameController` does.
+     */
+    public function defaultEmpireName(): string
+    {
+        return __('Game :game Seat :seat', [
+            'game' => $this->game->short_name,
+            'seat' => $this->number,
+        ]);
+    }
+
+    /**
+     * Get the name this seat's empire goes by.
+     *
+     * The chosen name, or the fallback above when there is none. Anything showing an empire to
+     * somebody uses this; only the screen that *edits* the name needs to tell the two apart.
+     */
+    public function empireName(): string
+    {
+        return $this->empire_name ?? $this->defaultEmpireName();
+    }
 
     /**
      * Get the game this seat is at.
@@ -151,6 +249,7 @@ class GameSeat extends Model
         return [
             'role' => GameRole::class,
             'is_active' => 'boolean',
+            'email_notifications' => 'boolean',
         ];
     }
 }

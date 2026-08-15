@@ -63,4 +63,18 @@ class GameSeatFactory extends Factory
             'is_active' => false,
         ]);
     }
+
+    /**
+     * Indicate that the player has asked to be emailed about this game.
+     *
+     * There is no matching `optedOut()` state, and no state for `number` or `empire_name` at all:
+     * opting out is the column default, the number is assigned by `GameSeat::booted()` whatever the
+     * factory says, and an unnamed empire is the whole point of that column being nullable.
+     */
+    public function optedIn(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'email_notifications' => true,
+        ]);
+    }
 }

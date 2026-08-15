@@ -691,9 +691,14 @@ test('the unique index on game seats spans game and user and ignores is_active',
      * The index is what makes "retired seats still count" true at the database level rather than only
      * in a validation rule. If `is_active` were ever added to the key, a retired account could get a
      * second row and the reactivation contract would quietly break.
+     *
+     * Selected by `user_id` rather than by `game_id`, because the table now carries a second unique
+     * index that also starts at `game_id` — the one on `(game_id, number)` that keeps empire numbers
+     * from being handed out twice. Matching on the shared column found whichever the driver listed
+     * first, which is a coin toss this assertion should not be deciding.
      */
     $index = collect(Schema::getIndexes('game_seats'))
-        ->first(fn (array $index): bool => $index['unique'] === true && in_array('game_id', $index['columns'], true));
+        ->first(fn (array $index): bool => $index['unique'] === true && in_array('user_id', $index['columns'], true));
 
     expect($index)->not->toBeNull();
     expect($index['columns'])->toBe(['game_id', 'user_id']);

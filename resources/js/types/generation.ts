@@ -126,8 +126,12 @@ export type GenerationSummary = {
  *
  * The two `home_*` fields are a **third** kind of null and are not one of those two: most locations
  * are nobody's home even after the stage has been accepted, so null here is an ordinary answer rather
- * than a stage that has not run. They are always both set or both null — a home is a seat and an
- * account together, and the map names whose it is rather than only marking that it is somebody's.
+ * than a stage that has not run. They are always both set or both null — a home is a seat and a name
+ * together, and the map names whose it is rather than only marking that it is somebody's.
+ *
+ * `home_player_name` is the **empire's** name, never the account's: inside a game an empire is named by
+ * its empire name on every screen, and a gamemaster who needs to know which account that is has the
+ * roster on the same page. See `App\Concerns\PresentsGeneration::empireNameFor()`.
  */
 export type ClusterLocation = {
     id: number;
@@ -175,7 +179,8 @@ export type SystemAsset = {
  *
  * `seat_id` rather than a user id, because control is a seat: an entity belongs to a place at a game
  * rather than to a person across all of them. `player_name` rides beside it for the reason the cluster
- * map carries one — "somebody is here" is not the useful half.
+ * map carries one — "somebody is here" is not the useful half — and it is the **empire's** name, the
+ * same one `home_player_name` carries, so a system panel and the map above it never disagree.
  */
 export type SystemEntity = {
     id: number;

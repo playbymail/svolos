@@ -385,7 +385,8 @@ test('the screen carries the arrangement, on the map and on the roster', functio
     $marked = collect($payload['locations'])->firstWhere('id', $home->location_id);
 
     expect($marked['home_seat_id'])->toBe($seats[0]->id);
-    expect($marked['home_player_name'])->toBe($seats[0]->user->name);
+    /* The empire's name rather than the account's — see `PresentsGeneration::empireNameFor()`. */
+    expect($marked['home_player_name'])->toBe($seats[0]->empireName());
 
     $row = collect($payload['seats'])->firstWhere('id', $seats[0]->id);
 

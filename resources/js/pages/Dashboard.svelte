@@ -63,6 +63,7 @@
                 title="Playing"
                 description="Games you hold a player's seat in."
                 games={playerGames}
+                playable
             />
         {/if}
     {:else}

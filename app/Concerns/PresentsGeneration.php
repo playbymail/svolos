@@ -9,6 +9,7 @@ use App\Enums\GenerationStage;
 use App\Models\Asset;
 use App\Models\Entity;
 use App\Models\Game;
+use App\Models\GameSeat;
 use App\Models\GenerationRun;
 use App\Models\Location;
 use App\Models\Planet;
@@ -92,6 +93,30 @@ trait PresentsGeneration
     }
 
     /**
+     * Name the empire holding a seat, for a screen that is looking at the game world.
+     *
+     * **Empires are named by their empire name everywhere inside a game**, never by the account behind
+     * them. That is not only the player's screen being polite about privacy — it is the same rule on
+     * the gamemaster's and the administrator's, where the roster on the very same page is what answers
+     * "which account is this". Two names for one empire on one screen is the thing to avoid, and it is
+     * exactly what shipped for a moment when only the player's map had been converted.
+     *
+     * The game is attached rather than lazy-loaded because `GameSeat::defaultEmpireName()` reads its
+     * short name, and every caller here already has the game in hand — the alternative is a query per
+     * placed seat for a string the caller is holding.
+     */
+    private function empireNameFor(?GameSeat $seat, Game $game): ?string
+    {
+        if ($seat === null) {
+            return null;
+        }
+
+        $seat->setRelation('game', $game);
+
+        return $seat->empireName();
+    }
+
+    /**
      * Shape the locations a game's cluster is made of, with their stelliums if it has any yet.
      *
      * Returns an empty list until a cluster run exists, so a screen with nothing to show is given
@@ -136,7 +161,7 @@ trait PresentsGeneration
              */
             ->with([
                 'stellium' => fn ($query) => $query->withCount(['stars', 'planets']),
-                'homeStellium.gameSeat.user',
+                'homeStellium.gameSeat',
             ])
             ->get()
             ->map(fn (Location $location): array => [
@@ -154,7 +179,7 @@ trait PresentsGeneration
                  * locations are nobody's home even after the stage is accepted.
                  */
                 'home_seat_id' => $location->homeStellium?->game_seat_id,
-                'home_player_name' => $location->homeStellium?->gameSeat->user->name,
+                'home_player_name' => $this->empireNameFor($location->homeStellium?->gameSeat, $game),
             ])
             ->values()
             ->all();
@@ -202,7 +227,7 @@ trait PresentsGeneration
              * and still one query per level against a single system — the alternative is a lazy load
              * per planet, which is ten queries for a system nobody has settled.
              */
-            ->with(['stellium.stars.planets.entities.gameSeat.user', 'stellium.stars.planets.entities.assets'])
+            ->with(['stellium.stars.planets.entities.gameSeat', 'stellium.stars.planets.entities.assets'])
             ->first();
 
         if ($location?->stellium === null) {
@@ -227,7 +252,7 @@ trait PresentsGeneration
                             'fuel' => $planet->fuel,
                             'metals' => $planet->metals,
                             'minerals' => $planet->minerals,
-                            'entities' => $this->presentEntities($planet),
+                            'entities' => $this->presentEntities($planet, $game),
                         ])
                         ->values()
                         ->all(),
@@ -240,10 +265,11 @@ trait PresentsGeneration
     /**
      * Shape what is standing at one planet, and what each of those things holds.
      *
-     * The player's name rides along for the reason the cluster map carries it rather than only marking
-     * a home: "somebody is here" is not the useful half. It reaches through the seat rather than
-     * through the account directly, because control is a seat — an entity belongs to a place at a
-     * game, not to a person across all of them.
+     * The name rides along for the reason the cluster map carries it rather than only marking a home:
+     * "somebody is here" is not the useful half. It reaches through the seat rather than through the
+     * account, because control is a seat — an entity belongs to a place at a game, not to a person
+     * across all of them — and it is the **empire's** name for the reason `empireNameFor()` gives:
+     * inside a game an empire is named by its empire name, on every screen that shows one.
      *
      * Assets are ordered by assignment and then by kind, so the same entity reads the same way every
      * time and the infrastructure — the part that says what the thing *is* — comes first.
@@ -264,7 +290,7 @@ trait PresentsGeneration
      *     assets: array<int, array<string, mixed>>,
      * }>
      */
-    private function presentEntities(Planet $planet): array
+    private function presentEntities(Planet $planet, Game $game): array
     {
         return $planet->entities
             ->map(fn (Entity $entity): array => [
@@ -272,7 +298,7 @@ trait PresentsGeneration
                 'type' => $entity->type->value,
                 'type_label' => $entity->type->label(),
                 'seat_id' => $entity->game_seat_id,
-                'player_name' => $entity->gameSeat->user->name,
+                'player_name' => (string) $this->empireNameFor($entity->gameSeat, $game),
                 'assets' => $entity->assets
                     ->sortBy(fn (Asset $asset): array => [
                         (int) array_search($asset->assignment, AssetAssignment::cases(), true),

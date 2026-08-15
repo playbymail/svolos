@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Games\AnnounceGameActivation;
 use App\Concerns\PresentsGeneration;
 use App\Enums\GameRole;
 use App\Enums\GameStatus;
@@ -134,10 +135,17 @@ class GameController extends Controller
      * The short name is uppercased by `GameUpdateRequest` before the character rules see it, so editing a
      * game folds its short name exactly as creating one does.
      */
-    public function update(GameUpdateRequest $request, Game $game): RedirectResponse
+    public function update(GameUpdateRequest $request, Game $game, AnnounceGameActivation $announce): RedirectResponse
     {
         $game->fill($request->validated());
         $game->save();
+
+        /*
+         * A no-op unless this save is what made the game active. The check is the action's rather than
+         * this method's because the gamemaster's endpoint has to make exactly the same one — see
+         * `App\Actions\Games\AnnounceGameActivation`.
+         */
+        $announce->handle($game);
 
         Inertia::flash('toast', [
             'type' => 'success',

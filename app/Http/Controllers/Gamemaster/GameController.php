@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Gamemaster;
 
+use App\Actions\Games\AnnounceGameActivation;
 use App\Concerns\PresentsGeneration;
 use App\Enums\GameRole;
 use App\Enums\GameStatus;
@@ -113,10 +114,20 @@ class GameController extends Controller
      * dropped on the floor rather than written. Do not "improve" this into a `fill($request->all())`
      * with an `only()` somewhere, and do not add the two fields to that request.
      */
-    public function update(GameStatusUpdateRequest $request, Game $game): RedirectResponse
+    public function update(GameStatusUpdateRequest $request, Game $game, AnnounceGameActivation $announce): RedirectResponse
     {
         $game->fill($request->validated());
         $game->save();
+
+        /*
+         * A no-op unless this save is what made the game active, and unless somebody asked to hear
+         * about it. This is the endpoint the announcement is really *for* — a gamemaster starting
+         * their game — but the identical line on the administrator's copy is not a courtesy: a game
+         * activated from `/admin` has started just as much, and players who opted in are owed the same
+         * mail whoever pressed the button. The check itself belongs to the action so the two cannot
+         * drift apart. See `App\Actions\Games\AnnounceGameActivation`.
+         */
+        $announce->handle($game);
 
         Inertia::flash('toast', [
             'type' => 'success',

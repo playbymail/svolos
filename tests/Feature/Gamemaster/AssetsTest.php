@@ -352,7 +352,13 @@ test('the screen carries the opening position, under the world it stands on', fu
     $settled = $planets->firstWhere('ordinal', $homeOrdinal);
 
     expect(collect($settled['entities'])->pluck('type')->all())->toBe(['colony', 'ship']);
-    expect($settled['entities'][0]['player_name'])->toBe($seats[0]->user->name);
+    /*
+     * The **empire's** name, not the account's. An unnamed empire falls back to "Game ACME Seat 3",
+     * which is what these seats have — inside a game an empire is named by its empire name on every
+     * screen, and the roster below this panel is what says which account holds it.
+     */
+    expect($settled['entities'][0]['player_name'])->toBe($seats[0]->empireName());
+    expect($settled['entities'][0]['player_name'])->not->toBe($seats[0]->user->name);
     expect($settled['entities'][0]['seat_id'])->toBe($seats[0]->id);
 
     expect(array_keys($settled['entities'][0]))

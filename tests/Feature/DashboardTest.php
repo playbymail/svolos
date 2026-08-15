@@ -292,3 +292,27 @@ test('the games are eager loaded rather than fetched one per seat', function () 
     /* One `with('game')` load for the whole roster, however many seats it holds. */
     expect($gameQueries)->toBe(1);
 });
+
+test('each section links to the screen its seat opens', function () {
+    /*
+     * A player's row had no link at all until there was a screen to send it to, and the two sections
+     * now point at two different ones — `/gamemaster/games/{game}` and `/games/{game}` — because they
+     * are gated by two different seats. Losing either prop leaves that half of the roster with no way
+     * out of this page, and the feature behind it unreachable.
+     *
+     * Asserted against the source for the reason `ButtonNavigationTest` is: there is no jsdom in this
+     * project (see `.ai/rules/general.md`), so no test renders the markup, and the payload this screen
+     * sends is identical either way. A regex over one file is the only thing that can see it.
+     */
+    $page = (string) file_get_contents(resource_path('js/pages/Dashboard.svelte'));
+
+    expect($page)
+        ->toMatch('/games=\{gamemasterGames\}\s*\n\s*manageable/')
+        ->toMatch('/games=\{playerGames\}\s*\n\s*playable/');
+
+    $section = (string) file_get_contents(resource_path('js/components/DashboardGameSection.svelte'));
+
+    expect($section)
+        ->toContain('data-test="manage-game-{game.id}"')
+        ->toContain('data-test="open-game-{game.id}"');
+});

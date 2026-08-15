@@ -31,11 +31,18 @@ use Illuminate\Support\Carbon;
  * a name or a status. Re-seeding a game that has already started would silently rewrite the run its
  * turn reports describe, so both endpoints refuse it once the game has left `GameStatus::Setup`.
  *
+ * `turn` is how far through the game's calendar the game has got, and **nothing here writes it**. It
+ * is out of `#[Fillable]` for the reason `seed` is — a status save must not move it as a side effect —
+ * and there is no endpoint for it either, because turn processing belongs to the game engine and the
+ * engine is not wired up to this application yet. Every game reads 0 until something outside this
+ * model advances it. `yearAndQuarter()` is the only thing that interprets it.
+ *
  * @property int $id
  * @property string $name
  * @property string $short_name
  * @property int $seed
  * @property GameStatus $status
+ * @property int $turn
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read int|null $seats_count
@@ -99,6 +106,7 @@ class Game extends Model
      */
     protected $attributes = [
         'status' => GameStatus::Setup->value,
+        'turn' => 0,
     ];
 
     /**
@@ -136,6 +144,33 @@ class Game extends Model
                 $game->seed = self::randomSeed();
             }
         });
+    }
+
+    /**
+     * Say which year and quarter this game's turn falls in.
+     *
+     * A turn is a quarter, and four quarters make a year: turn 1 is year 0 quarter 1, turn 4 closes
+     * year 0, and turn 5 opens year 1. Turn 0 is the setup turn — year 0, quarter 0 — the state every
+     * game is created in and the one it stays in until the engine moves it.
+     *
+     * **The setup turn needs no special case, and that is worth reading twice.** Both expressions hold
+     * for it only because of two PHP rules: `intdiv()` truncates toward zero, so `intdiv(-1, 4)` is 0
+     * rather than -1; and `%` takes the sign of its dividend, so `-1 % 4` is -1 and the quarter comes
+     * back as 0. In a language that floored instead, turn 0 would silently read as year -1 quarter 0.
+     * `tests/Feature/GameModelTest.php` pins that case for exactly this reason — do not "simplify"
+     * either line without running it.
+     *
+     * Derived rather than stored, for the reason every generation state is: a year column beside the
+     * turn column is a second copy of the same fact and a second chance for it to be wrong.
+     *
+     * @return array{year: int, quarter: int}
+     */
+    public function yearAndQuarter(): array
+    {
+        return [
+            'year' => intdiv($this->turn - 1, 4),
+            'quarter' => (($this->turn - 1) % 4) + 1,
+        ];
     }
 
     /**
@@ -369,6 +404,7 @@ class Game extends Model
         return [
             'seed' => 'integer',
             'status' => GameStatus::class,
+            'turn' => 'integer',
         ];
     }
 }

@@ -14,6 +14,7 @@ use App\Http\Controllers\Gamemaster\GameSeatController as GamemasterGameSeatCont
 use App\Http\Controllers\Gamemaster\GenerationController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InvitationAcceptanceController;
+use App\Http\Controllers\Player\GameController as PlayerGameController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -69,6 +70,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::delete('impersonate', [ImpersonationController::class, 'destroy'])
     ->middleware('auth')
     ->name('impersonation.stop');
+
+/*
+ * Playing a game from the inside — the counterpart of the gamemaster group below, and a **member**
+ * area for the same reasons. `EnsureUserIsPlayer` reads an active `GameRole::Player` seat at the game
+ * in the URL and reads nothing else, so a gamemaster, an administrator with no seat and a retired
+ * player are all refused equally; the middleware says why each of those is deliberate.
+ *
+ * There is no index — which games you play is the dashboard, which now links here — and no store or
+ * destroy: a player does not create or leave a game, they are seated and retired by somebody running
+ * it. The profile is a PUT of its own rather than part of a wider update because it is the only thing
+ * on the screen a player writes; everything else there is the game's own state, read-only to them.
+ *
+ * No `scopeBindings()`, which the seat routes elsewhere all carry: the seat is not in the URL. It is
+ * the viewer's own seat at the game, resolved from the session, and there is exactly one of those.
+ */
+Route::middleware(['auth', 'verified', 'player'])
+    ->prefix('games')
+    ->name('games.')
+    ->group(function () {
+        Route::get('{game}', [PlayerGameController::class, 'show'])->name('show');
+        Route::put('{game}/profile', [PlayerGameController::class, 'updateProfile'])->name('profile.update');
+    });
 
 /*
  * Running a game from the inside. These are **member** routes and must stay out of the admin group:

@@ -207,9 +207,14 @@
 
 <div class="space-y-2">
     <p class="text-sm text-muted-foreground">
-        {locations.length} systems on the plane, each in the hex its X and Y fall
-        into, labelled with its Z — the height above or below it. Count hexes for
-        reach.
+        <!--
+            Singular is reachable now that a player's map carries their own system and nothing else.
+            A cluster under review never has one, which is why "1 systems" survived this long.
+        -->
+        {locations.length}
+        {locations.length === 1 ? 'system' : 'systems'} on the plane, each in the
+        hex its X and Y fall into, labelled with its Z — the height above or below
+        it. Count hexes for reach.
         {#if hasStars}
             Brighter and larger means more stars.
         {:else}

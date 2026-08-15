@@ -124,6 +124,48 @@ test('a game defaults to setup and a seat defaults to an active player before ei
     expect($game->fresh()?->status)->toBe(GameStatus::Setup);
 });
 
+test('a game starts at turn zero and reads it back as the setup quarter', function () {
+    expect((new Game)->turn)->toBe(0);
+
+    $game = Game::query()->create(['name' => 'Unstarted', 'short_name' => 'UNS']);
+
+    expect($game->fresh()?->turn)->toBe(0);
+});
+
+test('the turn maps onto the calendar', function (int $turn, int $year, int $quarter) {
+    expect(Game::factory()->create(['turn' => $turn])->yearAndQuarter())
+        ->toBe(['year' => $year, 'quarter' => $quarter]);
+})->with([
+    /*
+     * **Turn 0 is the case this dataset exists for.** It is the setup turn — year 0, quarter 0 — and
+     * `yearAndQuarter()` gets it from the same two expressions as every other turn only because PHP
+     * truncates `intdiv()` toward zero and gives `%` the sign of its dividend. In a language that
+     * floored instead it would read as year -1, and nothing else here would notice.
+     */
+    'the setup turn' => [0, 0, 0],
+    'the first quarter of the first year' => [1, 0, 1],
+    'the end of year zero' => [4, 0, 4],
+    'the year rolls over' => [5, 1, 1],
+    'and again' => [8, 1, 4],
+    'the third year opens' => [9, 2, 1],
+]);
+
+test('the turn cannot be mass assigned', function () {
+    /*
+     * Out of `#[Fillable]` for the reason `seed` is: nothing in the application writes it, and a
+     * status save must not move it as a side effect. Pinned at the model, because there is no
+     * endpoint to catch it at.
+     */
+    $game = Game::factory()->create(['turn' => 3]);
+
+    $game->fill(['name' => 'Renamed', 'turn' => 99]);
+    $game->save();
+
+    expect($game->fresh())
+        ->turn->toBe(3)
+        ->name->toBe('Renamed');
+});
+
 test('every game is given a seed on creation, whatever created it', function () {
     /*
      * The hook is on the model rather than in the controller precisely so this holds for a factory, a

@@ -258,13 +258,21 @@ test('changing a seat role cannot change whether the seat is active', function (
     expect($seat->fresh()?->is_active)->toBeFalse();
 });
 
-test('is_active is absent from the game seat fillable attributes', function () {
+test('is_active and number are absent from the game seat fillable attributes', function () {
     /*
      * Pinned at the model rather than only through the endpoint, because an endpoint test still passes
-     * when `is_active` becomes fillable — the request simply does not send it today.
+     * when one of these becomes fillable — the request simply does not send it today.
+     *
+     * The list is asserted whole rather than only by absence, so that adding a field is a decision
+     * somebody makes here rather than a side effect of a migration. Two of the four are the player's
+     * own — `empire_name` and `email_notifications`, written by `Player\GameController::updateProfile()`
+     * — and the two that are missing are missing for different strengths of reason: `is_active` may
+     * only change through the retire and reactivate endpoints, and `number` may never change at all.
      */
-    expect((new GameSeat)->getFillable())->toBe(['user_id', 'role'])
-        ->and((new GameSeat)->getFillable())->not->toContain('is_active');
+    expect((new GameSeat)->getFillable())
+        ->toBe(['user_id', 'role', 'empire_name', 'email_notifications'])
+        ->not->toContain('is_active')
+        ->not->toContain('number');
 });
 
 test('an administrator can retire a seat, and the row survives', function () {

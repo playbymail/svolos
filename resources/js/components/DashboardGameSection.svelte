@@ -5,9 +5,11 @@
     import Heading from '@/components/Heading.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';
+    import { gameStatusVariants } from '@/lib/game-status';
     import { toUrl } from '@/lib/utils';
     import { show as gamemasterGameShow } from '@/routes/gamemaster/games';
-    import type { DashboardGame, GameStatus } from '@/types';
+    import { show as playerGameShow } from '@/routes/games';
+    import type { DashboardGame } from '@/types';
 
     let {
         title,
@@ -15,6 +17,7 @@
         games,
         slug,
         manageable = false,
+        playable = false,
     }: {
         title: string;
         description: string;
@@ -30,6 +33,19 @@
          * anyone without an active gamemaster seat, so this is a link that would 403, not the check.
          */
         manageable?: boolean;
+        /**
+         * Whether each row links to the screen for *playing* that game.
+         *
+         * The player section's counterpart of `manageable`, and two props rather than one enum
+         * because they are two different destinations gated by two different seats. They are never
+         * both true: `EnsureUserIsPlayer` refuses a gamemaster and `EnsureUserIsGamemaster` refuses a
+         * player, and a seat holds one role.
+         *
+         * Archived and setup games link too. There is something to do on that screen in every status
+         * — naming your empire is most useful *before* the game starts — so the link is never
+         * conditional on the status the badge beside it already reports.
+         */
+        playable?: boolean;
     } = $props();
 
     /*
@@ -49,17 +65,6 @@
     const visibleGames = $derived(
         showArchived ? games : games.filter((game) => !game.is_archived),
     );
-
-    const statusVariants: Record<
-        GameStatus,
-        'default' | 'secondary' | 'outline' | 'destructive'
-    > = {
-        setup: 'outline',
-        active: 'default',
-        paused: 'secondary',
-        completed: 'secondary',
-        archived: 'destructive',
-    };
 </script>
 
 <section class="space-y-4" aria-labelledby="{slug}-heading">
@@ -124,7 +129,7 @@
                     <p class="min-w-0 flex-1 font-medium tracking-tight">
                         {game.name}
                     </p>
-                    <Badge variant={statusVariants[game.status]}>
+                    <Badge variant={gameStatusVariants[game.status]}>
                         {game.status_label}
                     </Badge>
                     {#if manageable}
@@ -134,6 +139,16 @@
                             data-test="manage-game-{game.id}"
                         >
                             Manage
+                            <span class="sr-only">{game.name}</span>
+                        </Link>
+                    {/if}
+                    {#if playable}
+                        <Link
+                            href={toUrl(playerGameShow(game.id))}
+                            class="text-sm underline-offset-4 hover:underline"
+                            data-test="open-game-{game.id}"
+                        >
+                            Open
                             <span class="sr-only">{game.name}</span>
                         </Link>
                     {/if}

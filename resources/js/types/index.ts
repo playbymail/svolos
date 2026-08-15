@@ -6,4 +6,5 @@ export * from './games';
 export * from './generation';
 export * from './invitations';
 export * from './navigation';
+export * from './player';
 export * from './ui';
