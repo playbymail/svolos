@@ -29,8 +29,9 @@ Assumptions:
 | Data directory | `/srv/svolos-data` |
 
 **Ubuntu 26.04 ships PHP 8.5**, which is what `apt install php-fpm` gets you and what this
-guide uses throughout. `composer.json` requires `php: ^8.4`, so 8.5 satisfies it — 8.4 is
-only relevant if you are deliberately pinning to an older series from a PPA.
+guide uses throughout. `composer.json` requires `php: ^8.5`, so the stock package is the
+supported one and pinning an older series from a PPA is no longer an option — `composer
+install` refuses 8.4 outright rather than warning.
 
 The version appears in five places that must all agree: the apt package names (section
 2.2), the pool file path and its socket (section 3), the sudoers rule (section 3.1), the
