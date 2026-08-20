@@ -9,8 +9,11 @@ resolved through the Vite manifest at `public/build/manifest.json`, so a page th
 the manifest makes the whole request fail with
 `Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest`, and the test asserting
 that page 500s instead of failing with a useful message. `public/build/` is gitignored, so a fresh
-clone or CI runner has no manifest until the build runs. `.github/workflows/tests.yml` encodes this:
-`composer setup` (which ends in `npm run build`) runs before `composer ci:check`.
+clone has no manifest until the build runs. `composer setup` ends in `npm run build` for that reason,
+and running it is the same thing as running the first half of the gate.
+
+**The gate runs nowhere but here.** There is no hosted CI: `.github/` was removed deliberately, so
+nothing catches a red gate except the person who ran it. Run both halves before you call work done.
 
 `composer ci:check` runs each check exactly once, in this order:
 
@@ -71,8 +74,9 @@ Three mechanical points:
 compiled Blade views are cached in `storage/framework/views`. Editing the template and immediately
 re-running those tests can be served the previously compiled version, so a change appears to have had
 no effect — or worse, a mutation you made to check that a test really fails appears to be caught when
-it was not exercised at all. Clear the cache between the edit and the run. CI is unaffected because
-`storage/framework/views` starts empty there.
+it was not exercised at all. Clear the cache between the edit and the run. A fresh clone is unaffected
+because `storage/framework/views` starts empty there, which is exactly why this only ever bites the
+person doing the editing.
 
 ## `.env` values containing spaces must be quoted
 
