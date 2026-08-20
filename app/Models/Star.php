@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 /**
  * One star in a stellium.
@@ -54,6 +55,28 @@ class Star extends Model
     public function planets(): HasMany
     {
         return $this->hasMany(Planet::class)->orderBy('ordinal');
+    }
+
+    /**
+     * Get the star's name within its stellium: 1 is `A`, up to the four a stellium can hold.
+     *
+     * Written out rather than derived with `chr(ord('A') + ...)` because the ceiling is real: a
+     * stellium holds at most four stars, `StelliumGenerator::STAR_DISTRIBUTION` is what guarantees it,
+     * and the arithmetic quietly named a fifth star `E` instead of saying something had gone wrong. A
+     * `LogicException` rather than an `InvalidArgumentException` because nothing is passed in — an
+     * ordinal outside the four is a row that should never have been written.
+     */
+    public function label(): string
+    {
+        return match ($this->ordinal) {
+            1 => 'A',
+            2 => 'B',
+            3 => 'C',
+            4 => 'D',
+            default => throw new LogicException(
+                sprintf('A stellium holds at most four stars, so there is no name for ordinal %d.', $this->ordinal)
+            ),
+        };
     }
 
     /**

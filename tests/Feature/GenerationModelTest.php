@@ -201,6 +201,23 @@ test('discarding a run deletes what it produced, all the way down to the planets
     expect(Planet::query()->count())->toBe(0);
 });
 
+test('names each of the four stars a stellium can hold, and refuses a fifth', function () {
+    /*
+     * The letters are the one thing on screen that comes from a star rather than from a planet, and the
+     * four are a real ceiling — `StelliumGenerator::STAR_DISTRIBUTION` never draws more. The fifth case
+     * is the point of the test: naming it `E` is what the arithmetic used to do, and a star nobody can
+     * account for should stop rather than quietly appear in the system panel.
+     */
+    $stellium = Stellium::factory()->withStars(4)->create();
+
+    expect($stellium->stars->map(fn (Star $star): string => $star->label())->all())
+        ->toBe(['A', 'B', 'C', 'D']);
+
+    $fifth = Star::factory()->for($stellium)->make(['ordinal' => 5]);
+
+    expect(fn () => $fifth->label())->toThrow(LogicException::class);
+});
+
 test('deleting a run frees every home standing on it, and keeps the seat', function () {
     /*
      * The home stellia are a **branch** off the same chain rather than a fifth level of it: they hang

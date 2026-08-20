@@ -241,7 +241,7 @@ trait PresentsGeneration
                 ->map(fn (Star $star): array => [
                     'id' => $star->id,
                     /* A star is named by its place in the stellium: 1 is A, and there are never more than four. */
-                    'label' => chr(ord('A') + $star->ordinal - 1),
+                    'label' => $star->label(),
                     'planets' => $star->planets
                         ->map(fn (Planet $planet): array => [
                             'id' => $planet->id,
