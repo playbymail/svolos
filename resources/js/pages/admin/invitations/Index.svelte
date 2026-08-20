@@ -18,9 +18,9 @@
 
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
-    import MailPlus from 'lucide-svelte/icons/mail-plus';
-    import RefreshCw from 'lucide-svelte/icons/refresh-cw';
-    import Trash2 from 'lucide-svelte/icons/trash-2';
+    import MailPlus from '@lucide/svelte/icons/mail-plus';
+    import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+    import Trash2 from '@lucide/svelte/icons/trash-2';
     import InvitationController from '@/actions/App/Http/Controllers/Admin/InvitationController';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';

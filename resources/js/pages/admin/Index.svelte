@@ -13,12 +13,12 @@
 
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
-    import BotMessageSquare from 'lucide-svelte/icons/bot-message-square';
-    import ChevronRight from 'lucide-svelte/icons/chevron-right';
-    import Dices from 'lucide-svelte/icons/dices';
-    import MailPlus from 'lucide-svelte/icons/mail-plus';
-    import MonitorSmartphone from 'lucide-svelte/icons/monitor-smartphone';
-    import Users from 'lucide-svelte/icons/users';
+    import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
+    import ChevronRight from '@lucide/svelte/icons/chevron-right';
+    import Dices from '@lucide/svelte/icons/dices';
+    import MailPlus from '@lucide/svelte/icons/mail-plus';
+    import MonitorSmartphone from '@lucide/svelte/icons/monitor-smartphone';
+    import Users from '@lucide/svelte/icons/users';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';
     import { toUrl } from '@/lib/utils';

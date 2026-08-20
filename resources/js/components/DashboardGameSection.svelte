@@ -1,7 +1,7 @@
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
-    import Eye from 'lucide-svelte/icons/eye';
-    import EyeOff from 'lucide-svelte/icons/eye-off';
+    import Eye from '@lucide/svelte/icons/eye';
+    import EyeOff from '@lucide/svelte/icons/eye-off';
     import Heading from '@/components/Heading.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';

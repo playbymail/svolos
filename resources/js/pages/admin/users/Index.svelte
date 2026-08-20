@@ -18,11 +18,11 @@
 
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
-    import BadgeCheck from 'lucide-svelte/icons/badge-check';
-    import KeyRound from 'lucide-svelte/icons/key-round';
-    import MailWarning from 'lucide-svelte/icons/mail-warning';
-    import Trash2 from 'lucide-svelte/icons/trash-2';
-    import UserRoundCog from 'lucide-svelte/icons/user-round-cog';
+    import BadgeCheck from '@lucide/svelte/icons/badge-check';
+    import KeyRound from '@lucide/svelte/icons/key-round';
+    import MailWarning from '@lucide/svelte/icons/mail-warning';
+    import Trash2 from '@lucide/svelte/icons/trash-2';
+    import UserRoundCog from '@lucide/svelte/icons/user-round-cog';
     import UserController from '@/actions/App/Http/Controllers/Admin/UserController';
     import ImpersonationController from '@/actions/App/Http/Controllers/ImpersonationController';
     import AppHead from '@/components/AppHead.svelte';

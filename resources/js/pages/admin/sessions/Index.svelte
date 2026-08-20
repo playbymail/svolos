@@ -18,8 +18,8 @@
 
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
-    import LogOut from 'lucide-svelte/icons/log-out';
-    import Monitor from 'lucide-svelte/icons/monitor';
+    import LogOut from '@lucide/svelte/icons/log-out';
+    import Monitor from '@lucide/svelte/icons/monitor';
     import SessionController from '@/actions/App/Http/Controllers/Admin/SessionController';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';

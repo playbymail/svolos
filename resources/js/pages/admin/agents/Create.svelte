@@ -22,7 +22,7 @@
 
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
-    import BotMessageSquare from 'lucide-svelte/icons/bot-message-square';
+    import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
     import AgentController from '@/actions/App/Http/Controllers/Admin/AgentController';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';

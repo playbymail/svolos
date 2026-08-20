@@ -27,7 +27,7 @@
 
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
-    import Save from 'lucide-svelte/icons/save';
+    import Save from '@lucide/svelte/icons/save';
     import GameController from '@/actions/App/Http/Controllers/Player/GameController';
     import AppHead from '@/components/AppHead.svelte';
     import ClusterHexMap from '@/components/ClusterHexMap.svelte';

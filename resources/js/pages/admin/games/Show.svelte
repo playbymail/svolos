@@ -34,10 +34,10 @@
 
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
-    import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
-    import Save from 'lucide-svelte/icons/save';
-    import UserMinus from 'lucide-svelte/icons/user-minus';
-    import UserPlus from 'lucide-svelte/icons/user-plus';
+    import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+    import Save from '@lucide/svelte/icons/save';
+    import UserMinus from '@lucide/svelte/icons/user-minus';
+    import UserPlus from '@lucide/svelte/icons/user-plus';
     import GameController from '@/actions/App/Http/Controllers/Admin/GameController';
     import GameSeatController from '@/actions/App/Http/Controllers/Admin/GameSeatController';
     import AppHead from '@/components/AppHead.svelte';

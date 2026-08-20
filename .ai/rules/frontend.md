@@ -184,13 +184,42 @@ directly, pass `--with-form`.
 Import route helpers from `@/routes` (named routes) and `@/actions` (controller actions). Never
 hardcode a URL string.
 
+## `fontaine` is a build-time dependency whose absence only warns
+
+`vite.config.ts` serves Instrument Sans through `bunny()` from `laravel-vite-plugin/fonts`, which
+self-hosts the files rather than calling out to a font CDN at runtime. Its `optimizedFallbacks`
+feature needs the optional peer `fontaine`, and **without it the build still succeeds** — the plugin
+prints `Optimized font fallbacks require the optional "fontaine" package` and carries on. That is the
+trap: nothing fails, and the only evidence is a line in a build log nobody reads and a layout that
+shifts when the webfont lands.
+
+With it installed, the emitted `fonts-*.css` gains an `Instrument Sans fallback` face carrying the
+real font's metrics — `size-adjust: 103.76%`, `descent-override: 24.09%` — and `--font-instrument-sans`
+lists it behind the webfont, so the text is the right size before the download finishes.
+
+It is a **devDependency**: it reads font metrics while Vite builds and ships nothing to the browser.
+That makes it load-bearing on the server all the same, because `scripts/deploy.sh` builds there. The
+step is a plain `npm ci` for that reason — adding `--omit=dev` would take out Vite itself, but the
+subtler loss would be this, which downgrades in silence rather than failing.
+
 ## UI components
 
 shadcn-svelte on Bits UI lives in `resources/js/components/ui/` and is excluded from ESLint and
 Prettier (`.prettierignore`, `eslint.config.js` ignores) because it is vendored generated code — do
 not reformat it, and do not add a second component library. If one component fights the port,
-hand-roll that single component instead. Icons come from `lucide-svelte`; toasts from `svelte-sonner`
+hand-roll that single component instead. Icons come from `@lucide/svelte`; toasts from `svelte-sonner`
 via `resources/js/lib/flash-toast.ts`.
+
+Import an icon by its **own path** — `import Check from '@lucide/svelte/icons/check'` — rather than
+from the package root, which is what all but one call site does. The root is a barrel re-exporting
+1,776 icons and leaves it to the bundler to shake the rest out; the path form never pulls them in to
+begin with.
+
+Use the icon's **canonical** name, not a deprecated alias. `@lucide/svelte` keeps renamed icons
+working — `icons/circle-help` re-exports `circle-question-mark`, types included, so `svelte-check`
+passes and nothing warns. That is precisely the problem: the alias is upstream-deprecated and will go
+in some future major, and until it does the identifier in our source names an icon that no longer
+exists. `circle-help` was the one we had, and it is now imported under its real name.
 
 ### A `Button` that navigates is `asChild` + `Link` — `href` on a `Button` is inert
 

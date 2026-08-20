@@ -27,10 +27,10 @@
 
 <script lang="ts">
     import { Form, router } from '@inertiajs/svelte';
-    import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
-    import Save from 'lucide-svelte/icons/save';
-    import UserMinus from 'lucide-svelte/icons/user-minus';
-    import UserPlus from 'lucide-svelte/icons/user-plus';
+    import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+    import Save from '@lucide/svelte/icons/save';
+    import UserMinus from '@lucide/svelte/icons/user-minus';
+    import UserPlus from '@lucide/svelte/icons/user-plus';
     import GameController from '@/actions/App/Http/Controllers/Gamemaster/GameController';
     import GameSeatController from '@/actions/App/Http/Controllers/Gamemaster/GameSeatController';
     import GenerationController from '@/actions/App/Http/Controllers/Gamemaster/GenerationController';

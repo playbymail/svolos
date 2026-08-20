@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Form, page } from '@inertiajs/svelte';
-    import UserRoundCog from 'lucide-svelte/icons/user-round-cog';
+    import UserRoundCog from '@lucide/svelte/icons/user-round-cog';
     import ImpersonationController from '@/actions/App/Http/Controllers/ImpersonationController';
     import { Button } from '@/components/ui/button';
 

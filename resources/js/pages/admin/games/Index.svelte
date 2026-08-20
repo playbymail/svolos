@@ -18,8 +18,8 @@
 
 <script lang="ts">
     import { Form, Link } from '@inertiajs/svelte';
-    import Dices from 'lucide-svelte/icons/dices';
-    import Trash2 from 'lucide-svelte/icons/trash-2';
+    import Dices from '@lucide/svelte/icons/dices';
+    import Trash2 from '@lucide/svelte/icons/trash-2';
     import GameController from '@/actions/App/Http/Controllers/Admin/GameController';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';

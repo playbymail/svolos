@@ -1,8 +1,8 @@
 <script lang="ts">
     import { Link, page } from '@inertiajs/svelte';
-    import BookOpen from 'lucide-svelte/icons/book-open';
-    import LayoutGrid from 'lucide-svelte/icons/layout-grid';
-    import ShieldCheck from 'lucide-svelte/icons/shield-check';
+    import BookOpen from '@lucide/svelte/icons/book-open';
+    import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+    import ShieldCheck from '@lucide/svelte/icons/shield-check';
     import type { Snippet } from 'svelte';
     import AppLogo from '@/components/AppLogo.svelte';
     import NavFooter from '@/components/NavFooter.svelte';

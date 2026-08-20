@@ -1,9 +1,9 @@
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
-    import Check from 'lucide-svelte/icons/check';
-    import Dices from 'lucide-svelte/icons/dices';
-    import Lock from 'lucide-svelte/icons/lock';
-    import Upload from 'lucide-svelte/icons/upload';
+    import Check from '@lucide/svelte/icons/check';
+    import Dices from '@lucide/svelte/icons/dices';
+    import Lock from '@lucide/svelte/icons/lock';
+    import Upload from '@lucide/svelte/icons/upload';
     import InputError from '@/components/InputError.svelte';
     import { Badge } from '@/components/ui/badge';
     import { Button } from '@/components/ui/button';

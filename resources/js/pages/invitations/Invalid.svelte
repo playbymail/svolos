@@ -18,9 +18,9 @@
 
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
-    import CircleHelp from 'lucide-svelte/icons/circle-help';
-    import Clock from 'lucide-svelte/icons/clock';
-    import UserCheck from 'lucide-svelte/icons/user-check';
+    import CircleQuestionMark from '@lucide/svelte/icons/circle-question-mark';
+    import Clock from '@lucide/svelte/icons/clock';
+    import UserCheck from '@lucide/svelte/icons/user-check';
     import AppHead from '@/components/AppHead.svelte';
     import { Button } from '@/components/ui/button';
     import { toUrl } from '@/lib/utils';
@@ -37,7 +37,7 @@
     } = $props();
 
     const icons = {
-        unknown: CircleHelp,
+        unknown: CircleQuestionMark,
         expired: Clock,
         accepted: UserCheck,
     };

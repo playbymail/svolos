@@ -12,9 +12,9 @@
     http on a LAN would otherwise get a button that silently does nothing.
 -->
 <script lang="ts">
-    import Check from 'lucide-svelte/icons/check';
-    import Copy from 'lucide-svelte/icons/copy';
-    import KeyRound from 'lucide-svelte/icons/key-round';
+    import Check from '@lucide/svelte/icons/check';
+    import Copy from '@lucide/svelte/icons/copy';
+    import KeyRound from '@lucide/svelte/icons/key-round';
     import { Button } from '@/components/ui/button';
     import type { AgentTokenFlash } from '@/types';
 

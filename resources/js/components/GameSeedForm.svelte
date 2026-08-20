@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Form } from '@inertiajs/svelte';
-    import Dices from 'lucide-svelte/icons/dices';
+    import Dices from '@lucide/svelte/icons/dices';
     import InputError from '@/components/InputError.svelte';
     import { Button } from '@/components/ui/button';
     import { Input } from '@/components/ui/input';

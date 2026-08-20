@@ -1,9 +1,9 @@
 <script lang="ts">
     import { Link, page } from '@inertiajs/svelte';
-    import ArrowRight from 'lucide-svelte/icons/arrow-right';
-    import Layers from 'lucide-svelte/icons/layers';
-    import Users from 'lucide-svelte/icons/users';
-    import Workflow from 'lucide-svelte/icons/workflow';
+    import ArrowRight from '@lucide/svelte/icons/arrow-right';
+    import Layers from '@lucide/svelte/icons/layers';
+    import Users from '@lucide/svelte/icons/users';
+    import Workflow from '@lucide/svelte/icons/workflow';
     import AppHead from '@/components/AppHead.svelte';
     import { Button } from '@/components/ui/button';
     import {

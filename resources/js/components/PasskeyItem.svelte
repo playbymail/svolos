@@ -1,7 +1,7 @@
 <script lang="ts">
-    import KeyRound from 'lucide-svelte/icons/key-round';
-    import Pencil from 'lucide-svelte/icons/pencil';
-    import Trash2 from 'lucide-svelte/icons/trash-2';
+    import KeyRound from '@lucide/svelte/icons/key-round';
+    import Pencil from '@lucide/svelte/icons/pencil';
+    import Trash2 from '@lucide/svelte/icons/trash-2';
     import InputError from '@/components/InputError.svelte';
     import { Button } from '@/components/ui/button';
     import {

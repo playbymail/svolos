@@ -18,8 +18,8 @@
 
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
-    import BotMessageSquare from 'lucide-svelte/icons/bot-message-square';
-    import ChevronRight from 'lucide-svelte/icons/chevron-right';
+    import BotMessageSquare from '@lucide/svelte/icons/bot-message-square';
+    import ChevronRight from '@lucide/svelte/icons/chevron-right';
     import AppHead from '@/components/AppHead.svelte';
     import Heading from '@/components/Heading.svelte';
     import { Badge } from '@/components/ui/badge';

@@ -22,10 +22,10 @@
 
 <script lang="ts">
     import { Form, Link, page } from '@inertiajs/svelte';
-    import KeyRound from 'lucide-svelte/icons/key-round';
-    import RefreshCw from 'lucide-svelte/icons/refresh-cw';
-    import Trash2 from 'lucide-svelte/icons/trash-2';
-    import UserPlus from 'lucide-svelte/icons/user-plus';
+    import KeyRound from '@lucide/svelte/icons/key-round';
+    import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+    import Trash2 from '@lucide/svelte/icons/trash-2';
+    import UserPlus from '@lucide/svelte/icons/user-plus';
     import AgentCredentialController from '@/actions/App/Http/Controllers/Admin/AgentCredentialController';
     import AgentSeatController from '@/actions/App/Http/Controllers/Admin/AgentSeatController';
     import AgentTokenPanel from '@/components/AgentTokenPanel.svelte';
