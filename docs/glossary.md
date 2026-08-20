@@ -119,6 +119,17 @@ them.
 | **Living** | The category of units that are alive. |
 | **Population unit** | A living unit of people. An entity holding none is uncontrolled. |
 
+**Population class** — what a population unit can be put to work at. There are four.
+
+| Class | Definition |
+| --- | --- |
+| **Unskilled Worker** | Population that can be assigned by the faction to work in farms, mines and factories. |
+| **Skilled Worker** | Population that can be assigned by the faction to operate farms, mines and factories, or to crew ships and colonies. |
+| **Soldier** | Population that can be assigned by the faction to defend ships and colonies, or to attack other entities. |
+| **Non-Assignable** | Population that cannot be assigned by the faction to farms, mines, factories, ships, colonies or any other directed task. |
+
+**Assign** — to put a population unit to a task.
+
 Every unit has a mass and two volumes.
 
 | Term | Definition |
