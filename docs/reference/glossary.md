@@ -149,14 +149,14 @@ The types settled so far.
 
 | Category | Type | Report code | Technology level | Mass | Volume | Disassembled volume |
 | --- | --- | --- | --- | --- | --- | --- |
-| Commodity | **Consumer Goods** | CSGD | none | 0.6 | 0.3 | 0.15 |
-| Commodity | **Food** | FOOD | none | | | |
+| Commodity | **Consumer Goods** | CSGD | none | 6 | 6 | 3 |
+| Commodity | **Food** | FOOD | none | 6 | 6 | 3 |
 | Resource | **Fuel** | FUEL | none | | | |
 | Resource | **Metals** | METL | none | | | |
 | Resource | **Minerals** | MNRL | none | | | |
 | Static | **Life Support** | LSU | 1–10 | 8 × TL | 8 × TL | 4 × TL |
-| Structural | **Structure** | STRC | 1–10 | 0.1 × TL | see below | 0.05 × TL |
-| Structural | **Light Structure** | STRL | 1–10 | 0.01 × TL | see below | 0.005 × TL |
+| Structural | **Structure** | STRC | 1–10 | 1 × TL | see below | 0.5 × TL |
+| Structural | **Light Structure** | STRL | 1–10 | 1 × TL | see below | 0.5 × TL |
 
 A blank is a thing not yet settled, not a thing that is nothing.
 
@@ -167,18 +167,21 @@ it does, the table gives the formula rather than a number.
 measure that depends on anything but the unit itself. The same unit encloses more room the further
 it is from vacuum: a hull holds pressure against nothing, and a field does not.
 
-| Assembled for | Volume |
-| --- | --- |
-| Ship or Orbital Colony | TL × TL ÷ 10 |
-| Enclosed Colony | TL × TL ÷ 5 |
-| Open Air Colony | TL × TL |
+| Assembled for | Structure | Light Structure |
+| --- | --- | --- |
+| Ship or Orbital Colony | TL × TL | TL × TL × 10 |
+| Enclosed Colony | TL × TL × 2 | TL × TL × 20 |
+| Open Air Colony | TL × TL × 10 | TL × TL × 100 |
 
-A higher technology level means a more massive unit that does more. STRL-1 encloses at most 1 VU;
-STRL-6 encloses 36.
+A higher technology level means a more massive unit that does more. A STRC-1 has a volume of 1 VU in
+a ship; a STRC-6 has 36.
 
-**Structure and Light Structure enclose the same room.** Light Structure is not a smaller wall — it
-is the same wall built of a tenth the material, so it weighs a tenth and packs to a tenth. That is
-the whole difference between them.
+**Structure and Light Structure cost the same and differ only in what they enclose.** They weigh the
+same and crate the same; a light structural unit holds ten times the room. That is the whole
+difference between them.
+
+Every mass and every assembled volume is a whole number of MU or VU. Only a crated volume is ever a
+fraction, and never smaller than a half.
 
 **Population class** — what a population unit can be put to work at. There are four.
 

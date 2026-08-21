@@ -101,13 +101,14 @@ The kinds carried the category's name until the table arrived, which is what
 
 The glossary has named four entities since it was written — open air colony, enclosed colony,
 orbital colony, ship — and the code carried two until the structural measures arrived. The split is
-not cosmetic: the same structural unit encloses `TL²` VU under an open sky, `TL² / 5` sealed on a
-surface and `TL² / 10` in a hull, and a single `colony` case cannot answer that.
+not cosmetic: the same structural unit encloses `TL²` VU in a hull, `TL² × 2` sealed on a
+surface and `TL² × 10` under an open sky, and a single `colony` case cannot answer that.
 `2026_08_21_175001_split_colony_entity_types` makes every existing colony an **open air** one,
 because the one the expedition prepared has mines in the hills and fields cleared for farms.
 
-`EntityType::structuralVolumeDivisor()` returns 10, 5 or 1, and `UnitType::assembledVolume()` is its
-only caller. It lives on the entity because the entity is the thing that varies — the same reasoning
+`EntityType::structuralVolumeMultiplier()` returns 1, 2 or 10, and `UnitType::assembledVolume()` is
+its only caller. A **multiplier rather than a divisor**, so the catalogue contains no integer
+division and no measure can be quietly truncated. It lives on the entity because the entity is the thing that varies — the same reasoning
 that put `usesDisassembledVolume()` on `Inventory`.
 
 **Only `assembledVolume()` takes an `EntityType`; the crated measure does not.** A crate is a crate
@@ -125,10 +126,14 @@ assertion was comparing a value to itself.
 
 ## `measure()` is the only decimal in the catalogue, and `SCALE` is thousandths
 
-`SCALE` was hundredths until light structure wanted a crated volume of **0.005 VU**. Widening it to
-thousandths was the one-line change it was supposed to be — with one correction: `format()` now
-derives its decimal places from `SCALE` rather than hard-coding two, so the claim stays true the next
-time.
+`SCALE` has been hundredths and thousandths, and is **tenths**. The catalogue was rewritten so that
+**a mass and an assembled volume are always whole**, and only a *crated* volume may be a fraction —
+the smallest anywhere is a half. `UnitTypeTest` asserts that directly, so the scale cannot drift back
+without a test failing first.
+
+`format()` derives its decimal places from `SCALE` rather than hard-coding them. That was a real bug
+found by moving the constant: it printed two places while the scale held three, so widening it would
+have silently truncated every measure.
 
 `UnitType::measure(0.005)` is the inverse of `format()` and the **only** place a decimal literal
 appears. It exists so the catalogue reads like the sheet it came from: these numbers are the content,
@@ -140,7 +145,7 @@ one. **The rule against methods returning floats is unchanged.**
 
 `mass()`, `assembledVolume()` and `disassembledVolume()` all take a technology level, and **every
 call site must pass one**. `LifeSupport` is 8 × TL MU, 8 × TL VU assembled and 4 × TL VU crated; the structural kinds are
-0.1 × TL and 0.01 × TL by mass with a **squared** assembled volume. A higher level always means a
+1 × TL by mass with a **squared** assembled volume. A higher level always means a
 **more massive unit that does more** — that is the game's rule, not an accident of these two, so
 expect the next kind to follow it.
 
@@ -154,6 +159,16 @@ a capacity calculation as a unit that weighs nothing, which is a wrong answer ra
 
 `UnitTypeTest` sweeps `LifeSupport` across the whole 1–10 range rather than checking one level,
 because the arithmetic *is* the content — a transposed multiplier still passes at TL 1.
+
+## `LIGHT_STRUCTURE_FACTOR` is the entire difference between STRC and STRL
+
+The two structural kinds weigh the same, crate the same, and share one formula. A light structural
+unit encloses **ten times** the room — thin walls holding more air per tonne. Set that constant to 1
+and they become one kind with two names, which is why a test asserts the factor rather than the
+numbers it produces.
+
+The difference used to be the other way round: identical volume, and STRL a tenth of the mass. Same
+idea, expressed in the measure that reads better on a report.
 
 ## Life support is a component, and the glossary said so first
 
@@ -308,6 +323,20 @@ It is **not** a `GenerationFailed`: there is no field on that form a gamemaster 
 it, and the remedy is regenerating the homes. The hole is already covered elsewhere —
 `Game::playersWithoutHomeStellium()` reports it and `gameStatusRules()` refuses to let such a game
 become `Active` — so this stage's job is to be honest about it, not to invent a second gate.
+
+## The colony's structure is oversized on purpose — do not trim it
+
+Twenty STRL-10 enclose 200,000 VU, about **96%** of the starting colony's volume and far more room
+than its people can fill. It reads like a number somebody fat-fingered. It is not.
+
+The advance expedition built a **city**, sized for an armada that mostly never arrived, and the first
+wave that did has vanished. Empty streets built for a population that is not coming is the premise
+the game opens on. Shrinking the quantity to match the survivors would quietly delete that, exactly
+the way moving the ship's engines out of cargo would.
+
+The *measures* are settled and the *quantities* are content, so the numbers here may still be tuned —
+but the colony having far more enclosed volume than it needs is a fact of the setting, not a bug in
+the kit.
 
 ## The ship's engines are in the hold on purpose
 

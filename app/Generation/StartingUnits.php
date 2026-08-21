@@ -45,6 +45,18 @@ final class StartingUnits
      * Buildings enough to shelter people, four mines and two factories already working, and depots of
      * everything a colony burns. Nothing here is crated: it was all built to be used where it stands.
      *
+     * ## The structure is deliberately far larger than the colony needs
+     *
+     * Twenty light structural units at TL 10 enclose 200,000 VU — around **96%** of everything the
+     * colony holds, and vastly more room than the people who arrive can fill. That is not a number
+     * waiting to be trimmed.
+     *
+     * The expedition built a **city**, sized for the armada. Most of those ships never arrived, and
+     * the first wave that did is gone. A player walks into empty streets built for a population that
+     * is not coming, which is the premise the whole game opens on — see
+     * `docs/copy/player-introduction.txt`. Cutting the quantity to fit the survivors would delete
+     * the story from the data.
+     *
      * @return list<UnitHolding>
      */
     public function openAirColony(): array

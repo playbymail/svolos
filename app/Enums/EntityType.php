@@ -55,26 +55,28 @@ enum EntityType: string
     }
 
     /**
-     * Get what a structural unit's assembled volume is divided by when it is built for this kind.
+     * Get what a structural unit's assembled volume is multiplied by when it is built for this kind.
      *
-     * Structure assembled for a ship encloses **TL² / 10** VU, for an enclosed colony **TL² / 5**,
-     * and for an open air colony **TL²** — so this returns 10, 5 and 1. It is the one measure in the
-     * game that depends on what a unit was assembled *for* rather than only on what it is, which is
-     * why it lives here: the entity is the thing that varies, so the entity is the thing that
-     * answers.
+     * A `Structure` unit encloses **TL²** VU in a ship or an orbital colony, **TL² × 2** in an
+     * enclosed colony and **TL² × 10** in the open air — so this returns 1, 2 and 10. It is the one
+     * measure in the game that depends on what a unit was assembled *for* rather than only on what
+     * it is, which is why it lives here: the entity is the thing that varies, so the entity is the
+     * thing that answers.
      *
      * The ordering says something about the game. The same structural unit goes furthest under an
      * open sky and least far inside a hull, because a hull has to hold pressure against vacuum and a
      * field does not. An orbital colony is a ship that cannot move, and is measured like one.
      *
-     * `UnitType::assembledVolume()` is the only caller.
+     * A multiplier rather than a divisor, so that nothing here needs integer division and no measure
+     * can be quietly truncated. `UnitType::assembledVolume()` is the only caller, and it applies the
+     * kind's own factor on top — light structure encloses ten times what structure does.
      */
-    public function structuralVolumeDivisor(): int
+    public function structuralVolumeMultiplier(): int
     {
         return match ($this) {
-            self::Ship, self::OrbitalColony => 10,
-            self::EnclosedColony => 5,
-            self::OpenAirColony => 1,
+            self::Ship, self::OrbitalColony => 1,
+            self::EnclosedColony => 2,
+            self::OpenAirColony => 10,
         };
     }
 }

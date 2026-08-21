@@ -61,14 +61,14 @@ enum UnitType: string
     /**
      * What every measure on this enum is multiplied by.
      *
-     * Mass is in MU and both volumes are in VU, each stored as thousandths: a mass of `500` is 0.5 MU.
+     * Mass is in MU and both volumes are in VU, each stored as tenths: a mass of `5` is 0.5 MU.
      *
-     * It was hundredths until light structure arrived wanting a disassembled volume of 0.005 VU.
-     * Widening it was a one-line change, which was the whole point of having a named scale — but note
-     * that `format()` reads its decimal places off this constant rather than hard-coding two, so that
-     * the claim stays true the next time.
+     * It has been hundredths and thousandths. It is tenths now because the catalogue was rewritten so
+     * that **every measure is whole except a crated volume**, and the only fractions left anywhere are
+     * halves. `format()` reads its decimal places off this constant rather than hard-coding them, so
+     * moving it stays a one-line change.
      */
-    public const int SCALE = 1_000;
+    public const int SCALE = 10;
 
     /**
      * The value stored for a kind that has no technology level at all.
@@ -81,6 +81,15 @@ enum UnitType: string
      * `UnitHolding` refuses any other pairing.
      */
     public const int NO_TECHNOLOGY_LEVEL = 0;
+
+    /**
+     * How much more room light structure encloses than structure does, for the same mass.
+     *
+     * **This is the whole difference between the two structural kinds.** They weigh the same, they
+     * crate the same, and a light structural unit encloses ten times the space — thin walls holding
+     * more air per tonne of material. Setting it to 1 would make them one kind with two names.
+     */
+    public const int LIGHT_STRUCTURE_FACTOR = 10;
 
     /** The lowest technology level a kind that has one may be built at. */
     public const int MINIMUM_TECHNOLOGY_LEVEL = 1;
@@ -248,15 +257,14 @@ enum UnitType: string
         $this->assertTechnologyLevel($technologyLevel);
 
         return match ($this) {
-            self::Structure => self::measure(0.1) * $technologyLevel,
-            self::LightStructure => self::measure(0.01) * $technologyLevel,
+            self::Structure, self::LightStructure => self::measure(1) * $technologyLevel,
             self::LifeSupport => self::measure(8) * $technologyLevel,
             self::Engine => self::measure(25),
             self::Mine => self::measure(40),
             self::Factory => self::measure(60),
             self::Machinery => self::measure(2),
-            self::ConsumerGoods => self::measure(0.6),
-            self::Fuel, self::Food, self::Metals, self::Minerals, self::Supplies => self::measure(1),
+            self::Food, self::ConsumerGoods => self::measure(6),
+            self::Fuel, self::Metals, self::Minerals, self::Supplies => self::measure(1),
         };
     }
 
@@ -268,28 +276,30 @@ enum UnitType: string
      *
      * **The structural kinds depend on what they were assembled for**, which is why this takes an
      * `EntityType` and the crated measure does not: a crate is a crate wherever it is going, but a
-     * wall built into a hull is not the same wall built around a field. `TL² / 10` for a ship or an
-     * orbital colony, `TL² / 5` enclosed, `TL²` in the open air — see
-     * `EntityType::structuralVolumeDivisor()`. `Structure` and `LightStructure` share the formula
-     * exactly: light structure encloses the same room for a tenth of the mass, which is the whole
-     * difference between them.
+     * wall built into a hull is not the same wall built around a field. `TL²` for a ship or an
+     * orbital colony, `TL² × 2` enclosed, `TL² × 10` in the open air — see
+     * `EntityType::structuralVolumeMultiplier()`.
+     *
+     * `LightStructure` is the same formula times `LIGHT_STRUCTURE_FACTOR`. The two kinds weigh the
+     * same and crate the same; light structure simply encloses ten times the room, which is the whole
+     * difference between them and the only place it appears.
      */
     public function assembledVolume(int $technologyLevel, EntityType $assembledFor): int
     {
         $this->assertTechnologyLevel($technologyLevel);
 
         return match ($this) {
-            self::Structure, self::LightStructure => intdiv(
-                self::measure(1) * $technologyLevel ** 2,
-                $assembledFor->structuralVolumeDivisor(),
-            ),
+            self::Structure => self::measure(1) * $technologyLevel ** 2
+                * $assembledFor->structuralVolumeMultiplier(),
+            self::LightStructure => self::measure(1) * $technologyLevel ** 2
+                * $assembledFor->structuralVolumeMultiplier() * self::LIGHT_STRUCTURE_FACTOR,
             self::LifeSupport => self::measure(8) * $technologyLevel,
             self::Engine => self::measure(20),
             self::Mine => self::measure(60),
             self::Factory => self::measure(90),
             self::Machinery => self::measure(3),
-            self::ConsumerGoods => self::measure(0.3),
-            self::Fuel, self::Food, self::Supplies => self::measure(2),
+            self::Food, self::ConsumerGoods => self::measure(6),
+            self::Fuel, self::Supplies => self::measure(2),
             self::Metals, self::Minerals => self::measure(1),
         };
     }
@@ -302,15 +312,14 @@ enum UnitType: string
         $this->assertTechnologyLevel($technologyLevel);
 
         return match ($this) {
-            self::Structure => self::measure(0.05) * $technologyLevel,
-            self::LightStructure => self::measure(0.005) * $technologyLevel,
+            self::Structure, self::LightStructure => self::measure(0.5) * $technologyLevel,
             self::LifeSupport => self::measure(4) * $technologyLevel,
             self::Engine => self::measure(10),
             self::Mine => self::measure(30),
             self::Factory => self::measure(45),
             self::Machinery => self::measure(1.5),
-            self::ConsumerGoods => self::measure(0.15),
-            self::Fuel, self::Food, self::Supplies => self::measure(1),
+            self::Food, self::ConsumerGoods => self::measure(3),
+            self::Fuel, self::Supplies => self::measure(1),
             self::Metals, self::Minerals => self::measure(0.5),
         };
     }
