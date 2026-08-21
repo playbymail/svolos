@@ -3,10 +3,9 @@
 # Deploy the currently pushed state of $BRANCH into this working copy.
 #
 # The deployment model is a plain git working copy at /srv/svolos, with the database and
-# its backups outside it at /srv/svolos-data — see
-# docs/how-to/deploy-to-ubuntu-with-caddy.md. There is no releases/ directory and no
-# current symlink, so this script updates the running application in place, under
-# maintenance mode.
+# its backups outside it at /srv/svolos-data — see docs/reference/production-server.md and
+# docs/how-to/deploy-a-change.md. There is no releases/ directory and no current symlink,
+# so this script updates the running application in place, under maintenance mode.
 #
 # Safe to re-run. If any step fails the script stops and brings the application back up,
 # so a failed deploy leaves the previous code running: the working copy may already be on

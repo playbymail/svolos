@@ -52,20 +52,31 @@ premise expressed as data: `StartingAssets::ship()` puts the engines in cargo be
 to by path from PHP docblocks and from rules files, so moving or renaming one means updating those
 references in the same commit.
 
-## The deployment guide is a how-to guide, and lives with the others
+## One guide per goal — the deployment document became six
 
-It was `DEPLOY-CADDY.md` at the repository root, and it is now
-`docs/how-to/deploy-to-ubuntu-with-caddy.md`. There is no root exemption for a document that is a
-how-to guide by any reading: a reader looking for how to do something should find every such guide
-in one place, and a filename shouting in capitals at the root is not a category.
+`DEPLOY-CADDY.md` was a 900-line document at the repository root doing all four jobs at once, and
+it is the worked example of what this directory is for. It is now:
 
-Its title says what it shows — *How to deploy to Ubuntu 26.04 with Caddy* — rather than naming the
-subject, so it cannot be mistaken for a discussion of whether to.
+| Was | Is |
+| --- | --- |
+| Sections 1–10, the one-time build-out | `docs/how-to/set-up-a-production-server.md` |
+| Section 12, minting the first account | `docs/how-to/create-the-first-administrator.md` |
+| Sections 11 and 13, deploy and rollback | `docs/how-to/deploy-a-change.md` |
+| Section 14, the symptom list | `docs/how-to/troubleshoot-a-deployment.md` |
+| Sections 1, 15, 16 and every config listing | `docs/reference/production-server.md` |
+| Every *why* paragraph | [deployment.md](deployment.md), here |
 
-It is the one guide here that still carries its own reference and explanation sections: *What the
-server has* is reference, *Why Node is installed on the server* is explanation. That is a known
-untidiness, kept because both are about one specific server rather than about the application, and
-splitting them out would scatter a guide that is read start-to-finish while sitting at a terminal.
-Do not use it as a licence to mix kinds in the other guides.
+**The split is by goal, not by length.** Standing up a server, letting the first person in,
+shipping a change and diagnosing a failure are four different tasks at four different frequencies,
+and the person doing the fourth at midnight should not be scrolling through the first. A guide that
+covers one goal can be read start to finish; one that covers four can only be searched.
 
-`scripts/deploy.sh` refers to it by path in its header comment; move them together.
+Titles begin with "How to" and name the goal. *Deploying to Ubuntu with Caddy* named a subject and
+could as easily have introduced a discussion of whether to.
+
+The rule this replaced said the guide could stay at the repository root and could keep mixing kinds
+because it was read start-to-finish at a terminal. Both halves were wrong: the root is not a
+category, and it was mixing kinds *because* nobody had done the work, not because the work would
+have hurt.
+
+`scripts/deploy.sh` refers to the deploy guide by path in its header comment; keep that current.

@@ -10,15 +10,26 @@ Nothing here is generated. Each document is written and maintained by hand.
 
 ## How-to guides
 
-Directions for getting something done, written for a reader who already knows what they want.
+Directions for getting something done, written for a reader who already knows what they want. Each
+guide covers one goal, so it can be read start to finish rather than searched.
+
+### Writing an agent
 
 - [How to connect an agent to a game](how-to/connect-an-agent-to-a-game.md) — resolve a token from
   the registry, confirm which seat it acts as, and react correctly to each way a request can fail.
 - [How to keep an agent token safe](how-to/keep-an-agent-token-safe.md) — handling a credential that
   does not expire and cannot be recovered.
-- [How to deploy to Ubuntu 26.04 with Caddy](how-to/deploy-to-ubuntu-with-caddy.md) — a fresh
-  DigitalOcean server from nothing to a running installation, and deploying a change to it
-  afterwards.
+
+### Running the server
+
+- [How to set up a production server](how-to/set-up-a-production-server.md) — a fresh Ubuntu
+  droplet to a running installation served over HTTPS. Done once per server.
+- [How to create the first administrator](how-to/create-the-first-administrator.md) — getting the
+  first account onto an invite-only installation that has none.
+- [How to deploy a change](how-to/deploy-a-change.md) — the routine deploy, and rolling back the
+  code and the database when it was a bad one.
+- [How to troubleshoot a deployment](how-to/troubleshoot-a-deployment.md) — organised by symptom,
+  for reading at the moment something is broken.
 
 ## Reference
 
@@ -30,6 +41,9 @@ Descriptions to consult while working. Austere, and complete for what they cover
 - [Glossary](reference/glossary.md) — the terms the game is designed, built and played in, and the
   words that are reserved. A term belongs there once it is settled, whether or not anything
   implements it yet.
+- [Production server](reference/production-server.md) — the installation at
+  `svolos.pbbgaming.com`: paths, owners, packages, the PHP-FPM pool, the Caddyfile, the environment
+  values that carry weight, and what the deploy script does.
 
 ## Explanation
 
