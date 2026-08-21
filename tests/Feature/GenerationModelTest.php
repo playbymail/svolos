@@ -310,11 +310,12 @@ test('a unit weighs and takes up its kind times its quantity', function () {
     $unit = Unit::factory()->create([
         'type' => UnitType::LightStructure,
         'inventory' => Inventory::Components,
+        'technology_level' => 10,
         'quantity' => 20,
     ]);
 
-    expect($unit->mass())->toBe(UnitType::LightStructure->mass() * 20);
-    expect($unit->volume())->toBe(UnitType::LightStructure->assembledVolume() * 20);
+    expect($unit->mass())->toBe(UnitType::LightStructure->mass(10) * 20);
+    expect($unit->volume())->toBe(UnitType::LightStructure->assembledVolume(10) * 20);
 });
 
 test('a location knows how many hexes away another one is', function () {
@@ -382,6 +383,6 @@ test('one entity can hold the same kind at several technology levels', function 
     expect($running->reportName())->toBe('STRL-8');
 
     /* Cargo is crated, components are not, so the same kind is measured two ways on one entity. */
-    expect($built->volume())->toBe(UnitType::LightStructure->assembledVolume() * 300);
-    expect($crated->volume())->toBe(UnitType::LightStructure->disassembledVolume() * 40);
+    expect($built->volume())->toBe(UnitType::LightStructure->assembledVolume(10) * 300);
+    expect($crated->volume())->toBe(UnitType::LightStructure->disassembledVolume(2) * 40);
 });

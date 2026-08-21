@@ -97,6 +97,31 @@ glossary's reserved-words section says so outright.
 The kinds carried the category's name until the table arrived, which is what
 `2026_08_21_171834_rename_structural_unit_types` fixes.
 
+## A measure may be a function of the technology level
+
+`mass()`, `assembledVolume()` and `disassembledVolume()` all take a technology level, and **every
+call site must pass one**. `LifeSupport` is why: it is 8 × TL MU, 8 × TL VU assembled and 4 × TL VU
+crated, so a TL-10 unit is ten times a TL-1 one in every measure. Every other kind is flat today and
+the parameter costs it nothing.
+
+Do not add a no-argument convenience overload. A kind whose measure varies would answer it wrongly,
+and the caller that reached for it would never find out.
+
+`UnitType::assertTechnologyLevel()` is the single definition of which levels a kind accepts, called
+by each measure and by `UnitHolding`'s constructor. It lives on the enum rather than on the holding
+because of the same dependency: `LifeSupport->mass(0)` would otherwise return **zero** and flow into
+a capacity calculation as a unit that weighs nothing, which is a wrong answer rather than an error.
+
+`UnitTypeTest` sweeps `LifeSupport` across the whole 1–10 range rather than checking one level,
+because the arithmetic *is* the content — a transposed multiplier still passes at TL 1.
+
+## Life support is a component, and the glossary said so first
+
+`LifeSupport` sits in `[Components, Cargo]` beside the hull and the engines, never in operational.
+That is not a new decision: the glossary has defined components as "the structure of its hull, its
+engines, its **life support**, sensors and weapons" since it was written, well before the kind
+existed. When a kind arrives, check whether the glossary already placed it.
+
 ## `Machinery` and `Supplies` are the two kinds still unplaced
 
 Neither appears in the category table, neither has a report code, and neither reads unambiguously as
@@ -108,9 +133,9 @@ have one.
 `UnitTypeTest` writes each of those lists out, so deciding one of these two is an edit against a
 list rather than a hunt.
 
-**`CSGD` and `LSU` are named by the table but are not in `UnitType`.** Consumer goods and life
-support have codes and categories and no measures, and a kind with no mass or volume fails the
-catalogue sweep as half-defined. Add them with their numbers, not before.
+`CSGD` and `LSU` arrived with their measures on 2026-08-21 and are in the catalogue. The rule they
+were held out under still stands for the next one: **a kind goes in with its numbers, not before**,
+because a kind with no mass or volume fails the catalogue sweep as half-defined.
 
 ## Technology level is part of a row's identity, and `0` means "has none"
 

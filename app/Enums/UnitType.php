@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use InvalidArgumentException;
+
 /**
  * The kinds of unit that exist in the game.
  *
@@ -25,7 +27,8 @@ namespace App\Enums;
  * ## Every case carries a mass and two volumes
  *
  * `assembledVolume()` is the room a unit takes put together and ready to use; `disassembledVolume()`
- * is the room it takes packed and crated. **Which of the two applies is decided by the inventory a
+ * is the room it takes packed and crated. Both take a technology level, as `mass()` does, because a
+ * kind's measures may depend on it — `LifeSupport` is 8 × TL MU and 8 × TL VU, and 4 × TL crated. **Which of the two applies is decided by the inventory a
  * unit sits in, not by the unit** — see `Inventory::usesDisassembledVolume()` — and `volumeIn()` is
  * where the two meet. Cargo is the only inventory measured at the disassembled volume.
  *
@@ -84,10 +87,12 @@ enum UnitType: string
     case Structure = 'structure';
     case LightStructure = 'light_structure';
     case Engine = 'engine';
+    case LifeSupport = 'life_support';
     case Mine = 'mine';
     case Factory = 'factory';
     case Fuel = 'fuel';
     case Food = 'food';
+    case ConsumerGoods = 'consumer_goods';
     case Metals = 'metals';
     case Minerals = 'minerals';
     case Machinery = 'machinery';
@@ -119,8 +124,9 @@ enum UnitType: string
         return match ($this) {
             self::Structure, self::LightStructure => UnitCategory::Structural,
             self::Fuel, self::Metals, self::Minerals => UnitCategory::Resource,
-            self::Food => UnitCategory::Commodity,
+            self::Food, self::ConsumerGoods => UnitCategory::Commodity,
             self::Engine => UnitCategory::Propulsion,
+            self::LifeSupport => UnitCategory::Static,
             self::Mine, self::Factory => UnitCategory::Infrastructure,
             self::Machinery, self::Supplies => null,
         };
@@ -140,9 +146,10 @@ enum UnitType: string
     public function hasTechnologyLevel(): bool
     {
         return match ($this) {
-            self::Structure, self::LightStructure,
+            self::Structure, self::LightStructure, self::LifeSupport,
             self::Engine, self::Mine, self::Factory, self::Machinery => true,
-            self::Fuel, self::Food, self::Metals, self::Minerals, self::Supplies => false,
+            self::Fuel, self::Food, self::ConsumerGoods,
+            self::Metals, self::Minerals, self::Supplies => false,
         };
     }
 
@@ -174,10 +181,12 @@ enum UnitType: string
             self::Structure => 'Structure',
             self::LightStructure => 'Light Structure',
             self::Engine => 'Engine',
+            self::LifeSupport => 'Life Support',
             self::Mine => 'Mine',
             self::Factory => 'Factory',
             self::Fuel => 'Fuel',
             self::Food => 'Food',
+            self::ConsumerGoods => 'Consumer Goods',
             self::Metals => 'Metals',
             self::Minerals => 'Minerals',
             self::Machinery => 'Machinery',
@@ -195,7 +204,9 @@ enum UnitType: string
         return match ($this) {
             self::Structure => 'STRC',
             self::LightStructure => 'STRL',
+            self::LifeSupport => 'LSU',
             self::Food => 'FOOD',
+            self::ConsumerGoods => 'CSGD',
             self::Fuel => 'FUEL',
             self::Metals => 'METL',
             self::Minerals => 'MNRL',
@@ -206,16 +217,25 @@ enum UnitType: string
 
     /**
      * Get what one of these weighs, in MU at `SCALE`.
+     *
+     * **A measure can depend on the technology level**, which is why every one of them takes it.
+     * `LifeSupport` is the first: a TL-10 life support unit weighs ten times a TL-1 one, because it
+     * is a bigger installation keeping more people alive rather than the same one built better.
+     * Every other kind is flat today, and the parameter costs them nothing.
      */
-    public function mass(): int
+    public function mass(int $technologyLevel): int
     {
+        $this->assertTechnologyLevel($technologyLevel);
+
         return match ($this) {
             self::Structure => 50,
             self::LightStructure => 5,
+            self::LifeSupport => 8 * self::SCALE * $technologyLevel,
             self::Engine => 2_500,
             self::Mine => 4_000,
             self::Factory => 6_000,
             self::Machinery => 200,
+            self::ConsumerGoods => 60,
             self::Fuel, self::Food, self::Metals, self::Minerals, self::Supplies => 100,
         };
     }
@@ -226,15 +246,19 @@ enum UnitType: string
      * Higher than the mass for everything that is mostly air or mostly shape, and equal to it for the
      * two ores, which are the densest thing anybody carries.
      */
-    public function assembledVolume(): int
+    public function assembledVolume(int $technologyLevel): int
     {
+        $this->assertTechnologyLevel($technologyLevel);
+
         return match ($this) {
             self::Structure => 100,
             self::LightStructure => 10,
+            self::LifeSupport => 8 * self::SCALE * $technologyLevel,
             self::Engine => 2_000,
             self::Mine => 6_000,
             self::Factory => 9_000,
             self::Machinery => 300,
+            self::ConsumerGoods => 30,
             self::Fuel, self::Food, self::Supplies => 200,
             self::Metals, self::Minerals => 100,
         };
@@ -243,15 +267,19 @@ enum UnitType: string
     /**
      * Get how much room one of these takes packed and crated, in VU at `SCALE`.
      */
-    public function disassembledVolume(): int
+    public function disassembledVolume(int $technologyLevel): int
     {
+        $this->assertTechnologyLevel($technologyLevel);
+
         return match ($this) {
             self::Structure => 50,
             self::LightStructure => 5,
+            self::LifeSupport => 4 * self::SCALE * $technologyLevel,
             self::Engine => 1_000,
             self::Mine => 3_000,
             self::Factory => 4_500,
             self::Machinery => 150,
+            self::ConsumerGoods => 15,
             self::Fuel, self::Food, self::Supplies => 100,
             self::Metals, self::Minerals => 50,
         };
@@ -264,11 +292,41 @@ enum UnitType: string
      * question should ask for. Reading `assembledVolume()` directly is right only when the question
      * really is about the assembled state regardless of where the unit is.
      */
-    public function volumeIn(Inventory $inventory): int
+    public function volumeIn(Inventory $inventory, int $technologyLevel): int
     {
         return $inventory->usesDisassembledVolume()
-            ? $this->disassembledVolume()
-            : $this->assembledVolume();
+            ? $this->disassembledVolume($technologyLevel)
+            : $this->assembledVolume($technologyLevel);
+    }
+
+    /**
+     * Refuse a technology level this kind cannot be built at.
+     *
+     * The one definition of the rule, called by every measure and by `App\Generation\UnitHolding`'s
+     * constructor. It lives here rather than there because a measure can *depend* on the level:
+     * `LifeSupport->mass(0)` would otherwise return zero and flow into a capacity calculation as a
+     * unit that weighs nothing, which is a wrong answer rather than an error.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function assertTechnologyLevel(int $technologyLevel): void
+    {
+        if (! $this->hasTechnologyLevel()) {
+            if ($technologyLevel !== self::NO_TECHNOLOGY_LEVEL) {
+                throw new InvalidArgumentException(sprintf('%s has no technology level.', $this->label()));
+            }
+
+            return;
+        }
+
+        if ($technologyLevel < self::MINIMUM_TECHNOLOGY_LEVEL || $technologyLevel > self::MAXIMUM_TECHNOLOGY_LEVEL) {
+            throw new InvalidArgumentException(sprintf(
+                '%s is built at a technology level from %d to %d.',
+                $this->label(),
+                self::MINIMUM_TECHNOLOGY_LEVEL,
+                self::MAXIMUM_TECHNOLOGY_LEVEL,
+            ));
+        }
     }
 
     /**
@@ -291,9 +349,9 @@ enum UnitType: string
     {
         return match ($this) {
             self::Structure, self::LightStructure,
-            self::Engine => [Inventory::Components, Inventory::Cargo],
+            self::Engine, self::LifeSupport => [Inventory::Components, Inventory::Cargo],
             self::Mine, self::Factory,
-            self::Fuel, self::Food, self::Metals,
+            self::Fuel, self::Food, self::ConsumerGoods, self::Metals,
             self::Minerals, self::Machinery, self::Supplies => [Inventory::Cargo, Inventory::Operational],
         };
     }

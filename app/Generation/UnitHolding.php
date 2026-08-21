@@ -45,20 +45,7 @@ final readonly class UnitHolding
             );
         }
 
-        if ($type->hasTechnologyLevel()) {
-            if ($technologyLevel < UnitType::MINIMUM_TECHNOLOGY_LEVEL || $technologyLevel > UnitType::MAXIMUM_TECHNOLOGY_LEVEL) {
-                throw new InvalidArgumentException(sprintf(
-                    '%s is built at a technology level from %d to %d.',
-                    $type->label(),
-                    UnitType::MINIMUM_TECHNOLOGY_LEVEL,
-                    UnitType::MAXIMUM_TECHNOLOGY_LEVEL,
-                ));
-            }
-        } elseif ($technologyLevel !== UnitType::NO_TECHNOLOGY_LEVEL) {
-            throw new InvalidArgumentException(
-                sprintf('%s has no technology level.', $type->label())
-            );
-        }
+        $type->assertTechnologyLevel($technologyLevel);
     }
 
     /**
@@ -76,7 +63,7 @@ final readonly class UnitHolding
      */
     public function mass(): int
     {
-        return $this->type->mass() * $this->quantity;
+        return $this->type->mass($this->technologyLevel) * $this->quantity;
     }
 
     /**
@@ -86,6 +73,6 @@ final readonly class UnitHolding
      */
     public function volume(): int
     {
-        return $this->type->volumeIn($this->inventory) * $this->quantity;
+        return $this->type->volumeIn($this->inventory, $this->technologyLevel) * $this->quantity;
     }
 }

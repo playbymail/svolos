@@ -149,16 +149,19 @@ The types settled so far.
 
 | Category | Type | Report code | Technology level | Mass | Volume | Disassembled volume |
 | --- | --- | --- | --- | --- | --- | --- |
-| Commodity | **Consumer Goods** | CSGD | none | | | |
+| Commodity | **Consumer Goods** | CSGD | none | 0.6 | 0.3 | 0.15 |
 | Commodity | **Food** | FOOD | none | | | |
 | Resource | **Fuel** | FUEL | none | | | |
 | Resource | **Metals** | METL | none | | | |
 | Resource | **Minerals** | MNRL | none | | | |
-| Static | **Life Support** | LSU | | | | |
+| Static | **Life Support** | LSU | 1–10 | 8 × TL | 8 × TL | 4 × TL |
 | Structural | **Structure** | STRC | 1–10 | 0.5 | 1.0 | 0.5 |
 | Structural | **Light Structure** | STRL | 1–10 | 0.05 | 0.1 | 0.05 |
 
 A blank is a thing not yet settled, not a thing that is nothing.
+
+A measure may depend on the technology level, as life support's do. Where it does, the table gives
+the formula rather than a number.
 
 **Population class** — what a population unit can be put to work at. There are four.
 

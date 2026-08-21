@@ -58,7 +58,7 @@ class Unit extends Model
      */
     public function mass(): int
     {
-        return $this->type->mass() * $this->quantity;
+        return $this->type->mass($this->technology_level) * $this->quantity;
     }
 
     /**
@@ -68,7 +68,7 @@ class Unit extends Model
      */
     public function volume(): int
     {
-        return $this->type->volumeIn($this->inventory) * $this->quantity;
+        return $this->type->volumeIn($this->inventory, $this->technology_level) * $this->quantity;
     }
 
     /**
