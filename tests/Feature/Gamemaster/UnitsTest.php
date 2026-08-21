@@ -80,7 +80,7 @@ test('every player is given a colony on their home world and a ship above it', f
         $entities = Entity::query()->where('game_seat_id', $seat->id)->with('planet.star')->get();
 
         expect($entities)->toHaveCount(2);
-        expect($entities->pluck('type')->all())->toBe([EntityType::Colony, EntityType::Ship]);
+        expect($entities->pluck('type')->all())->toBe([EntityType::OpenAirColony, EntityType::Ship]);
 
         /*
          * Both stand at the *same* planet: the colony is on it and the ship is in orbit above it, and
@@ -127,9 +127,9 @@ test('every player is handed exactly the same kit', function () {
     }
 
     /* And it is the kit the manifest describes, so the two cannot drift apart. */
-    $colony = Entity::query()->where('type', EntityType::Colony)->with('units')->first();
+    $colony = Entity::query()->where('type', EntityType::OpenAirColony)->with('units')->first();
 
-    expect($colony?->units)->toHaveCount(count((new StartingUnits)->colony()));
+    expect($colony?->units)->toHaveCount(count((new StartingUnits)->openAirColony()));
 });
 
 test('the ship is carrying its engines rather than running on them', function () {
@@ -163,7 +163,7 @@ test('the summary counts what was placed, and who was left out', function () {
     expect($summary['players'])->toBe(2);
     expect($summary['colonies'])->toBe(2);
     expect($summary['ships'])->toBe(2);
-    expect($summary['units'])->toBe(2 * (count((new StartingUnits)->colony()) + count((new StartingUnits)->ship())));
+    expect($summary['units'])->toBe(2 * (count((new StartingUnits)->openAirColony()) + count((new StartingUnits)->ship())));
     expect($summary['players_without_a_home'])->toBe(0);
 });
 
@@ -192,7 +192,7 @@ test('generating again with the same seed is allowed, and replaces rather than d
 
     /* The superseded run's units went with its entities, through the database's cascade. */
     expect(Unit::query()->count())
-        ->toBe(2 * (count((new StartingUnits)->colony()) + count((new StartingUnits)->ship())));
+        ->toBe(2 * (count((new StartingUnits)->openAirColony()) + count((new StartingUnits)->ship())));
 });
 
 test('a player seated after the homes were arranged is skipped and counted', function () {
@@ -351,7 +351,7 @@ test('the screen carries the opening position, under the world it stands on', fu
 
     $settled = $planets->firstWhere('ordinal', $homeOrdinal);
 
-    expect(collect($settled['entities'])->pluck('type')->all())->toBe(['colony', 'ship']);
+    expect(collect($settled['entities'])->pluck('type')->all())->toBe(['open_air_colony', 'ship']);
     /*
      * The **empire's** name, not the account's. An unnamed empire falls back to "Game ACME Seat 3",
      * which is what these seats have — inside a game an empire is named by its empire name on every

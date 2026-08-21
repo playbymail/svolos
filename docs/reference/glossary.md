@@ -82,12 +82,12 @@ from the faction that controls it and from no other source. An uncontrolled enti
 
 There are four.
 
-| Entity | Sits |
-| --- | --- |
-| **Open Air Colony** | on the surface of a planet |
-| **Enclosed Colony** | on the surface of a planet |
-| **Orbital Colony** | in orbit around a planet |
-| **Ship** | in orbit around a planet |
+| Entity | Sits | Encloses |
+| --- | --- | --- |
+| **Open Air Colony** | on the surface of a planet | under its own sky |
+| **Enclosed Colony** | on the surface of a planet | sealed against it |
+| **Orbital Colony** | in orbit around a planet | against vacuum |
+| **Ship** | in orbit around a planet | against vacuum |
 
 | Term | Definition |
 | --- | --- |
@@ -155,13 +155,30 @@ The types settled so far.
 | Resource | **Metals** | METL | none | | | |
 | Resource | **Minerals** | MNRL | none | | | |
 | Static | **Life Support** | LSU | 1–10 | 8 × TL | 8 × TL | 4 × TL |
-| Structural | **Structure** | STRC | 1–10 | 0.5 | 1.0 | 0.5 |
-| Structural | **Light Structure** | STRL | 1–10 | 0.05 | 0.1 | 0.05 |
+| Structural | **Structure** | STRC | 1–10 | 0.1 × TL | see below | 0.05 × TL |
+| Structural | **Light Structure** | STRL | 1–10 | 0.01 × TL | see below | 0.005 × TL |
 
 A blank is a thing not yet settled, not a thing that is nothing.
 
-A measure may depend on the technology level, as life support's do. Where it does, the table gives
-the formula rather than a number.
+A measure may depend on the technology level, as life support's and the structural kinds' do. Where
+it does, the table gives the formula rather than a number.
+
+**A structural unit's assembled volume depends on what it was assembled for**, and it is the only
+measure that depends on anything but the unit itself. The same unit encloses more room the further
+it is from vacuum: a hull holds pressure against nothing, and a field does not.
+
+| Assembled for | Volume |
+| --- | --- |
+| Ship or Orbital Colony | TL × TL ÷ 10 |
+| Enclosed Colony | TL × TL ÷ 5 |
+| Open Air Colony | TL × TL |
+
+A higher technology level means a more massive unit that does more. STRL-1 encloses at most 1 VU;
+STRL-6 encloses 36.
+
+**Structure and Light Structure enclose the same room.** Light Structure is not a smaller wall — it
+is the same wall built of a tenth the material, so it weighs a tenth and packs to a tenth. That is
+the whole difference between them.
 
 **Population class** — what a population unit can be put to work at. There are four.
 

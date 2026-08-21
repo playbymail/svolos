@@ -86,7 +86,7 @@ test('the ship carries its engines in the hold and none installed', function () 
 
 test('a colony is given mines and factories it is already working', function () {
     $operational = array_values(array_filter(
-        (new StartingUnits)->colony(),
+        (new StartingUnits)->openAirColony(),
         fn (UnitHolding $holding): bool => $holding->inventory === Inventory::Operational
             && in_array($holding->type, [UnitType::Mine, UnitType::Factory], true),
     ));
@@ -103,19 +103,32 @@ test('a holding weighs and takes up its kind times its quantity', function () {
     $holding = new UnitHolding(UnitType::LightStructure, Inventory::Components, 20, 10);
 
     expect($holding->mass())->toBe(UnitType::LightStructure->mass(10) * 20);
-    expect($holding->volume())->toBe(UnitType::LightStructure->assembledVolume(10) * 20);
+    expect($holding->volume(EntityType::OpenAirColony))
+        ->toBe(UnitType::LightStructure->assembledVolume(10, EntityType::OpenAirColony) * 20);
 });
 
-test('every kind of entity has a kit', function (EntityType $type) {
-    expect((new StartingUnits)->for($type))->not->toBeEmpty();
-})->with(EntityType::cases());
+test('every kind of entity that starts a game has a kit, and the others have none', function () {
+    /*
+     * Two of the four kinds start a game. An enclosed colony and an orbital colony are things a
+     * player builds, so `for()` answers them with an empty kit rather than a guess — and this is what
+     * says that emptiness is deliberate rather than an unfinished arm.
+     */
+    $units = new StartingUnits;
+
+    foreach ($units->entityTypes() as $type) {
+        expect($units->for($type))->not->toBeEmpty();
+    }
+
+    expect($units->for(EntityType::EnclosedColony))->toBe([]);
+    expect($units->for(EntityType::OrbitalColony))->toBe([]);
+});
 
 test('the kinds of entity a player begins with are the ones with kits', function () {
     /*
      * `entityTypes()` is what the action loops, and `for()` is what it asks of each. A kind added to
      * one and not the other would place an entity holding nothing, or describe a kit nobody is given.
      */
-    expect((new StartingUnits)->entityTypes())->toBe([EntityType::Colony, EntityType::Ship]);
+    expect((new StartingUnits)->entityTypes())->toBe([EntityType::OpenAirColony, EntityType::Ship]);
 });
 
 test('a holding refuses a technology level its kind cannot have', function () {
@@ -137,25 +150,31 @@ test('a holding refuses a technology level its kind cannot have', function () {
         ->toThrow(InvalidArgumentException::class, 'built at a technology level from 1 to 10');
 });
 
-test('every holding in every kit agrees with the catalogue about levels', function (EntityType $type) {
+test('every holding in every kit agrees with the catalogue about levels', function () {
     /*
      * The kits are the only thing writing units today, so this is the sweep that keeps them honest
      * without naming a kind: whatever `StartingUnits` holds, its level is one the catalogue allows.
-     * Constructing the holding is most of the assertion — it throws otherwise — so this also proves
-     * the kits are loadable at all.
+     *
+     * Driven off `entityTypes()` rather than `EntityType::cases()`. Two of the four kinds have no
+     * kit, so a case-driven sweep spent half its runs asserting nothing at all — which PHPUnit
+     * reported as risky, and which was the only reason anybody noticed that the assertion inside was
+     * comparing a value to itself.
      */
-    foreach ((new StartingUnits)->for($type) as $holding) {
-        expect($holding->technologyLevel)->toBe(
-            $holding->type->hasTechnologyLevel() ? $holding->technologyLevel : UnitType::NO_TECHNOLOGY_LEVEL,
-        );
+    $units = new StartingUnits;
+    $checked = 0;
 
-        if ($holding->type->hasTechnologyLevel()) {
-            expect($holding->technologyLevel)
-                ->toBeGreaterThanOrEqual(UnitType::MINIMUM_TECHNOLOGY_LEVEL)
-                ->toBeLessThanOrEqual(UnitType::MAXIMUM_TECHNOLOGY_LEVEL);
+    foreach ($units->entityTypes() as $type) {
+        foreach ($units->for($type) as $holding) {
+            /* The catalogue's own rule, asked of the value the kit actually chose. */
+            expect(fn () => $holding->type->assertTechnologyLevel($holding->technologyLevel))
+                ->not->toThrow(InvalidArgumentException::class);
+
+            $checked++;
         }
     }
-})->with(EntityType::cases());
+
+    expect($checked)->toBeGreaterThan(0);
+});
 
 test('the kit that crossed the stars is all of one era', function () {
     /*
@@ -164,11 +183,19 @@ test('the kit that crossed the stars is all of one era', function () {
      * that has a level is at 10. The day a kit deliberately holds something older, this is the test
      * that asks whether that was meant.
      */
-    foreach (EntityType::cases() as $type) {
-        foreach ((new StartingUnits)->for($type) as $holding) {
+    $units = new StartingUnits;
+    $levelled = 0;
+
+    foreach ($units->entityTypes() as $type) {
+        foreach ($units->for($type) as $holding) {
             if ($holding->type->hasTechnologyLevel()) {
                 expect($holding->technologyLevel)->toBe(UnitType::MAXIMUM_TECHNOLOGY_LEVEL);
+
+                $levelled++;
             }
         }
     }
+
+    /* If nothing in the kits has a level any more, this test has stopped meaning anything. */
+    expect($levelled)->toBeGreaterThan(0);
 });

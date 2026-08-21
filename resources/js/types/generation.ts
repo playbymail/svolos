@@ -157,7 +157,8 @@ export type Inventory = 'components' | 'cargo' | 'operational';
 /**
  * The two kinds of thing that accept orders, mirroring `App\Enums\EntityType`.
  */
-export type EntityType = 'colony' | 'ship';
+export type EntityType =
+    'open_air_colony' | 'enclosed_colony' | 'orbital_colony' | 'ship';
 
 /**
  * A quantity of one kind of unit, in one inventory.

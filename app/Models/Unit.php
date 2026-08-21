@@ -64,11 +64,17 @@ class Unit extends Model
     /**
      * Get how much room this holding takes in total, in VU at `UnitType::SCALE`.
      *
-     * Measured at the volume its **inventory** asks for: crated in cargo, assembled anywhere else.
+     * Measured at the volume its **inventory** asks for: crated in cargo, assembled anywhere else —
+     * and, for the structural kinds, at the volume their **entity** asks for, since a wall built into
+     * a hull is not the same wall built around a field. That is what the `entity` load is for: a row
+     * cannot answer this alone. Eager-load `entity` when calling it over a collection.
      */
     public function volume(): int
     {
-        return $this->type->volumeIn($this->inventory, $this->technology_level) * $this->quantity;
+        $this->loadMissing('entity');
+
+        return $this->type->volumeIn($this->inventory, $this->technology_level, $this->entity->type)
+            * $this->quantity;
     }
 
     /**

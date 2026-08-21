@@ -36,8 +36,11 @@ test('every kind says what it is called, what it weighs and how much room it tak
 
     expect($type->label())->not->toBeEmpty();
     expect($type->mass($level))->toBeGreaterThan(0);
-    expect($type->assembledVolume($level))->toBeGreaterThan(0);
     expect($type->disassembledVolume($level))->toBeGreaterThan(0);
+
+    foreach (EntityType::cases() as $assembledFor) {
+        expect($type->assembledVolume($level, $assembledFor))->toBeGreaterThan(0);
+    }
 })->with(UnitType::cases());
 
 test('a measure refuses a technology level its kind cannot be built at', function (UnitType $type) {
@@ -50,8 +53,9 @@ test('a measure refuses a technology level its kind cannot be built at', functio
     $wrong = $type->hasTechnologyLevel() ? UnitType::NO_TECHNOLOGY_LEVEL : 5;
 
     expect(fn () => $type->mass($wrong))->toThrow(InvalidArgumentException::class);
-    expect(fn () => $type->assembledVolume($wrong))->toThrow(InvalidArgumentException::class);
     expect(fn () => $type->disassembledVolume($wrong))->toThrow(InvalidArgumentException::class);
+    expect(fn () => $type->assembledVolume($wrong, EntityType::Ship))
+        ->toThrow(InvalidArgumentException::class);
 })->with(UnitType::cases());
 
 test('crating a kind never makes it take more room', function (UnitType $type) {
@@ -62,7 +66,10 @@ test('crating a kind never makes it take more room', function (UnitType $type) {
      */
     $level = levelFor($type);
 
-    expect($type->disassembledVolume($level))->toBeLessThanOrEqual($type->assembledVolume($level));
+    foreach (EntityType::cases() as $assembledFor) {
+        expect($type->disassembledVolume($level))
+            ->toBeLessThanOrEqual($type->assembledVolume($level, $assembledFor));
+    }
 })->with(UnitType::cases());
 
 test('the inventory decides which volume a kind is measured at', function (UnitType $type) {
@@ -74,10 +81,10 @@ test('the inventory decides which volume a kind is measured at', function (UnitT
     $level = levelFor($type);
 
     foreach (Inventory::cases() as $inventory) {
-        expect($type->volumeIn($inventory, $level))->toBe(
+        expect($type->volumeIn($inventory, $level, EntityType::Ship))->toBe(
             $inventory->usesDisassembledVolume()
                 ? $type->disassembledVolume($level)
-                : $type->assembledVolume($level),
+                : $type->assembledVolume($level, EntityType::Ship),
         );
     }
 })->with(UnitType::cases());
@@ -94,16 +101,25 @@ test('the structural kinds carry the measures they were given', function () {
      * settled rather than placeholders. Written as the decimals they are read as, times the scale,
      * so that a change to `SCALE` does not quietly change what this asserts.
      */
-    expect(UnitType::Structure->mass(10))->toBe((int) (0.5 * UnitType::SCALE));
-    expect(UnitType::Structure->assembledVolume(10))->toBe((int) (1.0 * UnitType::SCALE));
+    expect(UnitType::Structure->mass(1))->toBe((int) (0.1 * UnitType::SCALE));
+    expect(UnitType::Structure->mass(10))->toBe((int) (1.0 * UnitType::SCALE));
+    expect(UnitType::Structure->disassembledVolume(1))->toBe((int) (0.05 * UnitType::SCALE));
     expect(UnitType::Structure->disassembledVolume(10))->toBe((int) (0.5 * UnitType::SCALE));
 
-    expect(UnitType::LightStructure->mass(10))->toBe((int) (0.05 * UnitType::SCALE));
-    expect(UnitType::LightStructure->assembledVolume(10))->toBe((int) (0.1 * UnitType::SCALE));
+    expect(UnitType::LightStructure->mass(1))->toBe((int) (0.01 * UnitType::SCALE));
+    expect(UnitType::LightStructure->mass(10))->toBe((int) (0.1 * UnitType::SCALE));
+    expect(UnitType::LightStructure->disassembledVolume(1))->toBe((int) (0.005 * UnitType::SCALE));
     expect(UnitType::LightStructure->disassembledVolume(10))->toBe((int) (0.05 * UnitType::SCALE));
 
-    /* Flat kinds are flat: the level is accepted and changes nothing. */
-    expect(UnitType::Structure->mass(1))->toBe(UnitType::Structure->mass(10));
+    /* Light structure is a tenth of structure in both, at every level. */
+    foreach (range(1, 10) as $level) {
+        expect(UnitType::LightStructure->mass($level) * 10)->toBe(UnitType::Structure->mass($level));
+        expect(UnitType::LightStructure->disassembledVolume($level) * 10)
+            ->toBe(UnitType::Structure->disassembledVolume($level));
+    }
+
+    /* A flat kind is flat: the level is accepted and changes nothing. */
+    expect(UnitType::Engine->mass(1))->toBe(UnitType::Engine->mass(10));
 });
 
 test('a measure is printed as the decimal it stands for', function () {
@@ -111,9 +127,12 @@ test('a measure is printed as the decimal it stands for', function () {
      * The one place hundredths become the number a report prints. Two decimal places always, so a
      * column of measures lines up.
      */
-    expect(UnitType::format(UnitType::Structure->mass(10)))->toBe('0.50');
-    expect(UnitType::format(UnitType::LightStructure->mass(10)))->toBe('0.05');
-    expect(UnitType::format(UnitType::LightStructure->assembledVolume(10) * 300))->toBe('30.00');
+    expect(UnitType::format(UnitType::Structure->mass(10)))->toBe('1.000');
+    expect(UnitType::format(UnitType::LightStructure->mass(10)))->toBe('0.100');
+    expect(UnitType::format(UnitType::LightStructure->disassembledVolume(1)))->toBe('0.005');
+
+    /* The decimal places come off the scale, so widening it does not silently truncate a measure. */
+    expect(UnitType::format(UnitType::SCALE))->toBe('1.000');
 });
 
 test('a report code is unique, and the kinds still without one are known', function () {
@@ -202,7 +221,7 @@ test('only a ship can ever move', function () {
      * its fuel and its installed engines, and nothing answers that yet because no order asks it.
      */
     expect(EntityType::Ship->isMobile())->toBeTrue();
-    expect(EntityType::Colony->isMobile())->toBeFalse();
+    expect(EntityType::OpenAirColony->isMobile())->toBeFalse();
 });
 
 test('every kind of entity says what it is called', function (EntityType $type) {
@@ -318,8 +337,13 @@ test('consumer goods carry the measures they were given', function () {
     $none = UnitType::NO_TECHNOLOGY_LEVEL;
 
     expect(UnitType::ConsumerGoods->mass($none))->toBe((int) (0.6 * UnitType::SCALE));
-    expect(UnitType::ConsumerGoods->assembledVolume($none))->toBe((int) (0.3 * UnitType::SCALE));
     expect(UnitType::ConsumerGoods->disassembledVolume($none))->toBe((int) (0.15 * UnitType::SCALE));
+
+    /* A commodity is a crate, and a crate is the same size whatever it is going into. */
+    foreach (EntityType::cases() as $assembledFor) {
+        expect(UnitType::ConsumerGoods->assembledVolume($none, $assembledFor))
+            ->toBe((int) (0.3 * UnitType::SCALE));
+    }
 
     expect(UnitType::ConsumerGoods->reportName($none))->toBe('CSGD');
 });
@@ -333,12 +357,16 @@ test('a life support unit is measured by its technology level', function (int $l
      * content here — a transposed multiplier would still pass a single-level check at TL 1.
      */
     expect(UnitType::LifeSupport->mass($level))->toBe(8 * UnitType::SCALE * $level);
-    expect(UnitType::LifeSupport->assembledVolume($level))->toBe(8 * UnitType::SCALE * $level);
     expect(UnitType::LifeSupport->disassembledVolume($level))->toBe(4 * UnitType::SCALE * $level);
 
-    /* Crating one always halves it, at every level. */
+    /* Crating one always halves it, at every level, and it does not care what it is going into. */
+    foreach (EntityType::cases() as $assembledFor) {
+        expect(UnitType::LifeSupport->assembledVolume($level, $assembledFor))
+            ->toBe(8 * UnitType::SCALE * $level);
+    }
+
     expect(UnitType::LifeSupport->disassembledVolume($level) * 2)
-        ->toBe(UnitType::LifeSupport->assembledVolume($level));
+        ->toBe(UnitType::LifeSupport->assembledVolume($level, EntityType::Ship));
 })->with(range(UnitType::MINIMUM_TECHNOLOGY_LEVEL, UnitType::MAXIMUM_TECHNOLOGY_LEVEL));
 
 test('life support is something an entity is built from', function () {
@@ -355,3 +383,52 @@ test('life support is something an entity is built from', function () {
     expect(UnitType::LifeSupport->reportName(10))->toBe('LSU-10');
     expect(UnitType::LifeSupport->reportName(1))->toBe('LSU-1');
 });
+
+test('a structural unit encloses more room the further from vacuum it is', function () {
+    /*
+     * The one measure that depends on what a unit was assembled *for*. The same structural unit is
+     * `TL² / 10` VU in a ship or an orbital colony, `TL² / 5` sealed on a surface, and `TL²` under an
+     * open sky — a hull has to hold pressure against vacuum and a field does not.
+     *
+     * Asserted at TL 6 because the ratios are whole numbers there and the example that settled this
+     * used it: STRL-6 encloses 36 VU in the open air.
+     */
+    $inOpenAir = UnitType::LightStructure->assembledVolume(6, EntityType::OpenAirColony);
+    $enclosed = UnitType::LightStructure->assembledVolume(6, EntityType::EnclosedColony);
+    $inOrbit = UnitType::LightStructure->assembledVolume(6, EntityType::OrbitalColony);
+    $inShip = UnitType::LightStructure->assembledVolume(6, EntityType::Ship);
+
+    expect($inOpenAir)->toBe(36 * UnitType::SCALE);
+    expect($enclosed * 5)->toBe($inOpenAir);
+    expect($inShip * 10)->toBe($inOpenAir);
+
+    /* An orbital colony is a ship that cannot move, and is measured like one. */
+    expect($inOrbit)->toBe($inShip);
+});
+
+test('the two structural kinds enclose the same room and differ only in what they cost', function (int $level) {
+    /*
+     * Light structure is not a smaller wall — it is the same wall built of less. Identical assembled
+     * volume, a tenth of the mass, a tenth of the crate. That is the whole difference between them,
+     * and it is why they share a formula in `assembledVolume()` rather than each having their own.
+     */
+    foreach (EntityType::cases() as $assembledFor) {
+        expect(UnitType::LightStructure->assembledVolume($level, $assembledFor))
+            ->toBe(UnitType::Structure->assembledVolume($level, $assembledFor));
+    }
+
+    expect(UnitType::LightStructure->mass($level) * 10)->toBe(UnitType::Structure->mass($level));
+})->with(range(1, 10));
+
+test('a structural unit is a square of its technology level', function (int $level) {
+    /*
+     * TL² rather than TL, which is what makes a level worth having: a TL-6 unit encloses thirty-six
+     * times a TL-1 one while weighing six times as much. Swept because the exponent is the content —
+     * a linear mistake still passes at TL 1.
+     */
+    expect(UnitType::Structure->assembledVolume($level, EntityType::OpenAirColony))
+        ->toBe($level ** 2 * UnitType::SCALE);
+
+    expect(UnitType::Structure->mass($level))
+        ->toBe($level * UnitType::Structure->mass(1));
+})->with(range(1, 10));

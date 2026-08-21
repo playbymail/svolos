@@ -255,7 +255,7 @@ class GenerateUnits implements StageGeneration
             fn (array $row): bool => $row['type'] === $type->value,
         ));
 
-        $colonies = $ofType(EntityType::Colony);
+        $colonies = $ofType(EntityType::OpenAirColony);
 
         return [
             'players' => $players,

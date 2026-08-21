@@ -61,9 +61,14 @@ enum UnitType: string
     /**
      * What every measure on this enum is multiplied by.
      *
-     * Mass is in MU and both volumes are in VU, each stored as hundredths: a mass of `50` is 0.5 MU.
+     * Mass is in MU and both volumes are in VU, each stored as thousandths: a mass of `500` is 0.5 MU.
+     *
+     * It was hundredths until light structure arrived wanting a disassembled volume of 0.005 VU.
+     * Widening it was a one-line change, which was the whole point of having a named scale — but note
+     * that `format()` reads its decimal places off this constant rather than hard-coding two, so that
+     * the claim stays true the next time.
      */
-    public const int SCALE = 100;
+    public const int SCALE = 1_000;
 
     /**
      * The value stored for a kind that has no technology level at all.
@@ -106,7 +111,22 @@ enum UnitType: string
      */
     public static function format(int $measure): string
     {
-        return number_format($measure / self::SCALE, 2);
+        return number_format($measure / self::SCALE, strlen((string) self::SCALE) - 1);
+    }
+
+    /**
+     * Get the stored form of a measure written the way the rules write it.
+     *
+     * The inverse of `format()`, and the only place a decimal appears in this file. It exists so the
+     * catalogue below reads like the sheet it came from — `measure(0.005)` rather than `5` — because
+     * these numbers are the content and a transposed digit in an integer literal is invisible.
+     *
+     * The float is a *literal* being converted once, not a measure being carried around; `round()`
+     * is what keeps `0.1 * 1000` from landing on 99. Nothing outside this class sees one.
+     */
+    private static function measure(float $units): int
+    {
+        return (int) round($units * self::SCALE);
     }
 
     /**
@@ -228,15 +248,15 @@ enum UnitType: string
         $this->assertTechnologyLevel($technologyLevel);
 
         return match ($this) {
-            self::Structure => 50,
-            self::LightStructure => 5,
-            self::LifeSupport => 8 * self::SCALE * $technologyLevel,
-            self::Engine => 2_500,
-            self::Mine => 4_000,
-            self::Factory => 6_000,
-            self::Machinery => 200,
-            self::ConsumerGoods => 60,
-            self::Fuel, self::Food, self::Metals, self::Minerals, self::Supplies => 100,
+            self::Structure => self::measure(0.1) * $technologyLevel,
+            self::LightStructure => self::measure(0.01) * $technologyLevel,
+            self::LifeSupport => self::measure(8) * $technologyLevel,
+            self::Engine => self::measure(25),
+            self::Mine => self::measure(40),
+            self::Factory => self::measure(60),
+            self::Machinery => self::measure(2),
+            self::ConsumerGoods => self::measure(0.6),
+            self::Fuel, self::Food, self::Metals, self::Minerals, self::Supplies => self::measure(1),
         };
     }
 
@@ -245,22 +265,32 @@ enum UnitType: string
      *
      * Higher than the mass for everything that is mostly air or mostly shape, and equal to it for the
      * two ores, which are the densest thing anybody carries.
+     *
+     * **The structural kinds depend on what they were assembled for**, which is why this takes an
+     * `EntityType` and the crated measure does not: a crate is a crate wherever it is going, but a
+     * wall built into a hull is not the same wall built around a field. `TL² / 10` for a ship or an
+     * orbital colony, `TL² / 5` enclosed, `TL²` in the open air — see
+     * `EntityType::structuralVolumeDivisor()`. `Structure` and `LightStructure` share the formula
+     * exactly: light structure encloses the same room for a tenth of the mass, which is the whole
+     * difference between them.
      */
-    public function assembledVolume(int $technologyLevel): int
+    public function assembledVolume(int $technologyLevel, EntityType $assembledFor): int
     {
         $this->assertTechnologyLevel($technologyLevel);
 
         return match ($this) {
-            self::Structure => 100,
-            self::LightStructure => 10,
-            self::LifeSupport => 8 * self::SCALE * $technologyLevel,
-            self::Engine => 2_000,
-            self::Mine => 6_000,
-            self::Factory => 9_000,
-            self::Machinery => 300,
-            self::ConsumerGoods => 30,
-            self::Fuel, self::Food, self::Supplies => 200,
-            self::Metals, self::Minerals => 100,
+            self::Structure, self::LightStructure => intdiv(
+                self::measure(1) * $technologyLevel ** 2,
+                $assembledFor->structuralVolumeDivisor(),
+            ),
+            self::LifeSupport => self::measure(8) * $technologyLevel,
+            self::Engine => self::measure(20),
+            self::Mine => self::measure(60),
+            self::Factory => self::measure(90),
+            self::Machinery => self::measure(3),
+            self::ConsumerGoods => self::measure(0.3),
+            self::Fuel, self::Food, self::Supplies => self::measure(2),
+            self::Metals, self::Minerals => self::measure(1),
         };
     }
 
@@ -272,16 +302,16 @@ enum UnitType: string
         $this->assertTechnologyLevel($technologyLevel);
 
         return match ($this) {
-            self::Structure => 50,
-            self::LightStructure => 5,
-            self::LifeSupport => 4 * self::SCALE * $technologyLevel,
-            self::Engine => 1_000,
-            self::Mine => 3_000,
-            self::Factory => 4_500,
-            self::Machinery => 150,
-            self::ConsumerGoods => 15,
-            self::Fuel, self::Food, self::Supplies => 100,
-            self::Metals, self::Minerals => 50,
+            self::Structure => self::measure(0.05) * $technologyLevel,
+            self::LightStructure => self::measure(0.005) * $technologyLevel,
+            self::LifeSupport => self::measure(4) * $technologyLevel,
+            self::Engine => self::measure(10),
+            self::Mine => self::measure(30),
+            self::Factory => self::measure(45),
+            self::Machinery => self::measure(1.5),
+            self::ConsumerGoods => self::measure(0.15),
+            self::Fuel, self::Food, self::Supplies => self::measure(1),
+            self::Metals, self::Minerals => self::measure(0.5),
         };
     }
 
@@ -292,11 +322,11 @@ enum UnitType: string
      * question should ask for. Reading `assembledVolume()` directly is right only when the question
      * really is about the assembled state regardless of where the unit is.
      */
-    public function volumeIn(Inventory $inventory, int $technologyLevel): int
+    public function volumeIn(Inventory $inventory, int $technologyLevel, EntityType $assembledFor): int
     {
         return $inventory->usesDisassembledVolume()
             ? $this->disassembledVolume($technologyLevel)
-            : $this->assembledVolume($technologyLevel);
+            : $this->assembledVolume($technologyLevel, $assembledFor);
     }
 
     /**

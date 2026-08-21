@@ -34,7 +34,7 @@ class EntityFactory extends Factory
             'game_seat_id' => GameSeat::factory(),
             'planet_id' => Planet::factory(),
             'generation_run_id' => null,
-            'type' => EntityType::Colony,
+            'type' => EntityType::OpenAirColony,
         ];
     }
 
@@ -43,7 +43,7 @@ class EntityFactory extends Factory
      */
     public function colony(): static
     {
-        return $this->state(fn (array $attributes): array => ['type' => EntityType::Colony]);
+        return $this->state(fn (array $attributes): array => ['type' => EntityType::OpenAirColony]);
     }
 
     /**

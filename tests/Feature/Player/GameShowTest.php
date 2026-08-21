@@ -330,7 +330,7 @@ test('the probe report carries the home system stars, planets and holdings', fun
     $response = $this->actingAs($member)->get(route('games.show', ['game' => $game]));
     $payload = (string) json_encode($response->viewData('page'));
 
-    expect($payload)->toContain('"type":"colony"')->toContain('"type":"ship"');
+    expect($payload)->toContain('"type":"open_air_colony"')->toContain('"type":"ship"');
 });
 
 test('every player route is gated by auth, verified and the player middleware', function () {

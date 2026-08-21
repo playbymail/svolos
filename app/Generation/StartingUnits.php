@@ -47,7 +47,7 @@ final class StartingUnits
      *
      * @return list<UnitHolding>
      */
-    public function colony(): array
+    public function openAirColony(): array
     {
         return [
             new UnitHolding(UnitType::LightStructure, Inventory::Components, 20, 10),
@@ -89,26 +89,31 @@ final class StartingUnits
     /**
      * Get the kit for one kind of entity.
      *
-     * The seam the action writes through, so that adding a third kind of starting entity is a case
-     * here rather than a branch there.
+     * The seam the action writes through, so that adding another kind of starting entity is a case
+     * here rather than a branch there. A kind that starts nothing answers with an empty list.
      *
      * @return list<UnitHolding>
      */
     public function for(EntityType $type): array
     {
         return match ($type) {
-            EntityType::Colony => $this->colony(),
+            EntityType::OpenAirColony => $this->openAirColony(),
             EntityType::Ship => $this->ship(),
+            EntityType::EnclosedColony, EntityType::OrbitalColony => [],
         };
     }
 
     /**
      * Get the kinds of entity every player is given, in the order they are created.
      *
+     * Two of the four kinds of entity start a game. An enclosed colony and an orbital colony are
+     * things a player builds, not things they are given, so `for()` answers them with an empty kit
+     * rather than pretending otherwise.
+     *
      * @return list<EntityType>
      */
     public function entityTypes(): array
     {
-        return [EntityType::Colony, EntityType::Ship];
+        return [EntityType::OpenAirColony, EntityType::Ship];
     }
 }

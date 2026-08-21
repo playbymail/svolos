@@ -2,6 +2,7 @@
 
 namespace App\Generation;
 
+use App\Enums\EntityType;
 use App\Enums\Inventory;
 use App\Enums\UnitType;
 use InvalidArgumentException;
@@ -70,9 +71,14 @@ final readonly class UnitHolding
      * Get how much room this holding takes in total, in VU at `UnitType::SCALE`.
      *
      * Measured at the volume its **inventory** asks for: crated in cargo, assembled anywhere else.
+     *
+     * The entity kind is a parameter rather than a property because a holding is written before an
+     * entity exists — `StartingUnits::for()` builds a kit *for* a kind, and the caller that asked for
+     * it is the one that knows. Only the structural kinds read it; see
+     * `UnitType::assembledVolume()`.
      */
-    public function volume(): int
+    public function volume(EntityType $assembledFor): int
     {
-        return $this->type->volumeIn($this->inventory, $this->technologyLevel) * $this->quantity;
+        return $this->type->volumeIn($this->inventory, $this->technologyLevel, $assembledFor) * $this->quantity;
     }
 }

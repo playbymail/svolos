@@ -97,12 +97,52 @@ glossary's reserved-words section says so outright.
 The kinds carried the category's name until the table arrived, which is what
 `2026_08_21_171834_rename_structural_unit_types` fixes.
 
+## `EntityType` is four kinds, because a structural unit is measured by what it was built for
+
+The glossary has named four entities since it was written — open air colony, enclosed colony,
+orbital colony, ship — and the code carried two until the structural measures arrived. The split is
+not cosmetic: the same structural unit encloses `TL²` VU under an open sky, `TL² / 5` sealed on a
+surface and `TL² / 10` in a hull, and a single `colony` case cannot answer that.
+`2026_08_21_175001_split_colony_entity_types` makes every existing colony an **open air** one,
+because the one the expedition prepared has mines in the hills and fields cleared for farms.
+
+`EntityType::structuralVolumeDivisor()` returns 10, 5 or 1, and `UnitType::assembledVolume()` is its
+only caller. It lives on the entity because the entity is the thing that varies — the same reasoning
+that put `usesDisassembledVolume()` on `Inventory`.
+
+**Only `assembledVolume()` takes an `EntityType`; the crated measure does not.** A crate is a crate
+wherever it is going. That asymmetry is the whole shape of the rule and is worth keeping visible.
+
+`Unit::volume()` therefore needs its `entity` relation, and calls `loadMissing()` to be safe —
+**eager-load `entity` when calling it over a collection.** `UnitHolding::volume()` takes the kind as
+an argument instead, because a holding is written before an entity exists.
+
+**Two of the four kinds start a game.** `StartingUnits::for()` answers an enclosed or an orbital
+colony with an **empty kit** rather than a guess, and `entityTypes()` is the list of the two that do.
+Sweeps over kits must iterate `entityTypes()`, not `EntityType::cases()` — a case-driven sweep spends
+half its runs asserting nothing, which is how PHPUnit's *risky* flag found a test whose only
+assertion was comparing a value to itself.
+
+## `measure()` is the only decimal in the catalogue, and `SCALE` is thousandths
+
+`SCALE` was hundredths until light structure wanted a crated volume of **0.005 VU**. Widening it to
+thousandths was the one-line change it was supposed to be — with one correction: `format()` now
+derives its decimal places from `SCALE` rather than hard-coding two, so the claim stays true the next
+time.
+
+`UnitType::measure(0.005)` is the inverse of `format()` and the **only** place a decimal literal
+appears. It exists so the catalogue reads like the sheet it came from: these numbers are the content,
+and a transposed digit in `5` is invisible where one in `0.005` is not. The float is a literal
+converted once — `round()` is what keeps `0.1 * 1000` off 99 — and nothing outside the class sees
+one. **The rule against methods returning floats is unchanged.**
+
 ## A measure may be a function of the technology level
 
 `mass()`, `assembledVolume()` and `disassembledVolume()` all take a technology level, and **every
-call site must pass one**. `LifeSupport` is why: it is 8 × TL MU, 8 × TL VU assembled and 4 × TL VU
-crated, so a TL-10 unit is ten times a TL-1 one in every measure. Every other kind is flat today and
-the parameter costs it nothing.
+call site must pass one**. `LifeSupport` is 8 × TL MU, 8 × TL VU assembled and 4 × TL VU crated; the structural kinds are
+0.1 × TL and 0.01 × TL by mass with a **squared** assembled volume. A higher level always means a
+**more massive unit that does more** — that is the game's rule, not an accident of these two, so
+expect the next kind to follow it.
 
 Do not add a no-argument convenience overload. A kind whose measure varies would answer it wrongly,
 and the caller that reached for it would never find out.
