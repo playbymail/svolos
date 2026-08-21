@@ -1,6 +1,6 @@
 # The opening position: entities and what they hold
 
-Globs: `app/Enums/{UnitType,Inventory}.php`, `app/Enums/EntityType.php`, `app/Generation/UnitHolding.php`,
+Globs: `app/Enums/{UnitType,UnitCategory,Inventory}.php`, `app/Enums/EntityType.php`, `app/Generation/UnitHolding.php`,
 `app/Generation/StartingUnits.php`, `app/Actions/Generation/GenerateUnits.php`,
 `app/Models/Entity.php`, `app/Models/Unit.php`,
 `database/migrations/*_create_entities_table.php`, `database/migrations/*_{create_assets_table,rename_assets_table_to_units}.php`,
@@ -76,14 +76,50 @@ question really is about the assembled state wherever the unit happens to be.
 does not pack down, but larger would mean crating something made it bulkier, which the rules have no
 way to mean.
 
+## Thirteen categories, and `Infrastructure` is one of them
+
+`UnitCategory` carries all thirteen with the definitions they were settled with, alphabetically —
+there is no dependency between them, unlike `GenerationStage` whose declaration order *is* its
+dependency order. `UnitCategory::types()` reads `UnitType::category()` rather than keeping a second
+list, so the two cannot drift; `UnitTypeTest` holds that true in both directions.
+
+**Nine of the thirteen are empty**, and that is a real state rather than a broken one — the
+catalogue has kinds for Structural, Resource, Commodity, Propulsion and Infrastructure and nothing
+for the rest yet.
+
+Note what `Infrastructure` now is: **a category of units**, the installations that produce something
+each turn. `Inventory::Components` was called `Infrastructure` until the day before this enum
+arrived, and the rename was made for the glossary's sake rather than in anticipation. It happens to
+have cleared the way — one word answering both questions would have been misread eventually. The
+glossary's reserved-words section says so outright.
+
+`Structural` is likewise the **category**; `Structure` and `LightStructure` are the two kinds in it.
+The kinds carried the category's name until the table arrived, which is what
+`2026_08_21_171834_rename_structural_unit_types` fixes.
+
+## `Machinery` and `Supplies` are the two kinds still unplaced
+
+Neither appears in the category table, neither has a report code, and neither reads unambiguously as
+`Infrastructure`, `Commodity` or `Resource` from its name. So `category()` and `abbreviation()` both
+answer `null` for them, and `hasTechnologyLevel()` is a **guess** — the only guess left, since
+`CSGD`, `FOOD`, `FUEL`, `METL` and `NMTL` were given as having no level and the structural kinds
+have one.
+
+`UnitTypeTest` writes each of those lists out, so deciding one of these two is an edit against a
+list rather than a hunt.
+
+**`CSGD` and `LSU` are named by the table but are not in `UnitType`.** Consumer goods and life
+support have codes and categories and no measures, and a kind with no mass or volume fails the
+catalogue sweep as half-defined. Add them with their numbers, not before.
+
 ## Technology level is part of a row's identity, and `0` means "has none"
 
-A unit is built at a technology level from 1 to 10, written into its report code: `LSTR-10`. Most
+A unit is built at a technology level from 1 to 10, written into its report code: `STRL-10`. Most
 kinds have one; the raw commodities do not, and those are shown as `FOOD` — **never `FOOD-0`**.
 
 **The level is in the unique key**, `(entity_id, type, inventory, technology_level)`, because one
-entity holds the same kind at several levels at once: a ship built with LSTR-10 carrying crated
-LSTR-2 and running LSTR-8 is three rows. Under the old key the second and third could not be written
+entity holds the same kind at several levels at once: a ship built with STRL-10 carrying crated
+STRL-2 and running STRL-8 is three rows. Under the old key the second and third could not be written
 at all, and the failure would have surfaced as a constraint violation inside a build order rather
 than as anything naming the real problem.
 
@@ -116,7 +152,7 @@ Laravel would derive.
 
 ## Only the structural kinds are settled; the other nine are placeholders
 
-`Structural` (STRU) and `LightStructural` (LSTR) carry real numbers and real report codes.
+`Structure` (STRC) and `LightStructure` (STRL) carry real numbers and real report codes.
 `2026_08_21_164234_split_structure_units_into_structural_grades` is where the single `structure`
 kind became the two, and every existing row became `light_structural` because
 `StartingUnits` is the only thing that has ever written one — the colony's buildings and the ship's

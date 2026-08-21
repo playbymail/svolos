@@ -274,8 +274,8 @@ trait PresentsGeneration
      * Units are ordered by inventory, then by kind, then by technology level **highest first**, so
      * the same entity reads the same way every time, the components — the part that says what the
      * thing *is* — come first, and a kind held at several levels leads with the best of them. The
-     * level has to be in the ordering at all because it is part of the row's identity: `LSTR-10` and
-     * `LSTR-2` in one hold are two rows of the same kind, and without it their order is whatever the
+     * level has to be in the ordering at all because it is part of the row's identity: `STRL-10` and
+     * `STRL-2` in one hold are two rows of the same kind, and without it their order is whatever the
      * database felt like.
      *
      * **One closure returning a tuple, never an array of closures.** `sortBy([$a, $b])` looks like two

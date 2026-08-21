@@ -11,8 +11,8 @@ use InvalidArgumentException;
  *
  * The unit the starting kits are written in, and the shape of one `units` row before it is a row:
  * `(entity, type, inventory, technology_level)` is unique in that table, so a holding is the whole
- * of what is known about a kind an entity has at one level in one place. A ship built with `LSTR-10`
- * carrying crated `LSTR-2` and running `LSTR-8` is three holdings of the same kind, which is why the
+ * of what is known about a kind an entity has at one level in one place. A ship built with `STRL-10`
+ * carrying crated `STRL-2` and running `STRL-8` is three holdings of the same kind, which is why the
  * level is part of the key rather than an attribute hanging off it.
  *
  * ## The constructor is where the catalogue's one rule is enforced
@@ -62,7 +62,7 @@ final readonly class UnitHolding
     }
 
     /**
-     * Get the name a report gives this holding: `LSTR-10`, or `FOOD`.
+     * Get the name a report gives this holding: `STRL-10`, or `FOOD`.
      *
      * Null when the kind has no report code yet — see `UnitType::abbreviation()`.
      */

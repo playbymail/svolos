@@ -2,6 +2,7 @@
 
 use App\Enums\EntityType;
 use App\Enums\Inventory;
+use App\Enums\UnitCategory;
 use App\Enums\UnitType;
 
 /*
@@ -57,13 +58,13 @@ test('the structural kinds carry the measures they were given', function () {
      * settled rather than placeholders. Written as the decimals they are read as, times the scale,
      * so that a change to `SCALE` does not quietly change what this asserts.
      */
-    expect(UnitType::Structural->mass())->toBe((int) (0.5 * UnitType::SCALE));
-    expect(UnitType::Structural->assembledVolume())->toBe((int) (1.0 * UnitType::SCALE));
-    expect(UnitType::Structural->disassembledVolume())->toBe((int) (0.5 * UnitType::SCALE));
+    expect(UnitType::Structure->mass())->toBe((int) (0.5 * UnitType::SCALE));
+    expect(UnitType::Structure->assembledVolume())->toBe((int) (1.0 * UnitType::SCALE));
+    expect(UnitType::Structure->disassembledVolume())->toBe((int) (0.5 * UnitType::SCALE));
 
-    expect(UnitType::LightStructural->mass())->toBe((int) (0.05 * UnitType::SCALE));
-    expect(UnitType::LightStructural->assembledVolume())->toBe((int) (0.1 * UnitType::SCALE));
-    expect(UnitType::LightStructural->disassembledVolume())->toBe((int) (0.05 * UnitType::SCALE));
+    expect(UnitType::LightStructure->mass())->toBe((int) (0.05 * UnitType::SCALE));
+    expect(UnitType::LightStructure->assembledVolume())->toBe((int) (0.1 * UnitType::SCALE));
+    expect(UnitType::LightStructure->disassembledVolume())->toBe((int) (0.05 * UnitType::SCALE));
 });
 
 test('a measure is printed as the decimal it stands for', function () {
@@ -71,9 +72,9 @@ test('a measure is printed as the decimal it stands for', function () {
      * The one place hundredths become the number a report prints. Two decimal places always, so a
      * column of measures lines up.
      */
-    expect(UnitType::format(UnitType::Structural->mass()))->toBe('0.50');
-    expect(UnitType::format(UnitType::LightStructural->mass()))->toBe('0.05');
-    expect(UnitType::format(UnitType::LightStructural->assembledVolume() * 300))->toBe('30.00');
+    expect(UnitType::format(UnitType::Structure->mass()))->toBe('0.50');
+    expect(UnitType::format(UnitType::LightStructure->mass()))->toBe('0.05');
+    expect(UnitType::format(UnitType::LightStructure->assembledVolume() * 300))->toBe('30.00');
 });
 
 test('a report code is unique, and the kinds still without one are known', function () {
@@ -92,17 +93,19 @@ test('a report code is unique, and the kinds still without one are known', funct
         expect($code)->toBe(mb_strtoupper($code));
     }
 
-    expect(UnitType::Structural->abbreviation())->toBe('STRU');
-    expect(UnitType::LightStructural->abbreviation())->toBe('LSTR');
+    expect(UnitType::Structure->abbreviation())->toBe('STRC');
+    expect(UnitType::LightStructure->abbreviation())->toBe('STRL');
+    expect(UnitType::Food->abbreviation())->toBe('FOOD');
+    expect(UnitType::Fuel->abbreviation())->toBe('FUEL');
+    expect(UnitType::Metals->abbreviation())->toBe('METL');
+    expect(UnitType::Minerals->abbreviation())->toBe('NMTL');
 
     $unnamed = array_values(array_map(
         fn (UnitType $type): string => $type->value,
         array_filter(UnitType::cases(), fn (UnitType $type): bool => $type->abbreviation() === null),
     ));
 
-    expect($unnamed)->toBe([
-        'engine', 'mine', 'factory', 'fuel', 'food', 'metals', 'minerals', 'machinery', 'supplies',
-    ]);
+    expect($unnamed)->toBe(['engine', 'mine', 'factory', 'machinery', 'supplies']);
 });
 
 test('every kind may sit somewhere, and never in an inventory twice', function (UnitType $type) {
@@ -134,7 +137,7 @@ test('components is the closed inventory, and holds only what an entity is built
         fn (UnitType $type): bool => $type->allows(Inventory::Components),
     ));
 
-    expect($structural)->toBe([UnitType::Structural, UnitType::LightStructural, UnitType::Engine]);
+    expect($structural)->toBe([UnitType::Structure, UnitType::LightStructure, UnitType::Engine]);
 });
 
 test('a mine is never part of what an entity is made of', function () {
@@ -174,7 +177,7 @@ test('a kind either has a technology level or has none, and the split is written
         array_filter(UnitType::cases(), fn (UnitType $type): bool => $type->hasTechnologyLevel()),
     ));
 
-    expect($levelled)->toBe(['structural', 'light_structural', 'engine', 'mine', 'factory', 'machinery']);
+    expect($levelled)->toBe(['structure', 'light_structure', 'engine', 'mine', 'factory', 'machinery']);
 
     $raw = array_values(array_map(
         fn (UnitType $type): string => $type->value,
@@ -189,11 +192,12 @@ test('a report names a levelled kind with its level, and a raw one without', fun
      * `FOOD`, never `FOOD-0`. The engine knows which kinds have a level, so the zero never reaches a
      * reader — which is the whole reason the absent case can be a sentinel rather than a null.
      */
-    expect(UnitType::LightStructural->reportName(10))->toBe('LSTR-10');
-    expect(UnitType::LightStructural->reportName(2))->toBe('LSTR-2');
-    expect(UnitType::Structural->reportName(7))->toBe('STRU-7');
+    expect(UnitType::LightStructure->reportName(10))->toBe('STRL-10');
+    expect(UnitType::LightStructure->reportName(2))->toBe('STRL-2');
+    expect(UnitType::Structure->reportName(7))->toBe('STRC-7');
 
-    expect(UnitType::Food->reportName(UnitType::NO_TECHNOLOGY_LEVEL))->toBeNull();
+    expect(UnitType::Food->reportName(UnitType::NO_TECHNOLOGY_LEVEL))->toBe('FOOD');
+    expect(UnitType::Fuel->reportName(UnitType::NO_TECHNOLOGY_LEVEL))->toBe('FUEL');
 });
 
 test('a kind with no report code has no report name either', function () {
@@ -203,4 +207,52 @@ test('a kind with no report code has no report name either', function () {
      */
     expect(UnitType::Engine->abbreviation())->toBeNull();
     expect(UnitType::Engine->reportName(10))->toBeNull();
+});
+
+test('every kind either has a category or is one of the two still without', function () {
+    /*
+     * The category table settled thirteen categories and the codes for four of them. `Machinery` and
+     * `Supplies` appear in none of it and read ambiguously from their names, so they answer null —
+     * and this is the list that fails the moment either is decided, which is when its report code
+     * and its measures want deciding too.
+     */
+    $uncategorised = array_values(array_map(
+        fn (UnitType $type): string => $type->value,
+        array_filter(UnitType::cases(), fn (UnitType $type): bool => $type->category() === null),
+    ));
+
+    expect($uncategorised)->toBe(['machinery', 'supplies']);
+});
+
+test('a category and the kinds in it agree with each other', function (UnitCategory $category) {
+    /*
+     * `UnitCategory::types()` reads `UnitType::category()` rather than keeping a second list, and
+     * this is what holds that true in both directions: every kind the category claims names it back.
+     *
+     * Most categories are empty — nine of the thirteen have no kind in the catalogue yet — which is
+     * itself worth asserting rather than skipping, since an empty category is a real state and not a
+     * broken one.
+     */
+    foreach ($category->types() as $type) {
+        expect($type->category())->toBe($category);
+    }
+
+    expect($category->label())->not->toBeEmpty();
+    expect($category->description())->not->toBeEmpty();
+})->with(UnitCategory::cases());
+
+test('the categories that have kinds are the ones the table gave codes for', function () {
+    /*
+     * The four categories the catalogue can currently populate, and what is in each. This is the
+     * inventory of what has actually been settled — everything else in `UnitCategory` is a name and
+     * a definition waiting for its kinds.
+     */
+    expect(UnitCategory::Structural->types())->toBe([UnitType::Structure, UnitType::LightStructure]);
+    expect(UnitCategory::Resource->types())->toBe([UnitType::Fuel, UnitType::Metals, UnitType::Minerals]);
+    expect(UnitCategory::Commodity->types())->toBe([UnitType::Food]);
+    expect(UnitCategory::Propulsion->types())->toBe([UnitType::Engine]);
+    expect(UnitCategory::Infrastructure->types())->toBe([UnitType::Mine, UnitType::Factory]);
+
+    /* Consumer goods (CSGD) and life support (LSU) are named by the table but have no measures yet. */
+    expect(UnitCategory::Static->types())->toBe([]);
 });

@@ -100,10 +100,10 @@ test('a colony is given mines and factories it is already working', function () 
 });
 
 test('a holding weighs and takes up its kind times its quantity', function () {
-    $holding = new UnitHolding(UnitType::LightStructural, Inventory::Components, 20, 10);
+    $holding = new UnitHolding(UnitType::LightStructure, Inventory::Components, 20, 10);
 
-    expect($holding->mass())->toBe(UnitType::LightStructural->mass() * 20);
-    expect($holding->volume())->toBe(UnitType::LightStructural->assembledVolume() * 20);
+    expect($holding->mass())->toBe(UnitType::LightStructure->mass() * 20);
+    expect($holding->volume())->toBe(UnitType::LightStructure->assembledVolume() * 20);
 });
 
 test('every kind of entity has a kit', function (EntityType $type) {
@@ -125,15 +125,15 @@ test('a holding refuses a technology level its kind cannot have', function () {
      *
      * Both directions, because both are wrong in the same way — a row that says something the
      * catalogue does not. A raw commodity at level 3 would print as `FOOD-3`, and a levelled kind at
-     * 0 would print as `LSTR-0`, which is not a thing anybody can build.
+     * 0 would print as `STRL-0`, which is not a thing anybody can build.
      */
     expect(fn () => new UnitHolding(UnitType::Food, Inventory::Cargo, 10, 3))
         ->toThrow(InvalidArgumentException::class, 'Food has no technology level.');
 
-    expect(fn () => new UnitHolding(UnitType::LightStructural, Inventory::Cargo, 10, 0))
+    expect(fn () => new UnitHolding(UnitType::LightStructure, Inventory::Cargo, 10, 0))
         ->toThrow(InvalidArgumentException::class, 'built at a technology level from 1 to 10');
 
-    expect(fn () => new UnitHolding(UnitType::LightStructural, Inventory::Cargo, 10, 11))
+    expect(fn () => new UnitHolding(UnitType::LightStructure, Inventory::Cargo, 10, 11))
         ->toThrow(InvalidArgumentException::class, 'built at a technology level from 1 to 10');
 });
 

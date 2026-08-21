@@ -109,36 +109,56 @@ Being the *target* of an order carries no requirement of control.
 **Unit** — the countable thing an entity is composed of and holds. Entities are built by transferring
 units into them.
 
-**Unit category** — a grouping of unit types. There are many; living, weapons and resources are among
-them.
+**Unit category** — a grouping of unit types. There are thirteen.
 
 **Unit type** — what a particular unit is, within its category.
 
+| Category | Definition |
+| --- | --- |
+| **Ammunition** | Expendable munitions consumed in combat. |
+| **Cadre** | Roles filled by population units on temporary assignment; their food and consumer-goods needs are counted with the underlying population. |
+| **Commodity** | Consumable goods that feed the population and set its standard of living. |
+| **Infrastructure** | Assembled installations that produce output each turn (production, power, research). |
+| **Living** | Population units whose counts change each turn through demographics. |
+| **Propulsion** | Drives that move or maneuver an entity. |
+| **Recon** | Sensor and probe equipment used to gather information. |
+| **Resource** | Raw materials extracted from planetary deposits and consumed in production. |
+| **Static** | Assembled support installation (life support). |
+| **Structural** | Material assembled to enclose volume for ships and colonies. |
+| **Technology** | Units used to advance or transfer Tech Level; may be non-physical. |
+| **Transportation** | Units that move population and materials between entities at a planet. |
+| **Weaponry** | Combat systems that inflict or deflect damage; most require assembly and crew. |
+
 | Term | Definition |
 | --- | --- |
-| **Living** | The category of units that are alive. |
-| **Resources** | The category of units that are fuel, metals, minerals or food. |
-| **Structural** | The category of units an entity's frame is built from. |
 | **Population unit** | A living unit of people. An entity holding none is uncontrolled. |
 
 **Technology level** — how advanced a unit is, from 1 to 10. Abbreviated **TL**.
 
 **Report code** — the short name a unit type is given in reports and orders. A unit that has a
-technology level carries it in the code: **LSTR-10**. A unit that has none is written without one:
+technology level carries it in the code: **STRL-10**. A unit that has none is written without one:
 **FOOD**, never *FOOD-0*.
 
 Most types have a technology level. The raw commodities do not — a tonne of food is a tonne of food.
 
 One entity may hold the same type at several technology levels, and in different inventories: a ship
-built with LSTR-10 can carry LSTR-2 in cargo and hold LSTR-8 operational at the same time. Each is a
+built with STRL-10 can carry STRL-2 in cargo and hold STRL-8 operational at the same time. Each is a
 separate holding.
 
-The Structural category holds two types.
+The types settled so far.
 
-| Type | Report code | Mass | Volume | Disassembled volume |
-| --- | --- | --- | --- | --- |
-| **Structural** | STRU | 0.5 | 1.0 | 0.5 |
-| **Light Structural** | LSTR | 0.05 | 0.1 | 0.05 |
+| Category | Type | Report code | Technology level | Mass | Volume | Disassembled volume |
+| --- | --- | --- | --- | --- | --- | --- |
+| Commodity | **Consumer Goods** | CSGD | none | | | |
+| Commodity | **Food** | FOOD | none | | | |
+| Resource | **Fuel** | FUEL | none | | | |
+| Resource | **Metals** | METL | none | | | |
+| Resource | **Non-Metals** | NMTL | none | | | |
+| Static | **Life Support** | LSU | | | | |
+| Structural | **Structure** | STRC | 1–10 | 0.5 | 1.0 | 0.5 |
+| Structural | **Light Structure** | STRL | 1–10 | 0.05 | 0.1 | 0.05 |
+
+A blank is a thing not yet settled, not a thing that is nothing.
 
 **Population class** — what a population unit can be put to work at. There are four.
 
@@ -286,3 +306,9 @@ a particular one is meant.
 for a person using the application; that is **account**.
 
 **Agent** means a computer-controlled faction. It is not a kind of account.
+
+**Structural** is the category. **Structure** is one of the two types in it, and **Light Structure**
+is the other. Say the category only when the whole of it is meant.
+
+**Infrastructure** is a category of units. It is not an inventory: the inventory holding what an
+entity was built from is **components**.

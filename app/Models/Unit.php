@@ -18,8 +18,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * using are all rows here, told apart by `inventory`.
  *
  * `(entity_id, type, inventory, technology_level)` is unique, so a row is the whole answer to "how
- * much of this does it have, at this level, here". A ship built with `LSTR-10` that carries crated
- * `LSTR-2` and runs `LSTR-8` is three rows. Beyond kind and level, individual units cannot differ
+ * much of this does it have, at this level, here". A ship built with `STRL-10` that carries crated
+ * `STRL-2` and runs `STRL-8` is three rows. Beyond kind and level, individual units cannot differ
  * from one another — no condition, no damage, no name — and nothing in the rules asks that yet.
  *
  * Which inventories a kind may sit in is a rule on `App\Enums\UnitType`, enforced when a holding is
@@ -72,7 +72,7 @@ class Unit extends Model
     }
 
     /**
-     * Get the name a report gives this row: `LSTR-10`, or `FOOD`.
+     * Get the name a report gives this row: `STRL-10`, or `FOOD`.
      *
      * Null when the kind has no report code yet — see `UnitType::abbreviation()`.
      */

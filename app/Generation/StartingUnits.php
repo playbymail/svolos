@@ -50,7 +50,7 @@ final class StartingUnits
     public function colony(): array
     {
         return [
-            new UnitHolding(UnitType::LightStructural, Inventory::Components, 20, 10),
+            new UnitHolding(UnitType::LightStructure, Inventory::Components, 20, 10),
             new UnitHolding(UnitType::Mine, Inventory::Operational, 4, 10),
             new UnitHolding(UnitType::Factory, Inventory::Operational, 2, 10),
             new UnitHolding(UnitType::Fuel, Inventory::Operational, 500),
@@ -74,7 +74,7 @@ final class StartingUnits
     public function ship(): array
     {
         return [
-            new UnitHolding(UnitType::LightStructural, Inventory::Components, 300, 10),
+            new UnitHolding(UnitType::LightStructure, Inventory::Components, 300, 10),
             /* Crated, not installed. See the class docblock: this is why the ship cannot leave. */
             new UnitHolding(UnitType::Engine, Inventory::Cargo, 2, 10),
             new UnitHolding(UnitType::Mine, Inventory::Cargo, 2, 10),

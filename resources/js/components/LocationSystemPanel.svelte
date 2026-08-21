@@ -54,11 +54,11 @@
      * Name one unit the way this panel shows it.
      *
      * A kind held at several technology levels is several entries, and without the level they read as
-     * the same thing repeated — a ship built with LSTR-10 carrying crated LSTR-2 would show two
-     * indistinguishable "Light Structural" lines. `0` means the kind has no level at all, which is
+     * the same thing repeated — a ship built with STRL-10 carrying crated STRL-2 would show two
+     * indistinguishable "Light Structure" lines. `0` means the kind has no level at all, which is
      * most of the raw commodities, and those are named by the label alone.
      *
-     * The label rather than the report code (`LSTR-10`), because this is a screen and not a report:
+     * The label rather than the report code (`STRL-10`), because this is a screen and not a report:
      * most kinds have no report code assigned yet, so the codes would be blank for two entries in
      * three. See `App\Enums\UnitType::abbreviation()`.
      */

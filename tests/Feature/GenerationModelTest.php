@@ -308,13 +308,13 @@ test('a unit weighs and takes up its kind times its quantity', function () {
      * a screen reads the second.
      */
     $unit = Unit::factory()->create([
-        'type' => UnitType::LightStructural,
+        'type' => UnitType::LightStructure,
         'inventory' => Inventory::Components,
         'quantity' => 20,
     ]);
 
-    expect($unit->mass())->toBe(UnitType::LightStructural->mass() * 20);
-    expect($unit->volume())->toBe(UnitType::LightStructural->assembledVolume() * 20);
+    expect($unit->mass())->toBe(UnitType::LightStructure->mass() * 20);
+    expect($unit->volume())->toBe(UnitType::LightStructure->assembledVolume() * 20);
 });
 
 test('a location knows how many hexes away another one is', function () {
@@ -340,8 +340,8 @@ test('a location knows how far it is from the centre', function () {
 
 test('one entity can hold the same kind at several technology levels', function () {
     /*
-     * The case the technology level was added for: a ship built with LSTR-10, carrying crated LSTR-2
-     * and running LSTR-8. Three rows of one kind, told apart by level and inventory.
+     * The case the technology level was added for: a ship built with STRL-10, carrying crated STRL-2
+     * and running STRL-8. Three rows of one kind, told apart by level and inventory.
      *
      * This is what makes `technology_level` part of the unique key rather than an attribute hanging
      * off it — the second and third rows simply could not be written under the old key, and the
@@ -351,21 +351,21 @@ test('one entity can hold the same kind at several technology levels', function 
     $ship = Entity::factory()->create(['type' => EntityType::Ship]);
 
     $built = Unit::factory()->for($ship)->create([
-        'type' => UnitType::LightStructural,
+        'type' => UnitType::LightStructure,
         'inventory' => Inventory::Components,
         'technology_level' => 10,
         'quantity' => 300,
     ]);
 
     $crated = Unit::factory()->for($ship)->create([
-        'type' => UnitType::LightStructural,
+        'type' => UnitType::LightStructure,
         'inventory' => Inventory::Cargo,
         'technology_level' => 2,
         'quantity' => 40,
     ]);
 
     $running = Unit::factory()->for($ship)->create([
-        'type' => UnitType::LightStructural,
+        'type' => UnitType::LightStructure,
         'inventory' => Inventory::Cargo,
         'technology_level' => 8,
         'quantity' => 15,
@@ -377,11 +377,11 @@ test('one entity can hold the same kind at several technology levels', function 
     expect($crated->inventory)->toBe($running->inventory);
     expect($crated->technology_level)->not->toBe($running->technology_level);
 
-    expect($built->reportName())->toBe('LSTR-10');
-    expect($crated->reportName())->toBe('LSTR-2');
-    expect($running->reportName())->toBe('LSTR-8');
+    expect($built->reportName())->toBe('STRL-10');
+    expect($crated->reportName())->toBe('STRL-2');
+    expect($running->reportName())->toBe('STRL-8');
 
     /* Cargo is crated, components are not, so the same kind is measured two ways on one entity. */
-    expect($built->volume())->toBe(UnitType::LightStructural->assembledVolume() * 300);
-    expect($crated->volume())->toBe(UnitType::LightStructural->disassembledVolume() * 40);
+    expect($built->volume())->toBe(UnitType::LightStructure->assembledVolume() * 300);
+    expect($crated->volume())->toBe(UnitType::LightStructure->disassembledVolume() * 40);
 });
