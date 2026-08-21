@@ -117,6 +117,7 @@ them.
 | Term | Definition |
 | --- | --- |
 | **Living** | The category of units that are alive. |
+| **Resources** | The category of units that are fuel, metals, minerals or food. |
 | **Population unit** | A living unit of people. An entity holding none is uncontrolled. |
 
 **Population class** — what a population unit can be put to work at. There are four.
@@ -129,6 +130,22 @@ them.
 | **Non-Assignable** | Population that cannot be assigned by the faction to farms, mines, factories, ships, colonies or any other directed task. |
 
 **Assign** — to put a population unit to a task.
+
+**Cadre** — a team of population units able to perform tasks its units could not perform
+individually. A faction assigns population to a cadre.
+
+| Cadre | Made from |
+| --- | --- |
+| **Construction Crew** | Unskilled worker and skilled worker units. |
+| **Special Agent** | Skilled worker and soldier units. |
+| **Rebel** | Population discontent with the faction controlling it. |
+
+A **Rebel** cadre is neither created nor controlled by a faction, and is given no orders. The game
+engine raises one when it determines that the general population is discontent with the faction
+controlling it, and manages its size thereafter. Size is the whole of its effect: the engine reads
+how large a rebel cadre has grown to determine what it does to the entity holding it.
+
+**Game engine** — what runs a game.
 
 Every unit has a mass and two volumes.
 
