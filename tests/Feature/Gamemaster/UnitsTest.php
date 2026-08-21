@@ -147,7 +147,7 @@ test('the ship is carrying its engines rather than running on them', function ()
     /* "The main engines are gone. Burned out sometime during the voyage." */
     expect($engines?->inventory)->toBe(Inventory::Cargo);
     expect($ship->units->where('inventory', Inventory::Components)->pluck('type')->all())
-        ->toBe([UnitType::Structure]);
+        ->toBe([UnitType::LightStructural]);
 });
 
 test('the summary counts what was placed, and who was left out', function () {

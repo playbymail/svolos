@@ -100,10 +100,10 @@ test('a colony is given mines and factories it is already working', function () 
 });
 
 test('a holding weighs and takes up its kind times its quantity', function () {
-    $holding = new UnitHolding(UnitType::Structure, Inventory::Components, 20);
+    $holding = new UnitHolding(UnitType::LightStructural, Inventory::Components, 20);
 
-    expect($holding->mass())->toBe(UnitType::Structure->mass() * 20);
-    expect($holding->volume())->toBe(UnitType::Structure->volume() * 20);
+    expect($holding->mass())->toBe(UnitType::LightStructural->mass() * 20);
+    expect($holding->volume())->toBe(UnitType::LightStructural->assembledVolume() * 20);
 });
 
 test('every kind of entity has a kit', function (EntityType $type) {

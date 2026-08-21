@@ -52,7 +52,7 @@ class Unit extends Model
     }
 
     /**
-     * Get what this holding weighs in total, in tonnes.
+     * Get what this holding weighs in total, in MU at `UnitType::SCALE`.
      */
     public function mass(): int
     {
@@ -60,11 +60,13 @@ class Unit extends Model
     }
 
     /**
-     * Get how much room this holding takes in total, in cubic metres.
+     * Get how much room this holding takes in total, in VU at `UnitType::SCALE`.
+     *
+     * Measured at the volume its **inventory** asks for: crated in cargo, assembled anywhere else.
      */
     public function volume(): int
     {
-        return $this->type->volume() * $this->quantity;
+        return $this->type->volumeIn($this->inventory) * $this->quantity;
     }
 
     /**

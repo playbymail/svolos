@@ -36,6 +36,68 @@ run and break saved URLs. Only its **label** moved, to "Units" — the same trad
 for the opposite reason. Label is display, value is identity; when you read `Assets` in the enum,
 that is why.
 
+## The catalogue is code, and the deciding question is who edits the numbers
+
+`UnitType` is an enum rather than a `unit_types` table, and the reason is not how many kinds there
+will eventually be. It is that the numbers are tuned in this repository, do not vary per game, and
+no gamemaster sets them — that is a code shape, not a data shape. `PlanetType` and
+`PlanetGenerator::DEPOSIT_DICE` are the same argument, and `DatabaseSeeder` is deliberately a
+manifest that creates nothing.
+
+What the enum buys over a table is the `match` with no `default` arm: adding a kind is a
+compile-time error at every decision site, PHPStan sees the whole catalogue at level 8, and
+`UnitTypeTest` sweeps `cases()` so a half-defined kind fails rather than ships. If it ever does have
+to be data, every caller already reads through `UnitType`'s methods, so the enum becomes the seeder
+and nothing else moves.
+
+## Measures are integers at `UnitType::SCALE`, because capacity is a comparison
+
+A structural unit weighs 0.5 MU. It is stored as `50`.
+
+Capacity rules ask *does this fit*, and in floating point `0.1 + 0.2 > 0.3` is true — a colony
+holding thousands of units meets that. Every mass and volume on the catalogue is therefore an
+integer at `SCALE` (hundredths), `UnitType::format()` is the one place a stored measure becomes the
+decimal a report prints, and a third decimal place is a change to `SCALE` and nothing else.
+
+**Do not add a method returning a float.** The moment two of them are summed and compared the bug is
+back, and it will present as a hold that is one unit short for no reason anybody can see.
+
+## Two volumes, and the **inventory** picks
+
+`assembledVolume()` and `disassembledVolume()` are both on the kind; which one applies is
+`Inventory::usesDisassembledVolume()`, because the glossary puts that decision on the inventory and
+not on the unit. **Cargo is the only inventory measured crated.**
+
+`UnitType::volumeIn()` is what every capacity question should ask for, and it is what `Unit::volume()`
+and `UnitHolding::volume()` call. Reading `assembledVolume()` directly is right only when the
+question really is about the assembled state wherever the unit happens to be.
+
+`UnitTypeTest` asserts the disassembled volume is never *larger* — equal is allowed, since raw ore
+does not pack down, but larger would mean crating something made it bulkier, which the rules have no
+way to mean.
+
+## Only the structural kinds are settled; the other nine are placeholders
+
+`Structural` (STRU) and `LightStructural` (LSTR) carry real numbers and real report codes.
+`2026_08_21_164234_split_structure_units_into_structural_grades` is where the single `structure`
+kind became the two, and every existing row became `light_structural` because
+`StartingUnits` is the only thing that has ever written one — the colony's buildings and the ship's
+hull, both light structural.
+
+The other nine kinds are carried over from before there was a scale or a second volume: their
+measures are the old single numbers times `SCALE`, with a disassembled volume of half the assembled
+one. **They were sized against a structural unit weighing ten times what `Structural` now weighs**,
+so treat them as provisional and expect them to move when their categories are settled.
+
+`abbreviation()` returns `null` for all nine on purpose, rather than inventing a code that would then
+be hard to change. `UnitTypeTest` spells out exactly which kinds are unnamed, so the list is visible
+and shrinks; it also asserts no two codes collide, which is the failure that would make an order
+ambiguous.
+
+**There is no `UnitCategory` yet.** Structure *is* a category and the glossary records it as one with
+its two types, but nine of the eleven kinds have no category settled, so an enum would be mostly
+`null` arms. Add it when a second category is defined, not before.
+
 ## Control is a seat, and the arc stays dead
 
 `entities.game_seat_id` is non-nullable and is the whole of control. [agents.md](agents.md) had

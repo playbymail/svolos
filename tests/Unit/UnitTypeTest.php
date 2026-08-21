@@ -19,8 +19,91 @@ use App\Enums\UnitType;
 test('every kind says what it is called, what it weighs and how much room it takes', function (UnitType $type) {
     expect($type->label())->not->toBeEmpty();
     expect($type->mass())->toBeGreaterThan(0);
-    expect($type->volume())->toBeGreaterThan(0);
+    expect($type->assembledVolume())->toBeGreaterThan(0);
+    expect($type->disassembledVolume())->toBeGreaterThan(0);
 })->with(UnitType::cases());
+
+test('crating a kind never makes it take more room', function (UnitType $type) {
+    /*
+     * The point of a disassembled volume is that it is smaller. Equal is allowed — raw ore does not
+     * pack down — but larger would mean stowing something made it bulkier, which is not a state the
+     * rules have any way to mean.
+     */
+    expect($type->disassembledVolume())->toBeLessThanOrEqual($type->assembledVolume());
+})->with(UnitType::cases());
+
+test('the inventory decides which volume a kind is measured at', function (UnitType $type) {
+    /*
+     * `volumeIn()` is the measure every capacity question asks for, and the decision behind it
+     * belongs to `Inventory` rather than to the kind. Asserted for every pairing so that a fourth
+     * inventory cannot be added without answering the question.
+     */
+    foreach (Inventory::cases() as $inventory) {
+        expect($type->volumeIn($inventory))->toBe(
+            $inventory->usesDisassembledVolume() ? $type->disassembledVolume() : $type->assembledVolume(),
+        );
+    }
+})->with(UnitType::cases());
+
+test('cargo is the only inventory that crates what it holds', function () {
+    expect(Inventory::Cargo->usesDisassembledVolume())->toBeTrue();
+    expect(Inventory::Components->usesDisassembledVolume())->toBeFalse();
+    expect(Inventory::Operational->usesDisassembledVolume())->toBeFalse();
+});
+
+test('the structural kinds carry the measures they were given', function () {
+    /*
+     * The one test here that names kinds, because these two are the only ones whose numbers are
+     * settled rather than placeholders. Written as the decimals they are read as, times the scale,
+     * so that a change to `SCALE` does not quietly change what this asserts.
+     */
+    expect(UnitType::Structural->mass())->toBe((int) (0.5 * UnitType::SCALE));
+    expect(UnitType::Structural->assembledVolume())->toBe((int) (1.0 * UnitType::SCALE));
+    expect(UnitType::Structural->disassembledVolume())->toBe((int) (0.5 * UnitType::SCALE));
+
+    expect(UnitType::LightStructural->mass())->toBe((int) (0.05 * UnitType::SCALE));
+    expect(UnitType::LightStructural->assembledVolume())->toBe((int) (0.1 * UnitType::SCALE));
+    expect(UnitType::LightStructural->disassembledVolume())->toBe((int) (0.05 * UnitType::SCALE));
+});
+
+test('a measure is printed as the decimal it stands for', function () {
+    /*
+     * The one place hundredths become the number a report prints. Two decimal places always, so a
+     * column of measures lines up.
+     */
+    expect(UnitType::format(UnitType::Structural->mass()))->toBe('0.50');
+    expect(UnitType::format(UnitType::LightStructural->mass()))->toBe('0.05');
+    expect(UnitType::format(UnitType::LightStructural->assembledVolume() * 300))->toBe('30.00');
+});
+
+test('a report code is unique, and the kinds still without one are known', function () {
+    /*
+     * Two kinds sharing a code would make an order ambiguous, which is the failure worth a test.
+     *
+     * The second half is the list of kinds that have no code yet. It is deliberately spelled out:
+     * naming one is a decision, and this fails the moment somebody makes it, which is when the rest
+     * of the catalogue's numbers want revisiting anyway.
+     */
+    $codes = array_filter(array_map(fn (UnitType $type): ?string => $type->abbreviation(), UnitType::cases()));
+
+    expect($codes)->toBe(array_unique($codes));
+
+    foreach ($codes as $code) {
+        expect($code)->toBe(mb_strtoupper($code));
+    }
+
+    expect(UnitType::Structural->abbreviation())->toBe('STRU');
+    expect(UnitType::LightStructural->abbreviation())->toBe('LSTR');
+
+    $unnamed = array_values(array_map(
+        fn (UnitType $type): string => $type->value,
+        array_filter(UnitType::cases(), fn (UnitType $type): bool => $type->abbreviation() === null),
+    ));
+
+    expect($unnamed)->toBe([
+        'engine', 'mine', 'factory', 'fuel', 'food', 'metals', 'minerals', 'machinery', 'supplies',
+    ]);
+});
 
 test('every kind may sit somewhere, and never in an inventory twice', function (UnitType $type) {
     $inventories = $type->inventories();
@@ -42,7 +125,7 @@ test('allows agrees with inventories, in both directions', function (UnitType $t
 test('components is the closed inventory, and holds only what an entity is built from', function () {
     /*
      * The one rule in the catalogue that makes the three inventories mean anything. Components is
-     * the frame and the systems of the entity itself, so only the two kinds an entity is *built from*
+     * the frame and the systems of the entity itself, so only the kinds an entity is *built from*
      * may be assigned to it — and the day a third kind belongs there it should be a decision somebody
      * makes against this sentence rather than a `default` arm quietly including it.
      */
@@ -51,7 +134,7 @@ test('components is the closed inventory, and holds only what an entity is built
         fn (UnitType $type): bool => $type->allows(Inventory::Components),
     ));
 
-    expect($structural)->toBe([UnitType::Structure, UnitType::Engine]);
+    expect($structural)->toBe([UnitType::Structural, UnitType::LightStructural, UnitType::Engine]);
 });
 
 test('a mine is never part of what an entity is made of', function () {

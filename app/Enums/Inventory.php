@@ -32,6 +32,24 @@ enum Inventory: string
     case Operational = 'operational';
 
     /**
+     * Determine whether units in this inventory are measured at their disassembled volume.
+     *
+     * **Cargo is the only one.** Components and Operational are both units in use where they stand —
+     * a hull is assembled and a working mine is assembled — while cargo is crated to take less room,
+     * which is the whole point of putting it there. `UnitType::volumeIn()` is what reads this.
+     *
+     * Written case by case rather than as `$this === self::Cargo` so that a fourth inventory has to
+     * answer the question rather than inheriting an answer.
+     */
+    public function usesDisassembledVolume(): bool
+    {
+        return match ($this) {
+            self::Components, self::Operational => false,
+            self::Cargo => true,
+        };
+    }
+
+    /**
      * Get the human readable label for the inventory.
      */
     public function label(): string

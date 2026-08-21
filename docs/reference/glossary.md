@@ -118,7 +118,17 @@ them.
 | --- | --- |
 | **Living** | The category of units that are alive. |
 | **Resources** | The category of units that are fuel, metals, minerals or food. |
+| **Structure** | The category of units an entity's frame is built from. |
 | **Population unit** | A living unit of people. An entity holding none is uncontrolled. |
+
+**Report code** — the short name a unit type is given in reports and orders.
+
+The Structure category holds two types.
+
+| Type | Report code | Mass | Volume | Disassembled volume |
+| --- | --- | --- | --- | --- |
+| **Structural** | STRU | 0.5 | 1.0 | 0.5 |
+| **Light Structural** | LSTR | 0.05 | 0.1 | 0.05 |
 
 **Population class** — what a population unit can be put to work at. There are four.
 

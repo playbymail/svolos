@@ -3,6 +3,7 @@
 use App\Enums\GenerationRunStatus;
 use App\Enums\GenerationStage;
 use App\Enums\GenerationStageState;
+use App\Enums\Inventory;
 use App\Enums\UnitType;
 use App\Models\Entity;
 use App\Models\Game;
@@ -305,10 +306,14 @@ test('a unit weighs and takes up its kind times its quantity', function () {
      * classes: a holding describes what is about to be written and a unit is what was written, and
      * a screen reads the second.
      */
-    $unit = Unit::factory()->create(['type' => UnitType::Structure, 'quantity' => 20]);
+    $unit = Unit::factory()->create([
+        'type' => UnitType::LightStructural,
+        'inventory' => Inventory::Components,
+        'quantity' => 20,
+    ]);
 
-    expect($unit->mass())->toBe(UnitType::Structure->mass() * 20);
-    expect($unit->volume())->toBe(UnitType::Structure->volume() * 20);
+    expect($unit->mass())->toBe(UnitType::LightStructural->mass() * 20);
+    expect($unit->volume())->toBe(UnitType::LightStructural->assembledVolume() * 20);
 });
 
 test('a location knows how many hexes away another one is', function () {
