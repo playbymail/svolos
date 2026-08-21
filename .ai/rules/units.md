@@ -324,6 +324,38 @@ it, and the remedy is regenerating the homes. The hole is already covered elsewh
 `Game::playersWithoutHomeStellium()` reports it and `gameStatusRules()` refuses to let such a game
 become `Active` — so this stage's job is to be honest about it, not to invent a second gate.
 
+## Structure *provides* volume; everything else *consumes* it
+
+The assembled volume of a structural unit in `Components` is an entity's **capacity** — the room
+inside it. It is not space the structure takes up, and it must never be added to what the entity is
+carrying. A report shows it as *maximum capacity (volume)*, a number to fill; older games in this
+family printed it as a negative and left the player to do the arithmetic, and this one does not.
+
+Mass is the opposite: a structural unit's mass **is** part of the entity's total, because a ship's
+engines read total mass to work out what it costs to move.
+
+So an entity has two volume figures and one mass figure, and summing `Unit::volume()` across every
+row gives none of them. **This is not modelled yet** — nothing computes capacity or free space — and
+it is the piece a setup report cannot be written without.
+
+## Volume is rounded up per holding, and the grouping is the row
+
+**A part-used VU is a used VU.** `UnitType::roundUpToWholeVolume()` is applied by `Unit::volume()`
+and `UnitHolding::volume()` after the quantity is multiplied in, so the rounding lands on the
+*total*: fifty crated STRC-5 come to a whole 125 VU and pay nothing, forty-nine come to 122.5 and
+occupy 123.
+
+The grouping is inventory, kind and technology level — which is exactly the `units` unique key, so a
+row *is* a holding and no separate grouping pass is needed.
+
+**Per holding, never per unit.** Per unit it would be up to half a VU on every crate — fifty would
+occupy 150 rather than 125 — which is a tax rather than the small penalty it is meant to be. It
+exists to offset the gain from stowing, which is large: crating a structural unit takes it from `TL²`
+VU to half a tonne's worth.
+
+Adding two rows' volumes therefore adds two already-rounded numbers. That is correct — they are
+separate holdings and each pays its own rounding.
+
 ## The colony's structure is oversized on purpose — do not trim it
 
 Twenty STRL-10 enclose 200,000 VU, about **96%** of the starting colony's volume and far more room
@@ -334,9 +366,14 @@ wave that did has vanished. Empty streets built for a population that is not com
 the game opens on. Shrinking the quantity to match the survivors would quietly delete that, exactly
 the way moving the ship's engines out of cargo would.
 
+**The food is out of proportion for the same kind of reason.** Six thousand of the colony's 8,530 MU
+is food, thirty times the mass of the buildings holding it. That is damage to the ship rather than a
+loadout anybody planned: what survived is not what the fleet's planners loaded. Do not "rebalance"
+it into a tidy ratio.
+
 The *measures* are settled and the *quantities* are content, so the numbers here may still be tuned —
-but the colony having far more enclosed volume than it needs is a fact of the setting, not a bug in
-the kit.
+but the colony having far more enclosed volume than it needs, and far more food than anything else,
+are facts of the setting rather than bugs in the kit.
 
 ## The ship's engines are in the hold on purpose
 

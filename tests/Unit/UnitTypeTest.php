@@ -439,3 +439,40 @@ test('the only fractions left in the catalogue are crated volumes', function (Un
         expect($type->assembledVolume($level, $assembledFor) % UnitType::SCALE)->toBe(0);
     }
 })->with(UnitType::cases());
+
+test('a part-used VU is a used one', function () {
+    /*
+     * The rounding is charged on the *holding* — one inventory, one kind, one technology level, which
+     * is exactly one `units` row — and it is charged after the sum, not before. Fifty STRC-5 crated
+     * come to a whole 125 VU and pay nothing; forty-nine come to 122.5 and pay half a VU.
+     *
+     * Per unit instead of per holding it would be a tax of up to half a VU on every crate, which is
+     * not the small penalty it is meant to be: fifty crates would occupy 150 VU rather than 125.
+     */
+    $perUnit = UnitType::Structure->disassembledVolume(5);
+
+    expect(UnitType::format($perUnit))->toBe('2.5');
+
+    expect(UnitType::roundUpToWholeVolume($perUnit * 50))->toBe(125 * UnitType::SCALE);
+    expect(UnitType::roundUpToWholeVolume($perUnit * 49))->toBe(123 * UnitType::SCALE);
+    expect(UnitType::roundUpToWholeVolume($perUnit))->toBe(3 * UnitType::SCALE);
+
+    /* Never rounds a whole number up to the next one. */
+    expect(UnitType::roundUpToWholeVolume(7 * UnitType::SCALE))->toBe(7 * UnitType::SCALE);
+    expect(UnitType::roundUpToWholeVolume(0))->toBe(0);
+});
+
+test('rounding only ever moves a crated total, because nothing else is fractional', function (UnitType $type) {
+    /*
+     * Assembled volumes are whole by construction, so the rounding is a no-op on them. Applying it
+     * everywhere anyway costs nothing and means a fraction appearing somewhere new cannot slip
+     * through uncharged — this is the test that would notice.
+     */
+    $level = levelFor($type);
+
+    foreach (EntityType::cases() as $assembledFor) {
+        $assembled = $type->assembledVolume($level, $assembledFor) * 7;
+
+        expect(UnitType::roundUpToWholeVolume($assembled))->toBe($assembled);
+    }
+})->with(UnitType::cases());

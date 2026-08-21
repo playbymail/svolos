@@ -76,9 +76,14 @@ final readonly class UnitHolding
      * entity exists — `StartingUnits::for()` builds a kit *for* a kind, and the caller that asked for
      * it is the one that knows. Only the structural kinds read it; see
      * `UnitType::assembledVolume()`.
+     *
+     * **Rounded up to a whole VU**, because a holding is the grouping the rule is charged on. See
+     * `UnitType::roundUpToWholeVolume()`.
      */
     public function volume(EntityType $assembledFor): int
     {
-        return $this->type->volumeIn($this->inventory, $this->technologyLevel, $assembledFor) * $this->quantity;
+        return UnitType::roundUpToWholeVolume(
+            $this->type->volumeIn($this->inventory, $this->technologyLevel, $assembledFor) * $this->quantity
+        );
     }
 }

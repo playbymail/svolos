@@ -105,6 +105,12 @@ test('a holding weighs and takes up its kind times its quantity', function () {
     expect($holding->mass())->toBe(UnitType::LightStructure->mass(10) * 20);
     expect($holding->volume(EntityType::OpenAirColony))
         ->toBe(UnitType::LightStructure->assembledVolume(10, EntityType::OpenAirColony) * 20);
+
+    /* A crated holding pays the rounding: twenty STRC-5 crate to a whole 50 VU, nineteen to 47.5
+     * and therefore occupy 48. */
+    $crated = new UnitHolding(UnitType::Structure, Inventory::Cargo, 19, 5);
+
+    expect($crated->volume(EntityType::Ship))->toBe(48 * UnitType::SCALE);
 });
 
 test('every kind of entity that starts a game has a kit, and the others have none', function () {

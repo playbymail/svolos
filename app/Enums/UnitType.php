@@ -139,6 +139,31 @@ enum UnitType: string
     }
 
     /**
+     * Get the whole VU a measured volume actually occupies.
+     *
+     * **A part-used VU is a used VU.** A holding is grouped by inventory, kind and technology level —
+     * which is exactly one `units` row — its volume is summed, and the total is then rounded *up* to
+     * the next whole VU. Fifty STRC-5 crated come to 125 VU and occupy 125; forty-nine come to 122.5
+     * and occupy 123.
+     *
+     * The rounding is a deliberate small penalty against stowing, which otherwise pays for itself
+     * many times over: crating a structural unit shrinks it from `TL²` VU to half a tonne's worth. It
+     * is charged **per holding rather than per unit** — per unit it would be a tax of up to half a VU
+     * on every single crate, which is not small at all.
+     *
+     * Assembled volumes are always whole, so this only ever moves a crated total. Applying it
+     * everywhere anyway costs nothing and means a fraction appearing somewhere new cannot slip
+     * through uncharged.
+     *
+     * Integer arithmetic rather than `ceil()`: the measures are integers at `SCALE` and there is no
+     * reason to route them through a float to round them.
+     */
+    public static function roundUpToWholeVolume(int $volume): int
+    {
+        return intdiv($volume + self::SCALE - 1, self::SCALE) * self::SCALE;
+    }
+
+    /**
      * Get the category this kind belongs to, or null where none has been settled.
      *
      * Null rather than a guess, for the reason `abbreviation()` is null: a category chosen here to

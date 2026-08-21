@@ -183,6 +183,11 @@ difference between them.
 Every mass and every assembled volume is a whole number of MU or VU. Only a crated volume is ever a
 fraction, and never smaller than a half.
 
+**A part-used VU is a used VU.** Group a holding by inventory, then by type and technology level, sum
+its volume, and round the total **up**. Fifty crated STRC-5 come to 125 VU and occupy 125; forty-nine
+come to 122.5 and occupy 123. The rounding is a small penalty against stowing, which otherwise pays
+for itself many times over — and it is charged on the holding, never on each unit.
+
 **Population class** — what a population unit can be put to work at. There are four.
 
 | Class | Definition |
@@ -236,6 +241,10 @@ Assembled volume is usually twice disassembled volume, though not always.
 
 **Inventory** — a list of the units an entity holds. Every entity has three, and every unit sits in
 exactly one of them.
+
+**Maximum capacity** — the volume an entity's structural components enclose, and the room everything
+else it holds has to fit into. **The structural units do not consume any of it**: they are what
+creates it. A report gives the capacity as a number to fill, not as a debt to subtract.
 
 | Inventory | Definition |
 | --- | --- |

@@ -68,13 +68,20 @@ class Unit extends Model
      * and, for the structural kinds, at the volume their **entity** asks for, since a wall built into
      * a hull is not the same wall built around a field. That is what the `entity` load is for: a row
      * cannot answer this alone. Eager-load `entity` when calling it over a collection.
+     *
+     * **Rounded up to a whole VU.** This row *is* the grouping the rule is charged on — inventory,
+     * kind and technology level are its unique key — so the sum happens here and the rounding with
+     * it. Adding two rows' volumes together is therefore adding two already-rounded numbers, which is
+     * correct: they are separate holdings.
      */
     public function volume(): int
     {
         $this->loadMissing('entity');
 
-        return $this->type->volumeIn($this->inventory, $this->technology_level, $this->entity->type)
-            * $this->quantity;
+        return UnitType::roundUpToWholeVolume(
+            $this->type->volumeIn($this->inventory, $this->technology_level, $this->entity->type)
+                * $this->quantity
+        );
     }
 
     /**
