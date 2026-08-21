@@ -16,9 +16,9 @@ Directions for getting something done, written for a reader who already knows wh
   the registry, confirm which seat it acts as, and react correctly to each way a request can fail.
 - [How to keep an agent token safe](how-to/keep-an-agent-token-safe.md) — handling a credential that
   does not expire and cannot be recovered.
-
-Deploying the application is covered by [`DEPLOY-CADDY.md`](../DEPLOY-CADDY.md) at the repository
-root, which walks a fresh Ubuntu server from nothing to a running installation.
+- [How to deploy to Ubuntu 26.04 with Caddy](how-to/deploy-to-ubuntu-with-caddy.md) — a fresh
+  DigitalOcean server from nothing to a running installation, and deploying a change to it
+  afterwards.
 
 ## Reference
 

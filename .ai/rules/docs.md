@@ -52,9 +52,20 @@ premise expressed as data: `StartingAssets::ship()` puts the engines in cargo be
 to by path from PHP docblocks and from rules files, so moving or renaming one means updating those
 references in the same commit.
 
-## `DEPLOY-CADDY.md` stays at the repository root
+## The deployment guide is a how-to guide, and lives with the others
 
-It is a how-to guide by any reading, and it still does not live in `docs/how-to/`. Its audience
-arrives at the repository root looking for it, it is referenced from outside this repository, and it
-carries its own reference and explanation sections about one specific server. `docs/README.md` links
-to it. Moving it would break more than the tidiness is worth.
+It was `DEPLOY-CADDY.md` at the repository root, and it is now
+`docs/how-to/deploy-to-ubuntu-with-caddy.md`. There is no root exemption for a document that is a
+how-to guide by any reading: a reader looking for how to do something should find every such guide
+in one place, and a filename shouting in capitals at the root is not a category.
+
+Its title says what it shows — *How to deploy to Ubuntu 26.04 with Caddy* — rather than naming the
+subject, so it cannot be mistaken for a discussion of whether to.
+
+It is the one guide here that still carries its own reference and explanation sections: *What the
+server has* is reference, *Why Node is installed on the server* is explanation. That is a known
+untidiness, kept because both are about one specific server rather than about the application, and
+splitting them out would scatter a guide that is read start-to-finish while sitting at a terminal.
+Do not use it as a licence to mix kinds in the other guides.
+
+`scripts/deploy.sh` refers to it by path in its header comment; move them together.

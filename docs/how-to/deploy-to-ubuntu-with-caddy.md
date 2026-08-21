@@ -1,4 +1,4 @@
-# Epimethean Challenge (Svelte) — Deploying to Ubuntu 26.04 with Caddy
+# How to deploy to Ubuntu 26.04 with Caddy
 
 This is the deployment guide for the **Svelte** build of Epimethean Challenge
 (`playbymail/svolos`) on a DigitalOcean Ubuntu 26.04 server at
