@@ -100,7 +100,7 @@ test('a colony is given mines and factories it is already working', function () 
 });
 
 test('a holding weighs and takes up its kind times its quantity', function () {
-    $holding = new UnitHolding(UnitType::LightStructural, Inventory::Components, 20);
+    $holding = new UnitHolding(UnitType::LightStructural, Inventory::Components, 20, 10);
 
     expect($holding->mass())->toBe(UnitType::LightStructural->mass() * 20);
     expect($holding->volume())->toBe(UnitType::LightStructural->assembledVolume() * 20);
@@ -116,4 +116,59 @@ test('the kinds of entity a player begins with are the ones with kits', function
      * one and not the other would place an entity holding nothing, or describe a kit nobody is given.
      */
     expect((new StartingUnits)->entityTypes())->toBe([EntityType::Colony, EntityType::Ship]);
+});
+
+test('a holding refuses a technology level its kind cannot have', function () {
+    /*
+     * The same argument as the inventory rule two tests up: the kits are constants, so a holding
+     * contradicting the catalogue is a mistake in the source and should fail when the file loads.
+     *
+     * Both directions, because both are wrong in the same way — a row that says something the
+     * catalogue does not. A raw commodity at level 3 would print as `FOOD-3`, and a levelled kind at
+     * 0 would print as `LSTR-0`, which is not a thing anybody can build.
+     */
+    expect(fn () => new UnitHolding(UnitType::Food, Inventory::Cargo, 10, 3))
+        ->toThrow(InvalidArgumentException::class, 'Food has no technology level.');
+
+    expect(fn () => new UnitHolding(UnitType::LightStructural, Inventory::Cargo, 10, 0))
+        ->toThrow(InvalidArgumentException::class, 'built at a technology level from 1 to 10');
+
+    expect(fn () => new UnitHolding(UnitType::LightStructural, Inventory::Cargo, 10, 11))
+        ->toThrow(InvalidArgumentException::class, 'built at a technology level from 1 to 10');
+});
+
+test('every holding in every kit agrees with the catalogue about levels', function (EntityType $type) {
+    /*
+     * The kits are the only thing writing units today, so this is the sweep that keeps them honest
+     * without naming a kind: whatever `StartingUnits` holds, its level is one the catalogue allows.
+     * Constructing the holding is most of the assertion — it throws otherwise — so this also proves
+     * the kits are loadable at all.
+     */
+    foreach ((new StartingUnits)->for($type) as $holding) {
+        expect($holding->technologyLevel)->toBe(
+            $holding->type->hasTechnologyLevel() ? $holding->technologyLevel : UnitType::NO_TECHNOLOGY_LEVEL,
+        );
+
+        if ($holding->type->hasTechnologyLevel()) {
+            expect($holding->technologyLevel)
+                ->toBeGreaterThanOrEqual(UnitType::MINIMUM_TECHNOLOGY_LEVEL)
+                ->toBeLessThanOrEqual(UnitType::MAXIMUM_TECHNOLOGY_LEVEL);
+        }
+    }
+})->with(EntityType::cases());
+
+test('the kit that crossed the stars is all of one era', function () {
+    /*
+     * "You crossed the stars aboard technology your people once took for granted." Everything the
+     * expedition left and everything still aboard is the best there was, so every kind in the kits
+     * that has a level is at 10. The day a kit deliberately holds something older, this is the test
+     * that asks whether that was meant.
+     */
+    foreach (EntityType::cases() as $type) {
+        foreach ((new StartingUnits)->for($type) as $holding) {
+            if ($holding->type->hasTechnologyLevel()) {
+                expect($holding->technologyLevel)->toBe(UnitType::MAXIMUM_TECHNOLOGY_LEVEL);
+            }
+        }
+    }
 });

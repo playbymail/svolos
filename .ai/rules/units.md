@@ -76,6 +76,44 @@ question really is about the assembled state wherever the unit happens to be.
 does not pack down, but larger would mean crating something made it bulkier, which the rules have no
 way to mean.
 
+## Technology level is part of a row's identity, and `0` means "has none"
+
+A unit is built at a technology level from 1 to 10, written into its report code: `LSTR-10`. Most
+kinds have one; the raw commodities do not, and those are shown as `FOOD` — **never `FOOD-0`**.
+
+**The level is in the unique key**, `(entity_id, type, inventory, technology_level)`, because one
+entity holds the same kind at several levels at once: a ship built with LSTR-10 carrying crated
+LSTR-2 and running LSTR-8 is three rows. Under the old key the second and third could not be written
+at all, and the failure would have surfaced as a constraint violation inside a build order rather
+than as anything naming the real problem.
+
+**The absent case is `0`, not `NULL`, and the reason is that key.** SQLite — like most engines —
+treats `NULL`s as distinct in a unique index, so a nullable column would take two
+`(entity, food, cargo, NULL)` rows without complaint and break the single guarantee this table makes,
+precisely for the bulk commodities where a duplicate row does the most damage. `0` is also the
+*correct* value for those kinds rather than a placeholder: `UnitType::hasTechnologyLevel()` says
+which are which, `UnitHolding`'s constructor refuses any other pairing in either direction, and
+`reportName()` is what keeps the sentinel from ever reaching a reader.
+
+`hasTechnologyLevel()` is settled only for the two structural kinds. The rest are answered by whether
+they read as manufactured or as raw, and `UnitTypeTest` writes the split out as two lists so that
+correcting one is an edit against a list.
+
+## Renaming a table does not rename its indexes
+
+`Schema::rename('assets', 'units')` and the `assignment` → `inventory` `renameColumn` both left the
+unique index called **`assets_entity_id_type_assignment_unique`**, naming a table and a column that
+no longer existed. SQLite carries an index's name through both operations unchanged.
+
+That is not cosmetic. `dropUnique(['entity_id', 'type', 'inventory'])` derives the *conventional*
+name, looks for `units_entity_id_type_inventory_unique`, and finds nothing — so the migration adding
+`technology_level` failed halfway, after the column had been added and before the key was widened.
+It had to drop the stale index **by name**.
+
+If you rename a table here, rename its indexes in the same migration, or leave a comment saying you
+did not. The index is now `units_entity_id_type_inventory_technology_level_unique`, which is what
+Laravel would derive.
+
 ## Only the structural kinds are settled; the other nine are placeholders
 
 `Structural` (STRU) and `LightStructural` (LSTR) carry real numbers and real report codes.

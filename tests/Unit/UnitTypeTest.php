@@ -161,3 +161,46 @@ test('only a ship can ever move', function () {
 test('every kind of entity says what it is called', function (EntityType $type) {
     expect($type->label())->not->toBeEmpty();
 })->with(EntityType::cases());
+
+test('a kind either has a technology level or has none, and the split is written down', function () {
+    /*
+     * The list is the point. `hasTechnologyLevel()` is settled only for the two structural kinds;
+     * the rest are answered by whether they read as manufactured or as raw, and this fails the
+     * moment somebody decides one of them properly — which is when its measures and its report code
+     * want deciding too.
+     */
+    $levelled = array_values(array_map(
+        fn (UnitType $type): string => $type->value,
+        array_filter(UnitType::cases(), fn (UnitType $type): bool => $type->hasTechnologyLevel()),
+    ));
+
+    expect($levelled)->toBe(['structural', 'light_structural', 'engine', 'mine', 'factory', 'machinery']);
+
+    $raw = array_values(array_map(
+        fn (UnitType $type): string => $type->value,
+        array_filter(UnitType::cases(), fn (UnitType $type): bool => ! $type->hasTechnologyLevel()),
+    ));
+
+    expect($raw)->toBe(['fuel', 'food', 'metals', 'minerals', 'supplies']);
+});
+
+test('a report names a levelled kind with its level, and a raw one without', function () {
+    /*
+     * `FOOD`, never `FOOD-0`. The engine knows which kinds have a level, so the zero never reaches a
+     * reader — which is the whole reason the absent case can be a sentinel rather than a null.
+     */
+    expect(UnitType::LightStructural->reportName(10))->toBe('LSTR-10');
+    expect(UnitType::LightStructural->reportName(2))->toBe('LSTR-2');
+    expect(UnitType::Structural->reportName(7))->toBe('STRU-7');
+
+    expect(UnitType::Food->reportName(UnitType::NO_TECHNOLOGY_LEVEL))->toBeNull();
+});
+
+test('a kind with no report code has no report name either', function () {
+    /*
+     * Nine kinds are still unnamed, and inventing a code so that a report has something to print
+     * would make it hard to change later. Null says "not decided" where a placeholder would not.
+     */
+    expect(UnitType::Engine->abbreviation())->toBeNull();
+    expect(UnitType::Engine->reportName(10))->toBeNull();
+});

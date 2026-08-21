@@ -50,14 +50,14 @@ final class StartingUnits
     public function colony(): array
     {
         return [
-            new UnitHolding(UnitType::LightStructural, Inventory::Components, 20),
-            new UnitHolding(UnitType::Mine, Inventory::Operational, 4),
-            new UnitHolding(UnitType::Factory, Inventory::Operational, 2),
+            new UnitHolding(UnitType::LightStructural, Inventory::Components, 20, 10),
+            new UnitHolding(UnitType::Mine, Inventory::Operational, 4, 10),
+            new UnitHolding(UnitType::Factory, Inventory::Operational, 2, 10),
             new UnitHolding(UnitType::Fuel, Inventory::Operational, 500),
             new UnitHolding(UnitType::Food, Inventory::Operational, 1_000),
             new UnitHolding(UnitType::Metals, Inventory::Operational, 600),
             new UnitHolding(UnitType::Minerals, Inventory::Operational, 400),
-            new UnitHolding(UnitType::Machinery, Inventory::Operational, 150),
+            new UnitHolding(UnitType::Machinery, Inventory::Operational, 150, 10),
             new UnitHolding(UnitType::Supplies, Inventory::Operational, 250),
         ];
     }
@@ -74,14 +74,14 @@ final class StartingUnits
     public function ship(): array
     {
         return [
-            new UnitHolding(UnitType::LightStructural, Inventory::Components, 300),
+            new UnitHolding(UnitType::LightStructural, Inventory::Components, 300, 10),
             /* Crated, not installed. See the class docblock: this is why the ship cannot leave. */
-            new UnitHolding(UnitType::Engine, Inventory::Cargo, 2),
-            new UnitHolding(UnitType::Mine, Inventory::Cargo, 2),
-            new UnitHolding(UnitType::Factory, Inventory::Cargo, 1),
+            new UnitHolding(UnitType::Engine, Inventory::Cargo, 2, 10),
+            new UnitHolding(UnitType::Mine, Inventory::Cargo, 2, 10),
+            new UnitHolding(UnitType::Factory, Inventory::Cargo, 1, 10),
             new UnitHolding(UnitType::Fuel, Inventory::Cargo, 200),
             new UnitHolding(UnitType::Food, Inventory::Cargo, 400),
-            new UnitHolding(UnitType::Machinery, Inventory::Cargo, 100),
+            new UnitHolding(UnitType::Machinery, Inventory::Cargo, 100, 10),
             new UnitHolding(UnitType::Supplies, Inventory::Cargo, 300),
         ];
     }

@@ -118,6 +118,7 @@ class GenerateUnits implements StageGeneration
                     'entity_id' => $entity->id,
                     'type' => $holding->type->value,
                     'inventory' => $holding->inventory->value,
+                    'technology_level' => $holding->technologyLevel,
                     'quantity' => $holding->quantity,
                     'created_at' => $now,
                     'updated_at' => $now,

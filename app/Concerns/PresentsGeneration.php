@@ -271,8 +271,12 @@ trait PresentsGeneration
      * across all of them — and it is the **empire's** name for the reason `empireNameFor()` gives:
      * inside a game an empire is named by its empire name, on every screen that shows one.
      *
-     * Units are ordered by inventory and then by kind, so the same entity reads the same way every
-     * time and the components — the part that says what the thing *is* — comes first.
+     * Units are ordered by inventory, then by kind, then by technology level **highest first**, so
+     * the same entity reads the same way every time, the components — the part that says what the
+     * thing *is* — come first, and a kind held at several levels leads with the best of them. The
+     * level has to be in the ordering at all because it is part of the row's identity: `LSTR-10` and
+     * `LSTR-2` in one hold are two rows of the same kind, and without it their order is whatever the
+     * database felt like.
      *
      * **One closure returning a tuple, never an array of closures.** `sortBy([$a, $b])` looks like two
      * key extractors and is not: given an array of comparisons, Laravel calls a callable one as a full
@@ -303,6 +307,7 @@ trait PresentsGeneration
                     ->sortBy(fn (Unit $unit): array => [
                         (int) array_search($unit->inventory, Inventory::cases(), true),
                         (int) array_search($unit->type, UnitType::cases(), true),
+                        -$unit->technology_level,
                     ])
                     ->map(fn (Unit $unit): array => [
                         'id' => $unit->id,
@@ -310,6 +315,7 @@ trait PresentsGeneration
                         'type_label' => $unit->type->label(),
                         'inventory' => $unit->inventory->value,
                         'assignment_label' => $unit->inventory->label(),
+                        'technology_level' => $unit->technology_level,
                         'quantity' => $unit->quantity,
                     ])
                     ->values()

@@ -118,12 +118,22 @@ them.
 | --- | --- |
 | **Living** | The category of units that are alive. |
 | **Resources** | The category of units that are fuel, metals, minerals or food. |
-| **Structure** | The category of units an entity's frame is built from. |
+| **Structural** | The category of units an entity's frame is built from. |
 | **Population unit** | A living unit of people. An entity holding none is uncontrolled. |
 
-**Report code** — the short name a unit type is given in reports and orders.
+**Technology level** — how advanced a unit is, from 1 to 10. Abbreviated **TL**.
 
-The Structure category holds two types.
+**Report code** — the short name a unit type is given in reports and orders. A unit that has a
+technology level carries it in the code: **LSTR-10**. A unit that has none is written without one:
+**FOOD**, never *FOOD-0*.
+
+Most types have a technology level. The raw commodities do not — a tonne of food is a tonne of food.
+
+One entity may hold the same type at several technology levels, and in different inventories: a ship
+built with LSTR-10 can carry LSTR-2 in cargo and hold LSTR-8 operational at the same time. Each is a
+separate holding.
+
+The Structural category holds two types.
 
 | Type | Report code | Mass | Volume | Disassembled volume |
 | --- | --- | --- | --- | --- |

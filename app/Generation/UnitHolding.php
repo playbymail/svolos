@@ -10,8 +10,10 @@ use InvalidArgumentException;
  * A quantity of one kind of unit, in one inventory.
  *
  * The unit the starting kits are written in, and the shape of one `units` row before it is a row:
- * `(entity, type, inventory)` is unique in that table, so a holding is the whole of what is known
- * about a kind an entity has in one place.
+ * `(entity, type, inventory, technology_level)` is unique in that table, so a holding is the whole
+ * of what is known about a kind an entity has at one level in one place. A ship built with `LSTR-10`
+ * carrying crated `LSTR-2` and running `LSTR-8` is three holdings of the same kind, which is why the
+ * level is part of the key rather than an attribute hanging off it.
  *
  * ## The constructor is where the catalogue's one rule is enforced
  *
@@ -29,6 +31,7 @@ final readonly class UnitHolding
         public UnitType $type,
         public Inventory $inventory,
         public int $quantity,
+        public int $technologyLevel = UnitType::NO_TECHNOLOGY_LEVEL,
     ) {
         if (! $type->allows($inventory)) {
             throw new InvalidArgumentException(
@@ -41,6 +44,31 @@ final readonly class UnitHolding
                 sprintf('A holding of %s needs a quantity of at least one.', $type->label())
             );
         }
+
+        if ($type->hasTechnologyLevel()) {
+            if ($technologyLevel < UnitType::MINIMUM_TECHNOLOGY_LEVEL || $technologyLevel > UnitType::MAXIMUM_TECHNOLOGY_LEVEL) {
+                throw new InvalidArgumentException(sprintf(
+                    '%s is built at a technology level from %d to %d.',
+                    $type->label(),
+                    UnitType::MINIMUM_TECHNOLOGY_LEVEL,
+                    UnitType::MAXIMUM_TECHNOLOGY_LEVEL,
+                ));
+            }
+        } elseif ($technologyLevel !== UnitType::NO_TECHNOLOGY_LEVEL) {
+            throw new InvalidArgumentException(
+                sprintf('%s has no technology level.', $type->label())
+            );
+        }
+    }
+
+    /**
+     * Get the name a report gives this holding: `LSTR-10`, or `FOOD`.
+     *
+     * Null when the kind has no report code yet — see `UnitType::abbreviation()`.
+     */
+    public function reportName(): ?string
+    {
+        return $this->type->reportName($this->technologyLevel);
     }
 
     /**

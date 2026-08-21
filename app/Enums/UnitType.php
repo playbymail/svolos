@@ -57,6 +57,24 @@ enum UnitType: string
      */
     public const int SCALE = 100;
 
+    /**
+     * The value stored for a kind that has no technology level at all.
+     *
+     * Zero rather than `null`, and the reason is the unique key on `units`: SQLite — like most
+     * engines — treats `NULL`s as distinct in a unique index, so a nullable column would let a
+     * second `(entity, food, cargo, NULL)` row exist beside the first and quietly break the one
+     * guarantee that table makes. A sentinel keeps the key honest, and it is the *right* value for
+     * these kinds rather than a placeholder: `hasTechnologyLevel()` says which ones, and
+     * `UnitHolding` refuses any other pairing.
+     */
+    public const int NO_TECHNOLOGY_LEVEL = 0;
+
+    /** The lowest technology level a kind that has one may be built at. */
+    public const int MINIMUM_TECHNOLOGY_LEVEL = 1;
+
+    /** The highest technology level a kind that has one may be built at. */
+    public const int MAXIMUM_TECHNOLOGY_LEVEL = 10;
+
     /* The frame: a ship's hull, a colony's buildings. */
     case Structural = 'structural';
     case LightStructural = 'light_structural';
@@ -79,6 +97,45 @@ enum UnitType: string
     public static function format(int $measure): string
     {
         return number_format($measure / self::SCALE, 2);
+    }
+
+    /**
+     * Determine whether this kind is built at a technology level.
+     *
+     * Most kinds are. The exceptions are the raw commodities — a tonne of food is a tonne of food,
+     * and there is no better one — which is why they are shown as `FOOD` rather than `FOOD-0`.
+     *
+     * **Provisional for every kind but the two structural ones.** Only `Structural` and
+     * `LightStructural` have been settled; the rest are answered here by whether they read as
+     * manufactured or as raw, and `UnitTypeTest` spells the split out so that correcting it is one
+     * edit against a list rather than an archaeology exercise.
+     */
+    public function hasTechnologyLevel(): bool
+    {
+        return match ($this) {
+            self::Structural, self::LightStructural,
+            self::Engine, self::Mine, self::Factory, self::Machinery => true,
+            self::Fuel, self::Food, self::Metals, self::Minerals, self::Supplies => false,
+        };
+    }
+
+    /**
+     * Get the name a report gives this kind at a technology level: `LSTR-10`, or `FOOD`.
+     *
+     * A kind with no technology level is named by its code alone. Null when the kind has no report
+     * code yet — see `abbreviation()`.
+     */
+    public function reportName(int $technologyLevel): ?string
+    {
+        $abbreviation = $this->abbreviation();
+
+        if ($abbreviation === null) {
+            return null;
+        }
+
+        return $this->hasTechnologyLevel()
+            ? sprintf('%s-%d', $abbreviation, $technologyLevel)
+            : $abbreviation;
     }
 
     /**

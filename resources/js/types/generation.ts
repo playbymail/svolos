@@ -164,6 +164,10 @@ export type EntityType = 'colony' | 'ship';
  *
  * There is no `mass` or `volume` here: both are functions of the kind and the quantity, and shipping
  * them would be a second copy of `App\Enums\UnitType` that could disagree with the first.
+ *
+ * `technology_level` is `0` for a kind that has none — a tonne of food is a tonne of food. It is part
+ * of the row's identity rather than an attribute of it, so one entity can hold the same kind at
+ * several levels and each is its own entry.
  */
 export type SystemUnit = {
     id: number;
@@ -171,6 +175,7 @@ export type SystemUnit = {
     type_label: string;
     inventory: Inventory;
     assignment_label: string;
+    technology_level: number;
     quantity: number;
 };
 

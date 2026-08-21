@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\EntityType;
 use App\Enums\GenerationRunStatus;
 use App\Enums\GenerationStage;
 use App\Enums\GenerationStageState;
@@ -335,4 +336,52 @@ test('a location knows how far it is from the centre', function () {
 
     /* 3-4-12 is a Pythagorean quadruple, so this is exact rather than nearly right. */
     expect($location->radius())->toBe(13.0);
+});
+
+test('one entity can hold the same kind at several technology levels', function () {
+    /*
+     * The case the technology level was added for: a ship built with LSTR-10, carrying crated LSTR-2
+     * and running LSTR-8. Three rows of one kind, told apart by level and inventory.
+     *
+     * This is what makes `technology_level` part of the unique key rather than an attribute hanging
+     * off it — the second and third rows simply could not be written under the old key, and the
+     * failure would have been a constraint violation deep inside a build order rather than anything
+     * that named the real problem.
+     */
+    $ship = Entity::factory()->create(['type' => EntityType::Ship]);
+
+    $built = Unit::factory()->for($ship)->create([
+        'type' => UnitType::LightStructural,
+        'inventory' => Inventory::Components,
+        'technology_level' => 10,
+        'quantity' => 300,
+    ]);
+
+    $crated = Unit::factory()->for($ship)->create([
+        'type' => UnitType::LightStructural,
+        'inventory' => Inventory::Cargo,
+        'technology_level' => 2,
+        'quantity' => 40,
+    ]);
+
+    $running = Unit::factory()->for($ship)->create([
+        'type' => UnitType::LightStructural,
+        'inventory' => Inventory::Cargo,
+        'technology_level' => 8,
+        'quantity' => 15,
+    ]);
+
+    expect($ship->units()->count())->toBe(3);
+
+    /* Two of them share a kind *and* an inventory, and differ only by level. */
+    expect($crated->inventory)->toBe($running->inventory);
+    expect($crated->technology_level)->not->toBe($running->technology_level);
+
+    expect($built->reportName())->toBe('LSTR-10');
+    expect($crated->reportName())->toBe('LSTR-2');
+    expect($running->reportName())->toBe('LSTR-8');
+
+    /* Cargo is crated, components are not, so the same kind is measured two ways on one entity. */
+    expect($built->volume())->toBe(UnitType::LightStructural->assembledVolume() * 300);
+    expect($crated->volume())->toBe(UnitType::LightStructural->disassembledVolume() * 40);
 });

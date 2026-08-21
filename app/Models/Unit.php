@@ -17,9 +17,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * directly to a seat or to a planet. What an entity is made of, what it is carrying and what it is
  * using are all rows here, told apart by `inventory`.
  *
- * `(entity_id, type, inventory)` is unique, so a row is the whole answer to "how much of this does it
- * have, here". Individual units cannot differ from one another — no condition, no damage, no name —
- * and nothing in the rules asks that yet.
+ * `(entity_id, type, inventory, technology_level)` is unique, so a row is the whole answer to "how
+ * much of this does it have, at this level, here". A ship built with `LSTR-10` that carries crated
+ * `LSTR-2` and runs `LSTR-8` is three rows. Beyond kind and level, individual units cannot differ
+ * from one another — no condition, no damage, no name — and nothing in the rules asks that yet.
  *
  * Which inventories a kind may sit in is a rule on `App\Enums\UnitType`, enforced when a holding is
  * built rather than by a constraint on this table: `App\Generation\UnitHolding` refuses an illegal
@@ -31,6 +32,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $entity_id
  * @property UnitType $type
  * @property Inventory $inventory
+ * @property int $technology_level
  * @property int $quantity
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -70,6 +72,16 @@ class Unit extends Model
     }
 
     /**
+     * Get the name a report gives this row: `LSTR-10`, or `FOOD`.
+     *
+     * Null when the kind has no report code yet — see `UnitType::abbreviation()`.
+     */
+    public function reportName(): ?string
+    {
+        return $this->type->reportName($this->technology_level);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -79,6 +91,7 @@ class Unit extends Model
         return [
             'type' => UnitType::class,
             'inventory' => Inventory::class,
+            'technology_level' => 'integer',
             'quantity' => 'integer',
         ];
     }

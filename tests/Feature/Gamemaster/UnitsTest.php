@@ -365,7 +365,7 @@ test('the screen carries the opening position, under the world it stands on', fu
         ->toBe(['id', 'type', 'type_label', 'seat_id', 'player_name', 'units']);
 
     expect(array_keys($settled['entities'][0]['units'][0]))
-        ->toBe(['id', 'type', 'type_label', 'inventory', 'assignment_label', 'quantity']);
+        ->toBe(['id', 'type', 'type_label', 'inventory', 'assignment_label', 'technology_level', 'quantity']);
 
     /*
      * **The inventories arrive in contiguous runs, in the enum's declaration order.** Asserted as the
