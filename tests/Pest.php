@@ -411,7 +411,7 @@ function withAcceptedHomeStellia(Game $game, int $seed = 3): User
 /**
  * Take a game as far as accepted planets, and hand back its gamemaster.
  *
- * The setup for every assets test, and the first link in this chain that walks the *whole* world into
+ * The setup for every units test, and the first link in this chain that walks the *whole* world into
  * existence: after this a game has somewhere for everybody to stand.
  */
 function withAcceptedPlanets(Game $game, int $seed = 5): User
@@ -433,7 +433,7 @@ function withAcceptedPlanets(Game $game, int $seed = 5): User
  * The end of the chain: a game past this is fully generated, and `Game::isGenerationComplete()` is
  * true of it.
  */
-function withAcceptedAssets(Game $game, int $seed = 9): User
+function withAcceptedUnits(Game $game, int $seed = 9): User
 {
     $gamemaster = withAcceptedPlanets($game);
 

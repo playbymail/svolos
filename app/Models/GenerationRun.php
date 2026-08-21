@@ -119,11 +119,11 @@ class GenerationRun extends Model
     }
 
     /**
-     * Get the entities this run placed, if it was an assets run that is still standing.
+     * Get the entities this run placed, if it was a units run that is still standing.
      *
      * The one artefact relation whose foreign key is **nullable**, because an entity built during play
      * belongs to no run. That does not change what this relation means — it finds what this run put
-     * there, and `GenerateAssets::discard()` deletes exactly that.
+     * there, and `GenerateUnits::discard()` deletes exactly that.
      *
      * @return HasMany<Entity, $this>
      */

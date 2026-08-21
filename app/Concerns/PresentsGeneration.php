@@ -2,11 +2,10 @@
 
 namespace App\Concerns;
 
-use App\Enums\AssetAssignment;
-use App\Enums\AssetType;
 use App\Enums\GameStatus;
 use App\Enums\GenerationStage;
-use App\Models\Asset;
+use App\Enums\Inventory;
+use App\Enums\UnitType;
 use App\Models\Entity;
 use App\Models\Game;
 use App\Models\GameSeat;
@@ -14,6 +13,7 @@ use App\Models\GenerationRun;
 use App\Models\Location;
 use App\Models\Planet;
 use App\Models\Star;
+use App\Models\Unit;
 
 /**
  * Shapes a game's generation for a screen.
@@ -198,7 +198,7 @@ trait PresentsGeneration
      * the scoping is the same rule `Route::scopeBindings()` enforces on seat routes, done by hand here
      * because the location arrives as a query parameter rather than as a route parameter.
      *
-     * **It is also the review surface for the assets stage**, which is why each planet carries the
+     * **It is also the review surface for the units stage**, which is why each planet carries the
      * entities standing at it and what each of those holds. Nothing else on the screen could show it:
      * the cluster table has a row per system rather than per world, and only a handful of the hundred
      * locations have anybody at them. It rides here rather than in a panel of its own because "what is
@@ -227,7 +227,7 @@ trait PresentsGeneration
              * and still one query per level against a single system — the alternative is a lazy load
              * per planet, which is ten queries for a system nobody has settled.
              */
-            ->with(['stellium.stars.planets.entities.gameSeat', 'stellium.stars.planets.entities.assets'])
+            ->with(['stellium.stars.planets.entities.gameSeat', 'stellium.stars.planets.entities.units'])
             ->first();
 
         if ($location?->stellium === null) {
@@ -271,14 +271,14 @@ trait PresentsGeneration
      * across all of them — and it is the **empire's** name for the reason `empireNameFor()` gives:
      * inside a game an empire is named by its empire name, on every screen that shows one.
      *
-     * Assets are ordered by assignment and then by kind, so the same entity reads the same way every
-     * time and the infrastructure — the part that says what the thing *is* — comes first.
+     * Units are ordered by inventory and then by kind, so the same entity reads the same way every
+     * time and the components — the part that says what the thing *is* — comes first.
      *
      * **One closure returning a tuple, never an array of closures.** `sortBy([$a, $b])` looks like two
      * key extractors and is not: given an array of comparisons, Laravel calls a callable one as a full
      * comparator, `$prop($a, $b)`. A single-parameter closure then silently takes the first argument,
      * ignores the second and returns a position as though it were a comparison result — which sorts
-     * nothing and interleaves the assignments. That is invisible here and fatal one file away, because
+     * nothing and interleaves the inventories. That is invisible here and fatal one file away, because
      * `LocationSystemPanel` groups the list it is handed.
      *
      * @return array<int, array{
@@ -287,7 +287,7 @@ trait PresentsGeneration
      *     type_label: string,
      *     seat_id: int,
      *     player_name: string,
-     *     assets: array<int, array<string, mixed>>,
+     *     units: array<int, array<string, mixed>>,
      * }>
      */
     private function presentEntities(Planet $planet, Game $game): array
@@ -299,18 +299,18 @@ trait PresentsGeneration
                 'type_label' => $entity->type->label(),
                 'seat_id' => $entity->game_seat_id,
                 'player_name' => (string) $this->empireNameFor($entity->gameSeat, $game),
-                'assets' => $entity->assets
-                    ->sortBy(fn (Asset $asset): array => [
-                        (int) array_search($asset->assignment, AssetAssignment::cases(), true),
-                        (int) array_search($asset->type, AssetType::cases(), true),
+                'units' => $entity->units
+                    ->sortBy(fn (Unit $unit): array => [
+                        (int) array_search($unit->inventory, Inventory::cases(), true),
+                        (int) array_search($unit->type, UnitType::cases(), true),
                     ])
-                    ->map(fn (Asset $asset): array => [
-                        'id' => $asset->id,
-                        'type' => $asset->type->value,
-                        'type_label' => $asset->type->label(),
-                        'assignment' => $asset->assignment->value,
-                        'assignment_label' => $asset->assignment->label(),
-                        'quantity' => $asset->quantity,
+                    ->map(fn (Unit $unit): array => [
+                        'id' => $unit->id,
+                        'type' => $unit->type->value,
+                        'type_label' => $unit->type->label(),
+                        'inventory' => $unit->inventory->value,
+                        'assignment_label' => $unit->inventory->label(),
+                        'quantity' => $unit->quantity,
                     ])
                     ->values()
                     ->all(),

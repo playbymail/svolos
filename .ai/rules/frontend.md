@@ -142,7 +142,7 @@ to be careful with: grouping a list by neighbour and keying on the group makes a
 blank screen. Group by looking up the value across the whole accumulator instead, so one group per
 value is a property of the code rather than a hope about the server —
 `resources/js/components/LocationSystemPanel.svelte` does exactly this, and
-[assets.md](assets.md) has the whole story.
+[units.md](units.md) has the whole story.
 
 Note that `svelte/prefer-svelte-reactivity` fails the lint on a bare `new Map()`, even a local one
 thrown away at the end of a function, and pushes you towards `SvelteMap`. For a handful of groups a

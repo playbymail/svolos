@@ -6,7 +6,7 @@ use App\Generation\HomeTemplate;
 use App\Generation\HomeTemplateGenerator;
 use App\Generation\PlanetGenerator;
 use App\Generation\SeededRandomizer;
-use App\Generation\StartingAssets;
+use App\Generation\StartingUnits;
 use App\Generation\StelliumGenerator;
 use App\Models\Game;
 
@@ -65,7 +65,7 @@ function seededGenerators(): array
  * field somebody left out would be a home that differed between players, which is the one thing the
  * whole stage exists to prevent.
  *
- * `StartingAssets` is on this list and not on that one for a third reason again: it **draws nothing
+ * `StartingUnits` is on this list and not on that one for a third reason again: it **draws nothing
  * at all**. Every player is handed the same kit, which is a fairness rule rather than an oversight, so
  * there is no seed in its stream and the containment test below would fail it for the wrong reason.
  * Being here is what catches somebody later reaching for `Arr::random()` to make the kits differ —
@@ -75,7 +75,7 @@ function seededGenerators(): array
  */
 function generationSources(): array
 {
-    return [...seededGenerators(), HomeTemplate::class, StartingAssets::class];
+    return [...seededGenerators(), HomeTemplate::class, StartingUnits::class];
 }
 
 test('nothing in the generation subsystem reaches for an unseeded source of randomness', function (string $class) {

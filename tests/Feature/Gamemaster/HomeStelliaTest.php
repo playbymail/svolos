@@ -283,7 +283,7 @@ test('the planets are drawn over the homes, and the world is finished after them
      * which systems those are. Asserted from here as well as from `GenerationTest` because the order
      * of these two in particular is the whole reason the workflow was rearranged.
      *
-     * The planets no longer finish it either — the assets stage puts everybody on the board after
+     * The planets no longer finish it either — the units stage puts everybody on the board after
      * them — so the chain is walked one link further rather than stopping where it used to. What is
      * being pinned here is still the ordering of *these two*; the last link is here so that the test
      * says what "complete" means today instead of asserting it of a stage that is no longer last.

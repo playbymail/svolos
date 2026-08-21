@@ -147,12 +147,12 @@ export type ClusterLocation = {
 };
 
 /**
- * Where an asset sits: what the entity is made of, what it is carrying, and what it is using.
+ * Where a unit sits: what the entity is made of, what it is carrying, and what it is using.
  *
- * Mirrors `App\Enums\AssetAssignment`, and the order is that enum's declaration order — the panel
- * sorts by it so infrastructure, the part that says what a thing *is*, reads first.
+ * Mirrors `App\Enums\Inventory`, and the order is that enum's declaration order — the panel
+ * sorts by it so components, the part that says what a thing *is*, reads first.
  */
-export type AssetAssignment = 'infrastructure' | 'cargo' | 'operational';
+export type Inventory = 'components' | 'cargo' | 'operational';
 
 /**
  * The two kinds of thing that accept orders, mirroring `App\Enums\EntityType`.
@@ -160,16 +160,16 @@ export type AssetAssignment = 'infrastructure' | 'cargo' | 'operational';
 export type EntityType = 'colony' | 'ship';
 
 /**
- * A quantity of one kind of asset, in one assignment.
+ * A quantity of one kind of unit, in one inventory.
  *
  * There is no `mass` or `volume` here: both are functions of the kind and the quantity, and shipping
- * them would be a second copy of `App\Enums\AssetType` that could disagree with the first.
+ * them would be a second copy of `App\Enums\UnitType` that could disagree with the first.
  */
-export type SystemAsset = {
+export type SystemUnit = {
     id: number;
     type: string;
     type_label: string;
-    assignment: AssetAssignment;
+    inventory: Inventory;
     assignment_label: string;
     quantity: number;
 };
@@ -188,7 +188,7 @@ export type SystemEntity = {
     type_label: string;
     seat_id: number;
     player_name: string;
-    assets: SystemAsset[];
+    units: SystemUnit[];
 };
 
 /**
@@ -199,7 +199,7 @@ export type SystemEntity = {
  * name — there is nothing else to call it by.
  *
  * `entities` is empty for all but a handful of worlds in a game: only a home world has anybody at it
- * until people start building, and only then once the assets stage has run.
+ * until people start building, and only then once the units stage has run.
  */
 export type SystemPlanet = {
     id: number;

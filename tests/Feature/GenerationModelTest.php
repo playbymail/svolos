@@ -1,10 +1,9 @@
 <?php
 
-use App\Enums\AssetType;
 use App\Enums\GenerationRunStatus;
 use App\Enums\GenerationStage;
 use App\Enums\GenerationStageState;
-use App\Models\Asset;
+use App\Enums\UnitType;
 use App\Models\Entity;
 use App\Models\Game;
 use App\Models\GameSeat;
@@ -14,6 +13,7 @@ use App\Models\Location;
 use App\Models\Planet;
 use App\Models\Star;
 use App\Models\Stellium;
+use App\Models\Unit;
 use Illuminate\Support\Str;
 
 /*
@@ -245,11 +245,11 @@ test('deleting a run frees every home standing on it, and keeps the seat', funct
     expect(GameSeat::query()->whereKey($seat->id)->exists())->toBeTrue();
 });
 
-test('deleting a run takes the entities it placed, their assets, and neither the seat nor the world', function () {
+test('deleting a run takes the entities it placed, their units, and neither the seat nor the world', function () {
     /*
-     * The assets stage's branch, and it has one more level than the homes do. Three things are
+     * The units stage's branch, and it has one more level than the homes do. Three things are
      * asserted together because each would satisfy the others' absence: the entities go with the run,
-     * the assets go with the entities — through the **database's** cascade, since a mass delete fires
+     * the units go with the entities — through the **database's** cascade, since a mass delete fires
      * no model events — and neither the seat nor the planet is dragged down with them. A stray
      * `cascadeOnDelete()` read the wrong way round would delete a world because somebody regenerated
      * who was standing on it.
@@ -265,14 +265,14 @@ test('deleting a run takes the entities it placed, their assets, and neither the
         'planet_id' => $planet->id,
     ]);
 
-    Asset::factory()->for($entity)->create();
+    Unit::factory()->for($entity)->create();
 
-    expect(Asset::query()->count())->toBe(1);
+    expect(Unit::query()->count())->toBe(1);
 
     $run->delete();
 
     expect(Entity::query()->count())->toBe(0);
-    expect(Asset::query()->count())->toBe(0);
+    expect(Unit::query()->count())->toBe(0);
     expect(GameSeat::query()->whereKey($seat->id)->exists())->toBeTrue();
     expect(Planet::query()->whereKey($planet->id)->exists())->toBeTrue();
 });
@@ -280,7 +280,7 @@ test('deleting a run takes the entities it placed, their assets, and neither the
 test('an entity built in play belongs to no run', function () {
     /*
      * The one nullable run key in the schema, and the reason it is nullable: these first entities were
-     * placed by the assets stage, but a ship built during play was placed by nobody. The factory
+     * placed by the units stage, but a ship built during play was placed by nobody. The factory
      * leaves it null by default so that a test asking for the other one has to say so.
      */
     $entity = Entity::factory()->create();
@@ -292,23 +292,23 @@ test('an entity built in play belongs to no run', function () {
 test('deleting an entity takes what it was holding', function () {
     $entity = Entity::factory()->create();
 
-    Asset::factory()->for($entity)->create();
+    Unit::factory()->for($entity)->create();
 
     $entity->delete();
 
-    expect(Asset::query()->count())->toBe(0);
+    expect(Unit::query()->count())->toBe(0);
 });
 
-test('an asset weighs and takes up its kind times its quantity', function () {
+test('a unit weighs and takes up its kind times its quantity', function () {
     /*
-     * The same arithmetic `AssetHolding` does, asserted again on the row because the two are separate
-     * classes: a holding describes what is about to be written and an asset is what was written, and
+     * The same arithmetic `UnitHolding` does, asserted again on the row because the two are separate
+     * classes: a holding describes what is about to be written and a unit is what was written, and
      * a screen reads the second.
      */
-    $asset = Asset::factory()->create(['type' => AssetType::Structure, 'quantity' => 20]);
+    $unit = Unit::factory()->create(['type' => UnitType::Structure, 'quantity' => 20]);
 
-    expect($asset->mass())->toBe(AssetType::Structure->mass() * 20);
-    expect($asset->volume())->toBe(AssetType::Structure->volume() * 20);
+    expect($unit->mass())->toBe(UnitType::Structure->mass() * 20);
+    expect($unit->volume())->toBe(UnitType::Structure->volume() * 20);
 });
 
 test('a location knows how many hexes away another one is', function () {

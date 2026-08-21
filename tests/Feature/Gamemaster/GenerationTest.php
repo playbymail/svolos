@@ -816,7 +816,7 @@ test('a location\'s planets are fetched a row at a time, not shipped with the sc
         'props' => ['locationDetail' => ['stars' => [
             ['id', 'label', 'planets' => [
                 /*
-                 * `entities` is present and empty here: the assets stage has not run, and a world
+                 * `entities` is present and empty here: the units stage has not run, and a world
                  * nobody is standing on ships the same shape as one somebody is.
                  */
                 ['id', 'ordinal', 'type', 'type_label', 'habitability', 'fuel', 'metals', 'minerals', 'entities'],

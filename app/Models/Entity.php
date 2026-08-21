@@ -30,11 +30,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * ## Placed by a run, or built in play
  *
  * `generation_run_id` is nullable and that is the only nullable run key in the schema. These first
- * entities were written by the assets stage and go when it is regenerated or the generation is
+ * entities were written by the units stage and go when it is regenerated or the generation is
  * started over; anything built during play belongs to no run and is nobody's artefact. The migration
  * has the argument.
  *
- * No `#[Fillable]`, like every other model a generator writes: `GenerateAssets` inserts these in bulk
+ * No `#[Fillable]`, like every other model a generator writes: `GenerateUnits` inserts these in bulk
  * and nothing about them arrives from request input.
  *
  * @property int $id
@@ -47,7 +47,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read GameSeat $gameSeat
  * @property-read Planet $planet
  * @property-read GenerationRun|null $generationRun
- * @property-read Collection<int, Asset> $assets
+ * @property-read Collection<int, Unit> $units
  */
 class Entity extends Model
 {
@@ -95,11 +95,11 @@ class Entity extends Model
     /**
      * Get everything this entity owns.
      *
-     * @return HasMany<Asset, $this>
+     * @return HasMany<Unit, $this>
      */
-    public function assets(): HasMany
+    public function units(): HasMany
     {
-        return $this->hasMany(Asset::class);
+        return $this->hasMany(Unit::class);
     }
 
     /**

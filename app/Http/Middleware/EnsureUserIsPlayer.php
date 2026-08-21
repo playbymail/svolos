@@ -29,7 +29,7 @@ use Symfony\Component\HttpFoundation\Response;
  * - a **gamemaster is refused too**, which is the one that looks like an oversight and is not. This
  *   gate opens a screen about an empire — its number, its name, where in the cluster it begins, what
  *   it is holding — and a gamemaster has none of those. `GenerateHomeStellia` places players and not
- *   gamemasters, `GenerateAssets` gives players a colony and a ship and gamemasters nothing, and
+ *   gamemasters, `GenerateUnits` gives players a colony and a ship and gamemasters nothing, and
  *   there is no empire number for a seat that is not playing. Letting a gamemaster through would
  *   mean a screen made almost entirely of empty states, in service of a question they already have
  *   `/gamemaster/games/{game}` to answer better. A gamemaster who wants to see a player's view is

@@ -1,8 +1,8 @@
 <script lang="ts">
     import type {
-        AssetAssignment,
+        Inventory,
         LocationDetail,
-        SystemAsset,
+        SystemUnit,
         SystemEntity,
     } from '@/types';
 
@@ -34,16 +34,16 @@
     const planetColumns = 3 + deposits.length;
 
     /**
-     * Split an entity's assets into the assignments it has any of.
+     * Split an entity's units into the inventories it has any of.
      *
-     * An asset joins the group **that already has its assignment**, wherever that group is in the
-     * list, so one assignment can only ever produce one group. That is not tidiness: the group is the
+     * A unit joins the group **that already has its inventory**, wherever that group is in the
+     * list, so one inventory can only ever produce one group. That is not tidiness: the group is the
      * key of a `{#each}`, and Svelte throws `each_key_duplicate` on a repeat — which stops the whole
      * panel rendering and leaves it showing its loading skeleton for ever, with nothing on the screen
      * to say why. Grouping by *neighbour* was the first version of this, and it turned an unordered
      * payload into a fatal error one file away from where the ordering was decided.
      *
-     * A linear `find` rather than a keyed lookup because there are three assignments and never more:
+     * A linear `find` rather than a keyed lookup because there are three inventories and never more:
      * a `Map` here is both heavier to read and, under `svelte/prefer-svelte-reactivity`, an invitation
      * to reach for `SvelteMap` for a local that is thrown away at the end of the call.
      *
@@ -52,28 +52,28 @@
      */
     function holdings(
         entity: SystemEntity,
-    ): { assignment: AssetAssignment; label: string; assets: SystemAsset[] }[] {
+    ): { inventory: Inventory; label: string; units: SystemUnit[] }[] {
         const groups: {
-            assignment: AssetAssignment;
+            inventory: Inventory;
             label: string;
-            assets: SystemAsset[];
+            units: SystemUnit[];
         }[] = [];
 
-        for (const asset of entity.assets) {
+        for (const unit of entity.units) {
             const group = groups.find(
-                (candidate) => candidate.assignment === asset.assignment,
+                (candidate) => candidate.inventory === unit.inventory,
             );
 
             if (group) {
-                group.assets.push(asset);
+                group.units.push(unit);
 
                 continue;
             }
 
             groups.push({
-                assignment: asset.assignment,
-                label: asset.assignment_label,
-                assets: [asset],
+                inventory: unit.inventory,
+                label: unit.assignment_label,
+                units: [unit],
             });
         }
 
@@ -177,7 +177,7 @@
                                                     · {entity.player_name}
                                                 </span>
 
-                                                {#each holdings(entity) as group (group.assignment)}
+                                                {#each holdings(entity) as group (group.inventory)}
                                                     <div
                                                         class="text-muted-foreground"
                                                     >
@@ -185,13 +185,13 @@
                                                             class="font-medium"
                                                             >{group.label}</span
                                                         >
-                                                        {#each group.assets as asset, index (asset.id)}{index >
+                                                        {#each group.units as unit, index (unit.id)}{index >
                                                             0
                                                                 ? ', '
-                                                                : ' '}{asset.type_label}
+                                                                : ' '}{unit.type_label}
                                                             <span
                                                                 class="tabular-nums"
-                                                                >{asset.quantity}</span
+                                                                >{unit.quantity}</span
                                                             >{/each}
                                                     </div>
                                                 {/each}

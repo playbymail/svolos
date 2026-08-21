@@ -2,16 +2,16 @@
 
 namespace Database\Factories;
 
-use App\Enums\AssetAssignment;
-use App\Enums\AssetType;
-use App\Models\Asset;
+use App\Enums\Inventory;
+use App\Enums\UnitType;
 use App\Models\Entity;
+use App\Models\Unit;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<Asset>
+ * @extends Factory<Unit>
  */
-class AssetFactory extends Factory
+class UnitFactory extends Factory
 {
     /**
      * Define the model's default state.
@@ -20,11 +20,11 @@ class AssetFactory extends Factory
      * the reason `PlanetFactory`'s are: a test that cares sets the value, and one that does not should
      * not have its assertions shift underneath it.
      *
-     * `(entity_id, type, assignment)` is unique, so several assets on the **same** entity need distinct
-     * types or assignments — `->sequence(...)` over `type` is the idiom.
+     * `(entity_id, type, inventory)` is unique, so several units on the **same** entity need distinct
+     * types or inventories — `->sequence(...)` over `type` is the idiom.
      *
-     * Metals in cargo rather than something in infrastructure, because most kinds may not be
-     * infrastructure at all: the default has to be a pairing every kind allows.
+     * Metals in cargo rather than something in components, because most kinds may not be
+     * components at all: the default has to be a pairing every kind allows.
      *
      * @return array<string, mixed>
      */
@@ -32,8 +32,8 @@ class AssetFactory extends Factory
     {
         return [
             'entity_id' => Entity::factory(),
-            'type' => AssetType::Metals,
-            'assignment' => AssetAssignment::Cargo,
+            'type' => UnitType::Metals,
+            'inventory' => Inventory::Cargo,
             'quantity' => 10,
         ];
     }

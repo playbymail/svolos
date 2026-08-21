@@ -29,9 +29,9 @@ return new class extends Migration
      *
      * Every other generated table hangs off its run with a non-nullable key, because a location or a
      * planet has no meaning apart from the run that drew it. Entities are the first thing here that is
-     * not purely an artefact: these were placed by the assets stage, but a ship built during play will
+     * not purely an artefact: these were placed by the units stage, but a ship built during play will
      * have been placed by no run at all. The nullable column is what distinguishes the two, and it
-     * costs nothing — `GenerateAssets::discard()` still deletes `$run->entities()`, and starting the
+     * costs nothing — `GenerateUnits::discard()` still deletes `$run->entities()`, and starting the
      * generation over still takes them by cascade.
      *
      * Nothing built in play can be lost that way: a game cannot leave setup until its generation is

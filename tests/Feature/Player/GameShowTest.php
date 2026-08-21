@@ -299,7 +299,7 @@ test('a player seated after the homes were arranged is shown no cluster rather t
 
 test('the probe report carries the home system stars, planets and holdings', function () {
     /*
-     * The real generators, all the way through the assets stage, because what is being asserted is
+     * The real generators, all the way through the units stage, because what is being asserted is
      * that a player is shown a *finished* system: the planets around their star and the colony and
      * ship standing on their home world.
      */
@@ -308,7 +308,7 @@ test('the probe report carries the home system stars, planets and holdings', fun
 
     GameSeat::factory()->for($game)->for($member)->create();
 
-    withAcceptedAssets($game);
+    withAcceptedUnits($game);
     $game->update(['status' => GameStatus::Active]);
 
     $this->actingAs($member)

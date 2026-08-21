@@ -7,7 +7,7 @@ namespace App\Enums;
  *
  * An **entity** is a unit that accepts orders, and the only kind there is — see `.ai/rules/agents.md`,
  * which committed to that before any of this existed. It accepts them from the seat that controls it
- * and from nowhere else, and it owns the assets that make it up and the ones it is carrying.
+ * and from nowhere else, and it owns the units that make it up and the ones it is carrying.
  *
  * There are two kinds and the difference between them is movement:
  *
@@ -18,7 +18,7 @@ namespace App\Enums;
  * ## `isMobile()` says the kind may move, not that this one can
  *
  * Whether a particular ship can move depends on what it is holding — fuel, and enough engines
- * assigned to `AssetAssignment::Infrastructure` — and nothing here answers that, because there is no
+ * assigned to `Inventory::Components` — and nothing here answers that, because there is no
  * order yet to ask it. This is the fact about the *kind*, which is why it lives on the enum rather
  * than on the model: a colony is immobile whatever it holds.
  */

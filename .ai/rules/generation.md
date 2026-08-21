@@ -29,11 +29,11 @@ this order:
 
 Read [games.md](games.md) for the seed itself, [gamemaster.md](gamemaster.md) for the area's gate,
 [home-template.md](home-template.md) for the third stage, [home-stellia.md](home-stellia.md) for the
-fourth and [assets.md](assets.md) for the sixth.
+fourth and [units.md](units.md) for the sixth.
 
 **The last four are in that order because of a dependency, not a preference.** The planets stage used
 to run third and draw every star alike; it moved because a home system is *copied* rather than drawn,
-so it needs both the template to copy and the arrangement that says where to copy it. The assets stage
+so it needs both the template to copy and the arrangement that says where to copy it. The units stage
 is behind it for the same kind of reason one step further on: a home stellium says which *system*
 somebody begins at, and the world they stand on does not exist until the planets are written. Anyone
 tempted to move the planets back should read the top of `GeneratePlanets` first.
@@ -133,7 +133,7 @@ and planets with it — four levels deep now, which is why `GenerationModelTest`
 reaches the end rather than stopping at the stars. The **home stellia** come off the same delete as a
 *branch* rather than a fifth level: they hang straight off the run, and off a `game_seats` row that
 must survive them. The **entities** are a second such branch, one level deeper — they hang off the run
-and off both a seat and a planet, and their assets cascade from them, which is what
+and off both a seat and a planet, and their units cascade from them, which is what
 `GenerationModelTest` pins along with the fact that neither the seat nor the planet goes with them.
 The dialog on the gamemaster's screen enumerates all of it, home stellia and the colonies and ships
 included — that sentence *is* the confirmation, so it cannot be left describing only the cluster, and

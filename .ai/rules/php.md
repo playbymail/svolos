@@ -53,7 +53,7 @@ were a comparison result — and the collection comes back in an arbitrary order
 Sort on several keys like this instead:
 
 ```php
-->sortBy(fn (Asset $asset): array => [$assignmentIndex, $typeIndex])
+->sortBy(fn (Unit $unit): array => [$inventoryIndex, $typeIndex])
 ```
 
 One callable is a value retriever, and PHP compares equal-length arrays element by element, so the
@@ -63,7 +63,7 @@ tuple orders by the first key and then the second.
 to extra arguments passed to a userland closure, so the only symptom is order — which a test
 asserting the *first* element passes straight through. Assert the whole sequence, or the property the
 reader actually depends on. It has already cost once: an interleaved list reached a keyed Svelte
-`{#each}` and blanked a panel (see [assets.md](assets.md)).
+`{#each}` and blanked a panel (see [units.md](units.md)).
 
 ## Testing
 

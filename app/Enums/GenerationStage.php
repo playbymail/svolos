@@ -38,10 +38,10 @@ enum GenerationStage: string
     /*
      * The one stage that puts something on the map rather than drawing the map: every player's colony
      * on their home world, and the ship that carried them there in orbit above it, each with the
-     * assets it begins holding. It is last because it needs somewhere to stand — a home says *which*
+     * units it begins holding. It is last because it needs somewhere to stand — a home says *which*
      * system, and the planets stage is what turns that system into worlds one of which is the home
      * world. It is also the only stage that draws nothing at all: the kit is the same for every
-     * player, which is a fairness rule rather than an oversight. See `App\Generation\StartingAssets`.
+     * player, which is a fairness rule rather than an oversight. See `App\Generation\StartingUnits`.
      */
     case Assets = 'assets';
 
@@ -65,7 +65,14 @@ enum GenerationStage: string
             self::HomeStelliaTemplate => 'Home stellia template',
             self::HomeStellia => 'Home stellia',
             self::Planets => 'Planets',
-            self::Assets => 'Assets',
+            /*
+             * **"Units", and the difference from the case name is the same trade `Stelliums`
+             * makes.** The glossary settled `unit` as the word for the countable thing an entity
+             * holds, so that is what the screen says. The *case* and its backed value stay `Assets`
+             * because they are code: the value is stored in `generation_runs.stage` and is a route
+             * parameter, so renaming it would orphan every stored run and break saved URLs.
+             */
+            self::Assets => 'Units',
         };
     }
 

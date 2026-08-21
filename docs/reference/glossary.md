@@ -241,7 +241,7 @@ Turn 5 opens year 1.
 | **Seed** | The number a generation draws from. Two games with one seed have one world. |
 | **Stage** | One step of a generation. |
 
-The stages, in order: cluster, stellia, home template, home stellia, planets, assets.
+The stages, in order: cluster, stellia, home template, home stellia, planets, units.
 
 ---
 

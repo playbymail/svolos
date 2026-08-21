@@ -23,7 +23,7 @@ class StageGenerationRegistry
         private readonly GenerateHomeTemplate $homeTemplate,
         private readonly GenerateHomeStellia $homeStellia,
         private readonly GeneratePlanets $planets,
-        private readonly GenerateAssets $assets,
+        private readonly GenerateUnits $units,
     ) {}
 
     /**
@@ -37,7 +37,7 @@ class StageGenerationRegistry
             GenerationStage::HomeStelliaTemplate => $this->homeTemplate,
             GenerationStage::HomeStellia => $this->homeStellia,
             GenerationStage::Planets => $this->planets,
-            GenerationStage::Assets => $this->assets,
+            GenerationStage::Assets => $this->units,
         };
     }
 }

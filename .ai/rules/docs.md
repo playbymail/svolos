@@ -47,8 +47,8 @@ The text the application ships lives in `resources/js/pages/Story.svelte` and
 [frontend.md](frontend.md).
 
 They are kept because the game's premise is written down in them and parts of the design are that
-premise expressed as data: `StartingAssets::ship()` puts the engines in cargo because
-`player-introduction.txt` says they burned out. See [assets.md](assets.md). Both files are referred
+premise expressed as data: `StartingUnits::ship()` puts the engines in cargo because
+`player-introduction.txt` says they burned out. See [units.md](units.md). Both files are referred
 to by path from PHP docblocks and from rules files, so moving or renaming one means updating those
 references in the same commit.
 

@@ -1,21 +1,40 @@
 # The opening position: entities and what they hold
 
-Globs: `app/Enums/Asset*.php`, `app/Enums/EntityType.php`, `app/Generation/AssetHolding.php`,
-`app/Generation/StartingAssets.php`, `app/Actions/Generation/GenerateAssets.php`,
-`app/Models/Entity.php`, `app/Models/Asset.php`,
-`database/migrations/*_create_entities_table.php`, `database/migrations/*_create_assets_table.php`,
-`database/factories/{Entity,Asset}Factory.php`,
-`resources/js/components/LocationSystemPanel.svelte`, `tests/Unit/AssetTypeTest.php`,
-`tests/Unit/StartingAssetsTest.php`, `tests/Feature/Gamemaster/AssetsTest.php`
+Globs: `app/Enums/{UnitType,Inventory}.php`, `app/Enums/EntityType.php`, `app/Generation/UnitHolding.php`,
+`app/Generation/StartingUnits.php`, `app/Actions/Generation/GenerateUnits.php`,
+`app/Models/Entity.php`, `app/Models/Unit.php`,
+`database/migrations/*_create_entities_table.php`, `database/migrations/*_{create_assets_table,rename_assets_table_to_units}.php`,
+`database/factories/{Entity,Unit}Factory.php`,
+`resources/js/components/LocationSystemPanel.svelte`, `tests/Unit/UnitTypeTest.php`,
+`tests/Unit/StartingUnitsTest.php`, `tests/Feature/Gamemaster/UnitsTest.php`
 
 Read [generation.md](generation.md) first — this is the **sixth** stage of the machine described
 there, and every rule about *when* a stage may run applies here unchanged. Read
 [agents.md](agents.md) too: it settled what an entity is before one existed.
 
-An **entity** is a colony or a ship: the only kind of thing that accepts orders. An **asset** is a
-quantity of one kind of thing an entity holds, in one of three assignments. The stage puts a colony on
-every player's home world and the ship that brought them into orbit above it, each with the assets it
+An **entity** is a colony or a ship: the only kind of thing that accepts orders. A **unit** is a
+quantity of one kind of thing an entity holds, in one of three inventories. The stage puts a colony on
+every player's home world and the ship that brought them into orbit above it, each with the units it
 begins with.
+
+## The words here are the glossary's, and the stage is the one exception
+
+This was written as `asset`, `assignment` and `infrastructure`, and
+[`docs/reference/glossary.md`](../../docs/reference/glossary.md) settled three different words for
+the same three things: the countable thing an entity is composed of and holds is a **unit**, the
+list it sits in is an **inventory**, and the inventory holding what the entity was *built from* is
+**components**. The glossary is the authority — it says a term belongs there once it is settled,
+whether or not anything implements it yet — so the code moved, not the language.
+
+`2026_08_21_030637_rename_assets_table_to_units` is the rename: table, column, and the stored
+`infrastructure` values, all in one migration, because a database that has done one and not the
+others is broken either way round.
+
+**`GenerationStage::Assets` is deliberately still called that.** Its backed value `'assets'` is
+stored in `generation_runs.stage` and is a route parameter, so renaming it would orphan every stored
+run and break saved URLs. Only its **label** moved, to "Units" — the same trade `Stelliums` makes
+for the opposite reason. Label is display, value is identity; when you read `Assets` in the enum,
+that is why.
 
 ## Control is a seat, and the arc stays dead
 
@@ -27,13 +46,13 @@ nullable key.** Any of them re-creates the arc one level down.
 
 A seat rather than an account because control is per-game while an account is not, and because seats
 are retired rather than deleted — so an entity outlives its player leaving, which
-`AssetsTest` asserts directly.
+`UnitsTest` asserts directly.
 
 ## `generation_run_id` is nullable, and that null is the only one in the schema
 
 Every other generated table hangs off its run with a non-nullable key, because a location has no
 meaning apart from the run that drew it. Entities are the first thing here that is **not purely an
-artefact**: these were placed by the assets stage, and a ship built during play will have been placed
+artefact**: these were placed by the units stage, and a ship built during play will have been placed
 by no run. The nullable column is what distinguishes the two, and it costs nothing — `discard()` is
 still `$run->entities()->delete()` and starting over still takes them by cascade.
 
@@ -42,18 +61,18 @@ complete, and `restart()` refuses any game that has. `EntityFactory` leaves the 
 default** so a test that wants a run-placed entity has to say `->for($run)` — the distinction stays
 visible in the tests that turn on it.
 
-## `assignment` is stored; `zone` is derived; the difference is who decided
+## `inventory` is stored; `zone` is derived; the difference is who decided
 
 A crated mine and a working mine are the same kind in two states, and moving between them is an act
 somebody performs — so it is a column, the way `games.status` is. Contrast `planets.zone`, which has
 no column because it is a function of the ordinal and the star's planet count and could only ever
 disagree with them. Ask which one a new field is before adding it.
 
-Which assignments a kind may sit in is a **rule**, and it lives on `AssetType::assignments()` /
-`allows()`, enforced in `AssetHolding`'s constructor rather than by a check constraint. Only
-`Structure` and `Engine` may be `Infrastructure`, because infrastructure means the frame and systems
-of the entity itself; mines and factories are never infrastructure, because a colony's mine is a thing
-it operates rather than a thing it is. `assignments()` is written case by case with **no `default`
+Which inventories a kind may sit in is a **rule**, and it lives on `UnitType::inventories()` /
+`allows()`, enforced in `UnitHolding`'s constructor rather than by a check constraint. Only
+`Structure` and `Engine` may be `Components`, because components means the frame and systems
+of the entity itself; mines and factories are never components, because a colony's mine is a thing
+it operates rather than a thing it is. `inventories()` is written case by case with **no `default`
 arm** on purpose: a `default` would quietly give a new kind the commonest answer, and deciding where a
 new kind may sit is the whole of adding one.
 
@@ -67,7 +86,7 @@ are handed on turn one is not.
 
 So:
 
-- **`StartingAssets` is on `generationSources()` and not on `seededGenerators()`.** The second list
+- **`StartingUnits` is on `generationSources()` and not on `seededGenerators()`.** The second list
   asserts that a class contains `SeededRandomizer::for`, which this one must never do. Being on the
   first is what catches somebody later reaching for `Arr::random()` to make the kits "more
   interesting" — precisely the change that would look like an improvement.
@@ -81,7 +100,7 @@ So:
 ## A player with nowhere to stand is skipped and counted, not a failure
 
 Somebody seated after the homes were arranged has no home stellium and therefore no home world.
-`GenerateAssets` skips them and reports `players_without_a_home` in the summary, so the review card
+`GenerateUnits` skips them and reports `players_without_a_home` in the summary, so the review card
 says it out loud rather than quietly placing fewer colonies than there are players.
 
 It is **not** a `GenerationFailed`: there is no field on that form a gamemaster could change to fix
@@ -91,14 +110,14 @@ become `Active` — so this stage's job is to be honest about it, not to invent 
 
 ## The ship's engines are in the hold on purpose
 
-`StartingAssets::ship()` puts `Engine` under `Cargo` and nothing under `Infrastructure` but the hull.
+`StartingUnits::ship()` puts `Engine` under `Cargo` and nothing under `Components` but the hull.
 That is `docs/copy/player-introduction.txt` written as data: "The main engines are gone. Burned out
-sometime during the voyage." A ship's ability to move will be read off its **infrastructure**, so
-this ship cannot leave until somebody installs them. Moving those two units to `Infrastructure`
+sometime during the voyage." A ship's ability to move will be read off its **components**, so
+this ship cannot leave until somebody installs them. Moving those two units to `Components`
 would undo the premise the whole game opens on without touching a line of rules code, which is why
-`StartingAssetsTest` and `AssetsTest` both assert it.
+`StartingUnitsTest` and `UnitsTest` both assert it.
 
-The numbers in the manifests are content and are meant to be tuned. The *shape* — which assignment
+The numbers in the manifests are content and are meant to be tuned. The *shape* — which inventory
 each kind sits in — is not.
 
 ## Where it is reviewed, and why it has no screen of its own
@@ -110,7 +129,7 @@ them. Every planet carries an `entities` key, empty on the ones nobody is at: a 
 tell "nobody is here" from "this payload predates the stage" would be reading a distinction the server
 never meant to draw.
 
-Assets are ordered server-side by assignment and then by kind, so infrastructure — the part that says
+Units are ordered server-side by inventory and then by kind, so components — the part that says
 what the thing *is* — reads first. `LocationSystemPanel` groups the list it is handed rather than
 sorting it again: a second ordering could disagree with the first, and the one that would win is the
 one nobody is looking at.
@@ -122,11 +141,11 @@ belongs (see [php.md](php.md)). The interleaved list then reached a `{#each}` ke
 `each_key_duplicate` left the panel showing its loading skeleton for ever with only a console error
 to say why (see [frontend.md](frontend.md)). So:
 
-- the server sorts with **one** closure returning `[assignmentIndex, typeIndex]`;
-- the panel looks an assignment up across every group it has already made, so a duplicate key is
+- the server sorts with **one** closure returning `[inventoryIndex, typeIndex]`;
+- the panel looks an inventory up across every group it has already made, so a duplicate key is
   impossible whatever arrives;
-- `AssetsTest` asserts the **whole sequence** — that each assignment appears in one contiguous run,
-  in the enum's order. A test asserting only that infrastructure comes first passes on an interleaved
+- `UnitsTest` asserts the **whole sequence** — that each inventory appears in one contiguous run,
+  in the enum's order. A test asserting only that components comes first passes on an interleaved
   list, which is exactly how this shipped.
 
 ## What is deliberately absent
@@ -135,8 +154,8 @@ to say why (see [frontend.md](frontend.md)). So:
   call, never in a controller — see [agents.md](agents.md), which is still owed that half.
 - **Whether a *particular* ship can move.** `EntityType::isMobile()` is a fact about the kind. Fuel
   and installed engines are a rule, and no order asks it yet.
-- **Individual units.** `(entity_id, type, assignment)` is unique and the row carries a quantity, so
+- **Individual units.** `(entity_id, type, inventory)` is unique and the row carries a quantity, so
   no unit can differ from its neighbour — no condition, no damage, no name. The day something needs
   that it wants a second table, not the exploding of this one.
 - **`mass` and `volume` in the payload.** Both are functions of the kind and the quantity; shipping
-  them would be a second copy of `AssetType` that could disagree with the first.
+  them would be a second copy of `UnitType` that could disagree with the first.

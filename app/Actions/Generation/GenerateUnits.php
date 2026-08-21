@@ -6,27 +6,27 @@ use App\Enums\EntityType;
 use App\Enums\GameRole;
 use App\Enums\GenerationStage;
 use App\Generation\HomeTemplate;
-use App\Generation\StartingAssets;
-use App\Models\Asset;
+use App\Generation\StartingUnits;
 use App\Models\Entity;
 use App\Models\Game;
 use App\Models\GameSeat;
 use App\Models\GenerationRun;
 use App\Models\Planet;
+use App\Models\Unit;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Writes the position every player opens the game in.
  *
  * Two entities a player: a **colony** on their home world, and the **ship** that carried its people
- * there in orbit above the same planet. Each is given the kit `App\Generation\StartingAssets`
+ * there in orbit above the same planet. Each is given the kit `App\Generation\StartingUnits`
  * describes, which is identical for everybody.
  *
  * ## The one stage with no generator, because it draws nothing
  *
  * Every other stage pairs a pure generator against a seed. There is no seed in this one's stream at
  * all: what a player is handed on turn one is the same for every player, so there is nothing to draw
- * and `StartingAssets` is a description rather than a generator. The run still records the seed it
+ * and `StartingUnits` is a description rather than a generator. The run still records the seed it
  * was given, the way a run records `traveler` on a stage that never reads it — a run stores what it
  * was asked for.
  *
@@ -43,7 +43,7 @@ use Illuminate\Database\Eloquent\Collection;
  * template for the ordinal, the home stellia for the systems, the planets for the worlds themselves —
  * and could not sit anywhere but at the end.
  */
-class GenerateAssets implements StageGeneration
+class GenerateUnits implements StageGeneration
 {
     /**
      * How many rows go into one insert statement.
@@ -55,7 +55,7 @@ class GenerateAssets implements StageGeneration
      */
     public const int INSERT_CHUNK = 500;
 
-    public function __construct(private readonly StartingAssets $startingAssets) {}
+    public function __construct(private readonly StartingUnits $startingUnits) {}
 
     /**
      * Get the stage this generation produces.
@@ -94,7 +94,7 @@ class GenerateAssets implements StageGeneration
                 continue;
             }
 
-            foreach ($this->startingAssets->entityTypes() as $type) {
+            foreach ($this->startingUnits->entityTypes() as $type) {
                 $entityRows[] = [
                     'game_seat_id' => $seat->id,
                     'planet_id' => $homeWorld->id,
@@ -110,14 +110,14 @@ class GenerateAssets implements StageGeneration
             Entity::query()->insert($chunk);
         }
 
-        $assetRows = [];
+        $unitRows = [];
 
         foreach ($this->placedEntities($run) as $entity) {
-            foreach ($this->startingAssets->for($entity->type) as $holding) {
-                $assetRows[] = [
+            foreach ($this->startingUnits->for($entity->type) as $holding) {
+                $unitRows[] = [
                     'entity_id' => $entity->id,
                     'type' => $holding->type->value,
-                    'assignment' => $holding->assignment->value,
+                    'inventory' => $holding->inventory->value,
                     'quantity' => $holding->quantity,
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -125,17 +125,17 @@ class GenerateAssets implements StageGeneration
             }
         }
 
-        foreach (array_chunk($assetRows, self::INSERT_CHUNK) as $chunk) {
-            Asset::query()->insert($chunk);
+        foreach (array_chunk($unitRows, self::INSERT_CHUNK) as $chunk) {
+            Unit::query()->insert($chunk);
         }
 
-        return $this->summary($seats->count(), $entityRows, $assetRows);
+        return $this->summary($seats->count(), $entityRows, $unitRows);
     }
 
     /**
      * Throw away the opening positions a superseded run placed.
      *
-     * The assets go with them through the database's cascade rather than through a model event: this
+     * The units go with them through the database's cascade rather than through a model event: this
      * is a mass delete, and a mass delete fires none.
      */
     public function discard(GenerationRun $run): void
@@ -223,7 +223,7 @@ class GenerateAssets implements StageGeneration
     }
 
     /**
-     * Read back the entities this run just wrote, so their assets can point at them.
+     * Read back the entities this run just wrote, so their units can point at them.
      *
      * The ids are not known until after the insert — the rows are written in bulk, so nothing hands
      * them back — and this is the same read-back `GenerateStelliums` does between its two inserts.
@@ -244,10 +244,10 @@ class GenerateAssets implements StageGeneration
      * the card should say so rather than leaving somebody to subtract.
      *
      * @param  list<array<string, mixed>>  $entityRows
-     * @param  list<array<string, mixed>>  $assetRows
+     * @param  list<array<string, mixed>>  $unitRows
      * @return array<string, mixed>
      */
-    private function summary(int $players, array $entityRows, array $assetRows): array
+    private function summary(int $players, array $entityRows, array $unitRows): array
     {
         $ofType = fn (EntityType $type): int => count(array_filter(
             $entityRows,
@@ -260,7 +260,7 @@ class GenerateAssets implements StageGeneration
             'players' => $players,
             'colonies' => $colonies,
             'ships' => $ofType(EntityType::Ship),
-            'assets' => count($assetRows),
+            'units' => count($unitRows),
             'players_without_a_home' => $players - $colonies,
         ];
     }

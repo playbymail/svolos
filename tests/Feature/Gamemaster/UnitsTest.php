@@ -1,15 +1,15 @@
 <?php
 
-use App\Enums\AssetAssignment;
-use App\Enums\AssetType;
 use App\Enums\EntityType;
 use App\Enums\GameRole;
 use App\Enums\GenerationStage;
-use App\Generation\StartingAssets;
-use App\Models\Asset;
+use App\Enums\Inventory;
+use App\Enums\UnitType;
+use App\Generation\StartingUnits;
 use App\Models\Entity;
 use App\Models\Game;
 use App\Models\GameSeat;
+use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -21,7 +21,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 |
 | The sixth and last generation stage, and the only one that puts something *on* the map rather than
 | drawing more of it: a colony on every player's home world, the ship that carried them in orbit above
-| it, and the assets each begins holding.
+| it, and the units each begins holding.
 |
 | It is a **stage** for the reason the home stellia is one — it adds no routes, and everything about
 | when it may run is already covered by `GenerationTest`. Three things are different from every stage
@@ -42,7 +42,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 /**
  * Generate the opening position.
  */
-function generateAssets(User $gamemaster, Game $game, int $seed): TestResponse
+function generateUnits(User $gamemaster, Game $game, int $seed): TestResponse
 {
     return test()->actingAs($gamemaster)->post(
         route('gamemaster.games.generation.store', ['game' => $game, 'stage' => 'assets']),
@@ -59,10 +59,10 @@ test('the stage is locked until the planets have been drawn', function () {
     expect($game->load('generationRuns')->generationStateFor(GenerationStage::Assets)->value)
         ->toBe('locked');
 
-    generateAssets($gamemaster, $game, 4242)->assertForbidden();
+    generateUnits($gamemaster, $game, 4242)->assertForbidden();
 
     expect(Entity::query()->count())->toBe(0);
-    expect(Asset::query()->count())->toBe(0);
+    expect(Unit::query()->count())->toBe(0);
 });
 
 test('every player is given a colony on their home world and a ship above it', function () {
@@ -71,7 +71,7 @@ test('every player is given a colony on their home world and a ship above it', f
     $seats = seatPlayers($game, 3);
     $gamemaster = withAcceptedPlanets($game);
 
-    generateAssets($gamemaster, $game, 4242)->assertRedirect();
+    generateUnits($gamemaster, $game, 4242)->assertRedirect();
 
     $template = $game->load('generationRuns')
         ->generationRunFor(GenerationStage::HomeStelliaTemplate)?->template;
@@ -103,20 +103,20 @@ test('every player is handed exactly the same kit', function () {
     seatPlayers($game, 3);
     $gamemaster = withAcceptedPlanets($game);
 
-    generateAssets($gamemaster, $game, 4242);
+    generateUnits($gamemaster, $game, 4242);
 
     /*
      * The fairness rule, asserted across players rather than against a hard-coded list: what matters
      * is that nobody begins ahead, and pinning the numbers here would only restate
-     * `StartingAssetsTest` while making every tuning change fail in two places.
+     * `StartingUnitsTest` while making every tuning change fail in two places.
      */
     $kits = Entity::query()
-        ->with('assets')
+        ->with('units')
         ->get()
         ->groupBy(fn (Entity $entity): string => $entity->type->value)
         ->map(fn ($entities) => $entities
-            ->map(fn (Entity $entity): array => $entity->assets
-                ->map(fn (Asset $asset): string => "{$asset->type->value}:{$asset->assignment->value}:{$asset->quantity}")
+            ->map(fn (Entity $entity): array => $entity->units
+                ->map(fn (Unit $unit): string => "{$unit->type->value}:{$unit->inventory->value}:{$unit->quantity}")
                 ->sort()
                 ->values()
                 ->all())
@@ -127,9 +127,9 @@ test('every player is handed exactly the same kit', function () {
     }
 
     /* And it is the kit the manifest describes, so the two cannot drift apart. */
-    $colony = Entity::query()->where('type', EntityType::Colony)->with('assets')->first();
+    $colony = Entity::query()->where('type', EntityType::Colony)->with('units')->first();
 
-    expect($colony?->assets)->toHaveCount(count((new StartingAssets)->colony()));
+    expect($colony?->units)->toHaveCount(count((new StartingUnits)->colony()));
 });
 
 test('the ship is carrying its engines rather than running on them', function () {
@@ -138,16 +138,16 @@ test('the ship is carrying its engines rather than running on them', function ()
     seatPlayers($game, 1);
     $gamemaster = withAcceptedPlanets($game);
 
-    generateAssets($gamemaster, $game, 4242);
+    generateUnits($gamemaster, $game, 4242);
 
-    $ship = Entity::query()->where('type', EntityType::Ship)->with('assets')->sole();
+    $ship = Entity::query()->where('type', EntityType::Ship)->with('units')->sole();
 
-    $engines = $ship->assets->firstWhere('type', AssetType::Engine);
+    $engines = $ship->units->firstWhere('type', UnitType::Engine);
 
     /* "The main engines are gone. Burned out sometime during the voyage." */
-    expect($engines?->assignment)->toBe(AssetAssignment::Cargo);
-    expect($ship->assets->where('assignment', AssetAssignment::Infrastructure)->pluck('type')->all())
-        ->toBe([AssetType::Structure]);
+    expect($engines?->inventory)->toBe(Inventory::Cargo);
+    expect($ship->units->where('inventory', Inventory::Components)->pluck('type')->all())
+        ->toBe([UnitType::Structure]);
 });
 
 test('the summary counts what was placed, and who was left out', function () {
@@ -156,14 +156,14 @@ test('the summary counts what was placed, and who was left out', function () {
     seatPlayers($game, 2);
     $gamemaster = withAcceptedPlanets($game);
 
-    generateAssets($gamemaster, $game, 4242);
+    generateUnits($gamemaster, $game, 4242);
 
     $summary = $game->load('generationRuns')->generationRunFor(GenerationStage::Assets)?->summary;
 
     expect($summary['players'])->toBe(2);
     expect($summary['colonies'])->toBe(2);
     expect($summary['ships'])->toBe(2);
-    expect($summary['assets'])->toBe(2 * (count((new StartingAssets)->colony()) + count((new StartingAssets)->ship())));
+    expect($summary['units'])->toBe(2 * (count((new StartingUnits)->colony()) + count((new StartingUnits)->ship())));
     expect($summary['players_without_a_home'])->toBe(0);
 });
 
@@ -173,7 +173,7 @@ test('generating again with the same seed is allowed, and replaces rather than d
     seatPlayers($game, 2);
     $gamemaster = withAcceptedPlanets($game);
 
-    generateAssets($gamemaster, $game, 4242);
+    generateUnits($gamemaster, $game, 4242);
 
     $first = Entity::query()->pluck('id')->all();
 
@@ -183,16 +183,16 @@ test('generating again with the same seed is allowed, and replaces rather than d
      * gives anything different at all, so demanding a new number would be asking about the wrong
      * thing. What regenerating is actually for is the test below this one.
      */
-    generateAssets($gamemaster, $game, 4242)->assertValid()->assertRedirect();
+    generateUnits($gamemaster, $game, 4242)->assertValid()->assertRedirect();
 
     $second = Entity::query()->pluck('id')->all();
 
     expect($second)->toHaveCount(4);
     expect(array_intersect($first, $second))->toBeEmpty();
 
-    /* The superseded run's assets went with its entities, through the database's cascade. */
-    expect(Asset::query()->count())
-        ->toBe(2 * (count((new StartingAssets)->colony()) + count((new StartingAssets)->ship())));
+    /* The superseded run's units went with its entities, through the database's cascade. */
+    expect(Unit::query()->count())
+        ->toBe(2 * (count((new StartingUnits)->colony()) + count((new StartingUnits)->ship())));
 });
 
 test('a player seated after the homes were arranged is skipped and counted', function () {
@@ -208,7 +208,7 @@ test('a player seated after the homes were arranged is skipped and counted', fun
      */
     $latecomer = GameSeat::factory()->for($game)->for(User::factory())->create();
 
-    generateAssets($gamemaster, $game, 4242)->assertRedirect();
+    generateUnits($gamemaster, $game, 4242)->assertRedirect();
 
     expect(Entity::query()->where('game_seat_id', $latecomer->id)->count())->toBe(0);
 
@@ -232,7 +232,7 @@ test('gamemasters and retired seats are given nothing', function () {
      */
     $seats[1]->forceFill(['is_active' => false])->save();
 
-    generateAssets($gamemaster, $game, 4242);
+    generateUnits($gamemaster, $game, 4242);
 
     expect(Entity::query()->where('game_seat_id', $seats[1]->id)->count())->toBe(0);
     expect(Entity::query()->count())->toBe(2);
@@ -246,7 +246,7 @@ test('a game with nobody seated places nothing and is still acceptable', functio
     $game = Game::factory()->create();
     $gamemaster = withAcceptedPlanets($game);
 
-    generateAssets($gamemaster, $game, 4242)->assertRedirect();
+    generateUnits($gamemaster, $game, 4242)->assertRedirect();
 
     expect(Entity::query()->count())->toBe(0);
 
@@ -271,7 +271,7 @@ test('a game is not complete until everybody has been put on the board', functio
      */
     expect($game->load('generationRuns')->isGenerationComplete())->toBeFalse();
 
-    generateAssets($gamemaster, $game, 4242);
+    generateUnits($gamemaster, $game, 4242);
 
     /* Generated is not accepted: the gamemaster still has to look at it. */
     expect($game->load('generationRuns')->isGenerationComplete())->toBeFalse();
@@ -286,18 +286,18 @@ test('starting the generation over takes every colony and ship with it, and leav
     $game = Game::factory()->create();
 
     $seats = seatPlayers($game, 2);
-    $gamemaster = withAcceptedAssets($game);
+    $gamemaster = withAcceptedUnits($game);
 
     expect(Entity::query()->count())->toBe(4);
-    expect(Asset::query()->count())->toBeGreaterThan(0);
+    expect(Unit::query()->count())->toBeGreaterThan(0);
 
     $this->actingAs($gamemaster)
         ->post(route('gamemaster.games.generation.restart', ['game' => $game]))
         ->assertRedirect();
 
     expect(Entity::query()->count())->toBe(0);
-    /* The assets went through the cascade rather than through a model event: it is a mass delete. */
-    expect(Asset::query()->count())->toBe(0);
+    /* The units went through the cascade rather than through a model event: it is a mass delete. */
+    expect(Unit::query()->count())->toBe(0);
 
     /* The roster is untouched, which is what the confirmation dialog promises. */
     expect($game->seats()->count())->toBe(count($seats) + 1);
@@ -307,7 +307,7 @@ test('an entity survives its player leaving the game', function () {
     $game = Game::factory()->create();
 
     $seats = seatPlayers($game, 1);
-    withAcceptedAssets($game);
+    withAcceptedUnits($game);
 
     /*
      * Seats are retired rather than deleted precisely so that engine history keeps naming them, and an
@@ -325,7 +325,7 @@ test('the screen carries the opening position, under the world it stands on', fu
     $seats = seatPlayers($game, 1);
     $gamemaster = withAcceptedPlanets($game);
 
-    generateAssets($gamemaster, $game, 4242);
+    generateUnits($gamemaster, $game, 4242);
 
     $this->actingAs($gamemaster)
         ->get(route('gamemaster.games.show', ['game' => $game]))
@@ -362,45 +362,45 @@ test('the screen carries the opening position, under the world it stands on', fu
     expect($settled['entities'][0]['seat_id'])->toBe($seats[0]->id);
 
     expect(array_keys($settled['entities'][0]))
-        ->toBe(['id', 'type', 'type_label', 'seat_id', 'player_name', 'assets']);
+        ->toBe(['id', 'type', 'type_label', 'seat_id', 'player_name', 'units']);
 
-    expect(array_keys($settled['entities'][0]['assets'][0]))
-        ->toBe(['id', 'type', 'type_label', 'assignment', 'assignment_label', 'quantity']);
+    expect(array_keys($settled['entities'][0]['units'][0]))
+        ->toBe(['id', 'type', 'type_label', 'inventory', 'assignment_label', 'quantity']);
 
     /*
-     * **The assignments arrive in contiguous runs, in the enum's declaration order.** Asserted as the
-     * whole sequence rather than as "infrastructure is first", because first-is-right passes on a
+     * **The inventories arrive in contiguous runs, in the enum's declaration order.** Asserted as the
+     * whole sequence rather than as "components is first", because first-is-right passes on a
      * list that is otherwise interleaved — which is what a `sortBy()` given an array of closures
      * silently produces, and what `LocationSystemPanel` turns into a duplicate `{#each}` key and a
-     * panel that never stops loading. The property the screen depends on is that an assignment
+     * panel that never stops loading. The property the screen depends on is that an inventory
      * appears in one run, so that is the property pinned here.
      */
     foreach ($settled['entities'] as $entity) {
-        $assignments = array_column($entity['assets'], 'assignment');
-        $runs = array_values(array_unique($assignments));
+        $inventories = array_column($entity['units'], 'inventory');
+        $runs = array_values(array_unique($inventories));
 
         expect($runs)->toBe(array_values(array_intersect(
-            array_map(fn (AssetAssignment $case): string => $case->value, AssetAssignment::cases()),
-            $assignments,
+            array_map(fn (Inventory $case): string => $case->value, Inventory::cases()),
+            $inventories,
         )));
 
         /*
-         * Contiguous: collapsing neighbours has to leave the same list as taking each assignment
+         * Contiguous: collapsing neighbours has to leave the same list as taking each inventory
          * once. They differ the moment one appears in two places.
          */
         $collapsed = [];
 
-        foreach ($assignments as $assignment) {
-            if (end($collapsed) !== $assignment) {
-                $collapsed[] = $assignment;
+        foreach ($inventories as $inventory) {
+            if (end($collapsed) !== $inventory) {
+                $collapsed[] = $inventory;
             }
         }
 
         expect($collapsed)->toBe($runs);
     }
 
-    /* Infrastructure first, because it is the part that says what the thing is. */
-    expect($settled['entities'][0]['assets'][0]['assignment'])->toBe('infrastructure');
+    /* Components first, because it is the part that says what the thing is. */
+    expect($settled['entities'][0]['units'][0]['inventory'])->toBe('components');
 
     /*
      * And every other world in the system carries an empty list rather than no key at all: a screen
@@ -416,7 +416,7 @@ test('the administrator sees the opening position too, read only', function () {
     $game = Game::factory()->create();
 
     seatPlayers($game, 1);
-    withAcceptedAssets($game);
+    withAcceptedUnits($game);
 
     $administrator = User::factory()->admin()->create();
 
@@ -444,7 +444,7 @@ test('an administrator without a seat cannot generate the stage', function () {
 
     $administrator = User::factory()->admin()->create();
 
-    generateAssets($administrator, $game, 4242)->assertForbidden();
+    generateUnits($administrator, $game, 4242)->assertForbidden();
 
     expect(Entity::query()->count())->toBe(0);
 });

@@ -3,7 +3,7 @@
 namespace App\Enums;
 
 /**
- * The kinds of asset that exist in the game.
+ * The kinds of unit that exist in the game.
  *
  * The catalogue, and it is code rather than a table for the reason `PlanetType` and
  * `PlanetGenerator::DEPOSIT_DICE` are: game content here is a thing the rules read, so it belongs
@@ -16,16 +16,16 @@ namespace App\Enums;
  * eventually be written against. Nothing reads them yet; they are here because a catalogue that
  * describes only names would have to be revisited to say anything at all.
  *
- * `assignments()` is a rule and is enforced today: `App\Generation\AssetHolding` refuses to be built
- * with an assignment its type does not allow, so an illegal holding cannot reach the database through
- * the one thing that writes them. It is what makes the difference between the three assignments real
- * rather than decorative — **only `Structure` and `Engine` may be Infrastructure**, because
- * infrastructure is the frame and the systems of the entity itself and a crate of food is neither.
+ * `inventories()` is a rule and is enforced today: `App\Generation\UnitHolding` refuses to be built
+ * with an inventory its type does not allow, so an illegal holding cannot reach the database through
+ * the one thing that writes them. It is what makes the difference between the three inventories real
+ * rather than decorative — **only `Structure` and `Engine` may be Components**, because
+ * components means the frame and the systems of the entity itself, and a crate of food is neither.
  *
  * The bulk commodities are counted in tonnes, so their mass is 1 a unit and they differ only in how
  * much room a tonne of them takes. The machinery is counted in whole installations.
  */
-enum AssetType: string
+enum UnitType: string
 {
     /* The frame: a ship's hull, a colony's buildings. */
     case Structure = 'structure';
@@ -93,36 +93,36 @@ enum AssetType: string
     }
 
     /**
-     * Get the assignments a holding of this kind may legally sit in.
+     * Get the inventories a holding of this kind may legally sit in.
      *
-     * **Infrastructure is the closed one.** It means the frame and systems of the entity itself, so
+     * **Components is the closed one.** It means the frame and systems of the entity itself, so
      * only the two kinds an entity is *built from* may be assigned to it. Everything else is either
      * being carried (`Cargo`) or being used (`Operational`), and every kind can be both of those:
      * anything can be crated, and anything can be put to work or drawn on.
      *
-     * Mines and factories are the mirror image — they are never infrastructure, because a colony's
+     * Mines and factories are the mirror image — they are never components, because a colony's
      * mine is a thing it operates rather than a thing it is made of.
      *
      * Written out case by case rather than with a `default` arm: a `default` would quietly give a new
      * kind the commonest answer, and deciding where a new kind may sit is the whole of adding one.
      *
-     * @return list<AssetAssignment>
+     * @return list<Inventory>
      */
-    public function assignments(): array
+    public function inventories(): array
     {
         return match ($this) {
-            self::Structure, self::Engine => [AssetAssignment::Infrastructure, AssetAssignment::Cargo],
+            self::Structure, self::Engine => [Inventory::Components, Inventory::Cargo],
             self::Mine, self::Factory,
             self::Fuel, self::Food, self::Metals,
-            self::Minerals, self::Machinery, self::Supplies => [AssetAssignment::Cargo, AssetAssignment::Operational],
+            self::Minerals, self::Machinery, self::Supplies => [Inventory::Cargo, Inventory::Operational],
         };
     }
 
     /**
-     * Determine whether a holding of this kind may sit in an assignment.
+     * Determine whether a holding of this kind may sit in an inventory.
      */
-    public function allows(AssetAssignment $assignment): bool
+    public function allows(Inventory $inventory): bool
     {
-        return in_array($assignment, $this->assignments(), true);
+        return in_array($inventory, $this->inventories(), true);
     }
 }

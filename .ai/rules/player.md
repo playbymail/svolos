@@ -27,7 +27,7 @@ refusals follow and three of them read as bugs to somebody looking at the middle
   membership, and a check consulting both role systems is the merge [roles.md](roles.md) forbids;
 - a **gamemaster at the very same game.** This is the one worth writing down. The screen is about an
   empire, and a gamemaster has none: `GenerateHomeStellia` places players and not gamemasters,
-  `GenerateAssets` gives players a colony and a ship and gamemasters nothing, and a seat that is not
+  `GenerateUnits` gives players a colony and a ship and gamemasters nothing, and a seat that is not
   playing has no empire to number. Letting them through would mean a screen made almost entirely of
   empty states, answering a question `/gamemaster/games/{game}` already answers better. A gamemaster
   who wants a player's view is really asking for a *particular* player's view — a different feature.
