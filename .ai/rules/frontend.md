@@ -74,10 +74,10 @@ sign-in is unreachable to the audience the page is written for, and
 `tests/Feature/StoryTest.php` asserts the absence of that middleware rather than only a 200.
 
 The prose is a `Passage[][]` inside the component and is the **only** copy of the text the
-application ships: `docs/player-copy.txt` is the author's draft, not a runtime source, and nothing
-reads it. Edit the component when the copy changes. The three opening lines are quoted again in
-`pages/Welcome.svelte`'s teaser block, which is the way into the page for someone who lands on `/`;
-`PublicLayout`'s header and footer carry the other two links.
+application ships: `docs/copy/player-introduction.txt` is the author's draft, not a runtime source,
+and nothing reads it. Edit the component when the copy changes. The three opening lines are quoted
+again in `pages/Welcome.svelte`'s teaser block, which is the way into the page for someone who lands
+on `/`; `PublicLayout`'s header and footer carry the other two links.
 
 `beat` is a line the copy sets alone and the page sets to carry that weight, `stanza` is a run of
 them read as one cadence, and `prose` is a muted paragraph. That contrast is the page's whole design

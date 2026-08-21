@@ -92,10 +92,10 @@ become `Active` — so this stage's job is to be honest about it, not to invent 
 ## The ship's engines are in the hold on purpose
 
 `StartingAssets::ship()` puts `Engine` under `Cargo` and nothing under `Infrastructure` but the hull.
-That is `docs/player-copy.txt` written as data: "The main engines are gone. Burned out sometime during
-the voyage." A ship's ability to move will be read off its **infrastructure**, so this ship cannot
-leave until somebody installs them. Moving those two units to `Infrastructure` would undo the premise
-the whole game opens on without touching a line of rules code, which is why
+That is `docs/copy/player-introduction.txt` written as data: "The main engines are gone. Burned out
+sometime during the voyage." A ship's ability to move will be read off its **infrastructure**, so
+this ship cannot leave until somebody installs them. Moving those two units to `Infrastructure`
+would undo the premise the whole game opens on without touching a line of rules code, which is why
 `StartingAssetsTest` and `AssetsTest` both assert it.
 
 The numbers in the manifests are content and are meant to be tuned. The *shape* — which assignment

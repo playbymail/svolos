@@ -8,7 +8,8 @@ Globs: `app/Actions/Agents/**`, `app/Models/AgentCredential.php`,
 `database/migrations/*_create_agent_credentials_table.php`,
 `database/factories/AgentCredentialFactory.php`, `resources/js/pages/admin/agents/**`,
 `resources/js/components/AgentTokenPanel.svelte`, `resources/js/types/agents.ts`,
-`tests/Feature/Agents/**`, `tests/Feature/Admin/Agent*Test.php`, `docs/agent-api.md`
+`tests/Feature/Agents/**`, `tests/Feature/Admin/Agent*Test.php`, `docs/reference/agent-api.md`,
+`docs/how-to/connect-an-agent-to-a-game.md`, `docs/how-to/keep-an-agent-token-safe.md`
 
 An **agent** is an account played by software rather than by a person. It holds seats, takes a game
 role, and will have its orders attributed to a seat exactly as anybody else does. The only thing that
@@ -188,16 +189,20 @@ to Redis.
 The `v1` prefix is not decoration: agents are deployed where this application cannot reach them, so a
 payload change cannot ship to both at the same moment.
 
-## `docs/agent-api.md` is the published contract — change it with the API
+## `docs/reference/agent-api.md` is the published contract — change it with the API
 
 That file is what somebody writes an agent against, and its readers are outside this repository and
 cannot be redeployed with it. Treat it as part of the API surface: a change to a route, a payload
 field, a status code, a message string or a rate limit is not finished until the document says so.
 
-It is **reference** in the Diataxis sense — it describes and does not explain. Reasoning belongs
-here, in this file, and the document links to it rather than repeating it. Its code examples are
-extracted verbatim from the file and run against production before it ships; keep that true, and note
-that the shell one avoids a variable named `status` because that identifier is read-only in zsh.
+It is **reference** in the Diataxis sense — it describes and does not explain, and it does not
+instruct either. Reasoning belongs here, in this file, and the document links to it rather than
+repeating it. Everything addressed to somebody *doing* the work lives in two how-to guides beside
+it, `docs/how-to/connect-an-agent-to-a-game.md` and `docs/how-to/keep-an-agent-token-safe.md`, and
+they are part of the same contract: a change that alters how a client must behave belongs in one of
+them. The code examples are all in the connect guide, extracted verbatim from that file and run
+against production before it ships; keep that true, and note that the shell one avoids a variable
+named `status` because that identifier is read-only in zsh.
 
 It documents `~/.config/svolos/agents.json` as where an agent finds its token, because agents are run
 from a workstation that has it — not from the production server. An agent is given a **base URL, a
@@ -208,11 +213,12 @@ generating throwaway code, traversal loops are places to get it wrong. The top-l
 scheme and is used as given. `seats` keeps that name rather than becoming `games` because the value
 is a credential for a **seat**, which is the unit this whole system is built on and what an order is
 attributed to; the key alongside it is the game's short name. Each entry also carries its `seat` id,
-which lets an agent name itself in a log without a request — a convenience, never a credential. The document tells it to read only its own
-entry and to stop rather than fall back to another agent's, since acting as somebody else is worse
-than not acting.
+which lets an agent name itself in a log without a request — a convenience, never a credential. The
+reference describes the file; the connect guide is where an agent is told to read only its own entry
+and to stop rather than fall back to another agent's, since acting as somebody else is worse than
+not acting.
 
-**Never put a real token in the document.** The repository is public and tokens do not expire, so one
+**Never put a real token in any of the three.** The repository is public and tokens do not expire, so one
 that reaches a commit is live until somebody notices, and the history keeps it afterwards. The first
 draft illustrated the `Authorization` header with a token copied out of a real registry while the
 examples were being written; it was caught before the file was committed.

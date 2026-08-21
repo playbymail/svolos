@@ -10,10 +10,10 @@ use App\Enums\EntityType;
  * What every player begins with.
  *
  * Two entities and the assets they hold: a **colony** standing on the home world, and the **ship**
- * that brought its people there, in orbit above it. `docs/player-copy.txt` is where both come from —
- * a vessel whose main engines burned out during a voyage that took decades instead of months, and
- * below it a world an advance expedition prepared and then vanished from. "The mines remain. The
- * factories remain. The stores remain. The people do not."
+ * that brought its people there, in orbit above it. `docs/copy/player-introduction.txt` is where
+ * both come from — a vessel whose main engines burned out during a voyage that took decades
+ * instead of months, and below it a world an advance expedition prepared and then vanished from.
+ * "The mines remain. The factories remain. The stores remain. The people do not."
  *
  * ## It draws nothing, and that is the fairness rule
  *

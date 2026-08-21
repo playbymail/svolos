@@ -12,7 +12,7 @@ use Symfony\Component\Finder\SplFileInfo;
 | administrator issuing a replacement. One that reaches a commit is live until somebody
 | notices, and the git history keeps it after the file is fixed.
 |
-| This is not hypothetical either. The first draft of `docs/agent-api.md` illustrated the
+| This is not hypothetical either. The first draft of `docs/reference/agent-api.md` illustrated the
 | `Authorization` header with a token copied from a real config file while writing the
 | examples. It was caught before the file was ever committed; this test is what makes the
 | catch repeatable rather than lucky.
