@@ -153,7 +153,7 @@ The types settled so far.
 | Commodity | **Food** | FOOD | none | | | |
 | Resource | **Fuel** | FUEL | none | | | |
 | Resource | **Metals** | METL | none | | | |
-| Resource | **Non-Metals** | NMTL | none | | | |
+| Resource | **Minerals** | MNRL | none | | | |
 | Static | **Life Support** | LSU | | | | |
 | Structural | **Structure** | STRC | 1–10 | 0.5 | 1.0 | 0.5 |
 | Structural | **Light Structure** | STRL | 1–10 | 0.05 | 0.1 | 0.05 |
@@ -312,3 +312,6 @@ is the other. Say the category only when the whole of it is meant.
 
 **Infrastructure** is a category of units. It is not an inventory: the inventory holding what an
 entity was built from is **components**.
+
+**Minerals** is the non-metallic Resource type, report code **MNRL**, and it is the same word the
+planetary deposits use. Never *non-metals*.

@@ -98,7 +98,7 @@ test('a report code is unique, and the kinds still without one are known', funct
     expect(UnitType::Food->abbreviation())->toBe('FOOD');
     expect(UnitType::Fuel->abbreviation())->toBe('FUEL');
     expect(UnitType::Metals->abbreviation())->toBe('METL');
-    expect(UnitType::Minerals->abbreviation())->toBe('NMTL');
+    expect(UnitType::Minerals->abbreviation())->toBe('MNRL');
 
     $unnamed = array_values(array_map(
         fn (UnitType $type): string => $type->value,

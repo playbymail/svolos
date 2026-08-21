@@ -102,7 +102,7 @@ The kinds carried the category's name until the table arrived, which is what
 Neither appears in the category table, neither has a report code, and neither reads unambiguously as
 `Infrastructure`, `Commodity` or `Resource` from its name. So `category()` and `abbreviation()` both
 answer `null` for them, and `hasTechnologyLevel()` is a **guess** — the only guess left, since
-`CSGD`, `FOOD`, `FUEL`, `METL` and `NMTL` were given as having no level and the structural kinds
+`CSGD`, `FOOD`, `FUEL`, `METL` and `MNRL` were given as having no level and the structural kinds
 have one.
 
 `UnitTypeTest` writes each of those lists out, so deciding one of these two is an edit against a

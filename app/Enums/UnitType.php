@@ -46,11 +46,12 @@ namespace App\Enums;
  *
  * ## `abbreviation()` is nullable, and that is the pressure to finish
  *
- * A report and an order name a kind by a short code — `STRC`, `STRL`, `FOOD`. Only the structural kinds have
- * been given one, so the rest answer `null` rather than being handed an invented code that would
- * then be hard to change. `FOOD`, `FUEL`, `METL` and `NMTL` came with the category table. `UnitTypeTest` lists exactly which kinds are still unnamed, so the gap is
- * visible and shrinking rather than forgotten. It also asserts no two kinds share a code, which is
- * the thing that makes an order ambiguous.
+ * A report and an order name a kind by a short code — `STRC`, `STRL`, `FOOD`. Six kinds have one:
+ * the two structural, and `FOOD`, `FUEL`, `METL` and `MNRL` from the category table. The rest answer
+ * `null` rather than being handed an invented code that would then be hard to change, and
+ * `UnitTypeTest` lists exactly which are still unnamed, so the gap is visible and shrinking rather
+ * than forgotten. It also asserts no two kinds share a code, which is the thing that would make an
+ * order ambiguous.
  */
 enum UnitType: string
 {
@@ -131,7 +132,7 @@ enum UnitType: string
      * Most kinds are. The exceptions are the raw commodities — a tonne of food is a tonne of food,
      * and there is no better one — which is why they are shown as `FOOD` rather than `FOOD-0`.
      *
-     * `CSGD`, `FOOD`, `FUEL`, `METL` and `NMTL` were given as having none, which settles `Food`,
+     * `CSGD`, `FOOD`, `FUEL`, `METL` and `MNRL` were given as having none, which settles `Food`,
      * `Fuel`, `Metals` and `Minerals` here. The structural kinds have one. **`Machinery` and
      * `Supplies` are still a guess** — neither has a code or a category yet — and `UnitTypeTest`
      * spells the split out so that correcting it is one edit against a list.
@@ -197,7 +198,7 @@ enum UnitType: string
             self::Food => 'FOOD',
             self::Fuel => 'FUEL',
             self::Metals => 'METL',
-            self::Minerals => 'NMTL',
+            self::Minerals => 'MNRL',
             self::Engine, self::Mine, self::Factory,
             self::Machinery, self::Supplies => null,
         };
