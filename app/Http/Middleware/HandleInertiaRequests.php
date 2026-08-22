@@ -42,9 +42,32 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
                 'impersonator' => $this->presentImpersonator($request),
+                'runsAGame' => $this->runsAGame($request),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
+    }
+
+    /**
+     * Whether this session runs a game anywhere, so the sidebar can offer the kit template library.
+     *
+     * The same question `App\Http\Middleware\EnsureUserRunsAGame` asks, through the same scope, and
+     * that is the whole point: the library is gated on holding an active gamemaster seat at *any*
+     * game, so a nav item computed any other way is either a link that 403s or — the worse half — a
+     * screen a gamemaster has no way to reach. It was shipped with no link at all once.
+     *
+     * This is a nav decision and **never** an authorisation one. Hiding the link is only about not
+     * offering a 403; the gate on the routes is the boundary, exactly as `auth.user.role` hides the
+     * administration item while the `admin` middleware refuses the area.
+     *
+     * It costs one `exists()` per Inertia response for a signed-in account and none at all for a
+     * guest, who short-circuits on the null user. `Inertia::optional()` is the wrong tool despite
+     * the shape: the sidebar renders on every page, so a prop that only arrives on a partial reload
+     * would be absent precisely when it is read.
+     */
+    private function runsAGame(Request $request): bool
+    {
+        return $request->user()?->gameSeats()->activeGamemaster()->exists() === true;
     }
 
     /**

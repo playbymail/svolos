@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Enums\GameRole;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,6 +31,11 @@ use Symfony\Component\HttpFoundation\Response;
  * must never consult `users.role`, `isAdmin()` or `App\Enums\UserRole`. An administrator who runs no
  * game is refused here, and a **retired** gamemaster seat grants nothing — seats are retired rather
  * than deleted, so `is_active` is what says somebody is still running the game.
+ *
+ * Both of those conditions live in `App\Models\GameSeat::activeGamemaster()` rather than being
+ * written out here, because `App\Http\Middleware\HandleInertiaRequests` has to ask the very same
+ * question to decide whether the sidebar offers a link to this area. Two copies that drift leave
+ * either a link that 403s or a screen a gamemaster cannot find.
  */
 class EnsureUserRunsAGame
 {
@@ -46,10 +50,7 @@ class EnsureUserRunsAGame
     public function handle(Request $request, Closure $next): Response
     {
         abort_unless(
-            $request->user()?->gameSeats()
-                ->where('is_active', true)
-                ->where('role', GameRole::Gamemaster)
-                ->exists() === true,
+            $request->user()?->gameSeats()->activeGamemaster()->exists() === true,
             Response::HTTP_FORBIDDEN,
         );
 

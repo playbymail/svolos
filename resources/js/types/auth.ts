@@ -49,6 +49,14 @@ export type Impersonator = {
 export type Auth = {
     user: User;
     impersonator: Impersonator | null;
+    /**
+     * Whether this account holds an active gamemaster seat at any game, as answered by
+     * `App\Http\Middleware\HandleInertiaRequests::runsAGame()`.
+     *
+     * Read by `AppSidebar` and by nothing else: it decides whether the kit template library is
+     * offered, not whether it is reachable. The `runs-a-game` middleware is the boundary.
+     */
+    runsAGame: boolean;
 };
 
 /* @chisel-passkeys */

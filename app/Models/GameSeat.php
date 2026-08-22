@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\GameRole;
 use Database\Factories\GameSeatFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -237,6 +239,27 @@ class GameSeat extends Model
     public function entities(): HasMany
     {
         return $this->hasMany(Entity::class);
+    }
+
+    /**
+     * Scope the query to seats that are currently running a game.
+     *
+     * An active seat holding `GameRole::Gamemaster` — the one thing that means "this account runs
+     * this game". A retired seat grants nothing, because seats are retired rather than deleted and
+     * `is_active` is what says somebody is still in the game.
+     *
+     * It is a scope rather than a `where` written out at each call site because the answer is asked
+     * in two places that must never disagree: `App\Http\Middleware\EnsureUserRunsAGame`, which
+     * gates the kit template library, and `App\Http\Middleware\HandleInertiaRequests`, which
+     * decides whether the sidebar offers a link to it. A nav item that asks a slightly different
+     * question than the gate is either a link that 403s or a screen nobody can find.
+     *
+     * @param  Builder<GameSeat>  $query
+     */
+    #[Scope]
+    protected function activeGamemaster(Builder $query): void
+    {
+        $query->where('is_active', true)->where('role', GameRole::Gamemaster);
     }
 
     /**

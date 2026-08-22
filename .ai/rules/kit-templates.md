@@ -8,9 +8,11 @@ Globs: `app/Generation/Kit.php`, `app/Generation/KitEntity.php`, `app/Generation
 `database/migrations/*_create_kit_templates_table.php`,
 `database/migrations/*_add_kit_to_generation_runs_table.php`,
 `database/factories/KitTemplateFactory.php`,
+`app/Http/Middleware/HandleInertiaRequests.php`,
 `resources/js/pages/gamemaster/kit-templates/**`, `resources/js/components/KitEditor.svelte`,
-`resources/js/types/kits.ts`, `tests/Unit/Kit*Test.php`,
-`tests/Feature/Gamemaster/KitTemplateTest.php`
+`resources/js/components/AppSidebar.svelte`, `resources/js/types/kits.ts`,
+`resources/js/types/auth.ts`, `tests/Unit/Kit*Test.php`,
+`tests/Feature/Gamemaster/KitTemplateTest.php`, `tests/Feature/AppShellTest.php`
 
 A **kit** is what every player in one game begins holding: a colony's worth of units and a ship's
 worth. Read [units.md](units.md) first — it is the stage this feeds, and every rule about the
@@ -107,6 +109,36 @@ and deleting one is the ordinary thing to do with a draft.
 
 There is no `edit` route: `show` renders the editor, the way the gamemaster's game screen is both the
 review and the controls. `create` is declared ahead of `{kitTemplate}` so the literal wins the match.
+
+## The way in is the sidebar, and it asks the gate's own question
+
+This area shipped **unreachable**. The routes, the four screens, the gate and the tests were all
+there and correct, and nothing in `resources/js` linked to `gamemaster.kit-templates.index` — the
+only way to open the library was to type the URL. The units stage even rendered "— you have none
+yet" beside the picker, which is the application telling somebody about a screen it offers no way to
+reach.
+
+Worth naming as a class rather than as one slip: **a gated area needs its entry point built with
+it.** The gate, the screens and the tests all pass without one, so nothing in the verification gate
+goes red — the feature is complete by every check and invisible to the person it was built for.
+
+`AppSidebar` shows a **Kit templates** item to accounts that run a game, hidden from everyone else
+the way the Administration item is hidden from members: the middleware is the boundary, and this is
+only about not offering a link that would 403.
+
+**It is hidden on the gate's own question, through the gate's own scope.** Running a game is a fact
+about *seats* and never about `users.role` (see [roles.md](roles.md)), so unlike the administration
+item it cannot be read off `auth.user` — `HandleInertiaRequests::runsAGame()` answers it on the
+server and shares it as `auth.runsAGame`, and both it and `EnsureUserRunsAGame` go through
+`GameSeat::activeGamemaster()`. That scope exists for exactly this reason. Two copies of "an active
+gamemaster seat" that drift give you one of two bugs, and the second is the one that hurts: a link
+that 403s, or a screen a gamemaster cannot find. `AppShellTest` pins the prop across a member, a
+player, a **retired** gamemaster and an **administrator holding no seat** — that last case is the one
+a prop computed off the application role would get wrong.
+
+The prop costs one `exists()` per Inertia response for a signed-in account, and none for a guest.
+`Inertia::optional()` looks like the right tool for it and is not: the sidebar renders on every page,
+so a prop that only arrives on a partial reload is absent precisely where it is read.
 
 ## `download()` is the application's first file response
 

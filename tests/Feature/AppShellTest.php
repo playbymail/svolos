@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Game;
+use App\Models\GameSeat;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia;
 
@@ -118,4 +120,90 @@ test('a page with nothing flashed carries no toast', function () {
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertInertia(fn (AssertableInertia $page) => $page->missingFlash('toast'));
+});
+
+/*
+|--------------------------------------------------------------------------
+| The kit template library's way in
+|--------------------------------------------------------------------------
+|
+| `/gamemaster/kit-templates` shipped with no link to it anywhere — the routes, the screens and the
+| gate were all there, and the only way to reach the library was to type the URL. The sidebar now
+| offers it, hidden from accounts that would be refused, and these pin the question it is hidden on.
+|
+| That question is **seats, never `users.role`** (see `.ai/rules/roles.md`), which is why an
+| administrator who runs no game is one of the cases below rather than an obvious pass.
+*/
+
+test('the shared props tell a gamemaster they run a game', function () {
+    $gamemaster = gamemasterOf(Game::factory()->create());
+
+    $this->actingAs($gamemaster)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('auth.runsAGame', true));
+});
+
+test('the shared props withhold the kit library from accounts that would be refused it', function (Closure $make) {
+    $user = $make();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('auth.runsAGame', false));
+})->with([
+    'a member with no seat anywhere' => [fn (): User => User::factory()->create()],
+
+    'a player, whose seat runs nothing' => [function (): User {
+        $player = User::factory()->create();
+        GameSeat::factory()->for(Game::factory())->for($player)->create();
+
+        return $player;
+    }],
+
+    /*
+     * The case the whole arrangement turns on. An administrator holds every application permission
+     * there is and still runs no game, so the link must not appear — `runs-a-game` would refuse them
+     * at the door, and a prop computed off `users.role` would offer them a 403.
+     */
+    'an administrator holding no seat' => [fn (): User => User::factory()->admin()->create()],
+
+    /*
+     * Seats are retired rather than deleted, so a former gamemaster still has the row. `is_active` is
+     * the whole difference between running a game and having run one.
+     */
+    'a retired gamemaster' => [function (): User {
+        $former = User::factory()->create();
+        GameSeat::factory()->for(Game::factory())->for($former)->gamemaster()->retired()->create();
+
+        return $former;
+    }],
+]);
+
+test('a guest is told they run nothing rather than being asked the question', function () {
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('auth.user', null)
+            ->where('auth.runsAGame', false)
+        );
+});
+
+test('the sidebar offers the kit template library, gated on that prop', function () {
+    /*
+     * The nav is built client-side, so as with the documentation link above there is no HTTP surface
+     * to assert against and this reads the component source. Narrow on purpose: it pins that the item
+     * exists, that it is hidden behind `runsAGame`, and that its href comes from Wayfinder rather than
+     * a hardcoded string — restyling the sidebar cannot break it, deleting the link can.
+     */
+    $sidebar = file_get_contents(resource_path('js/components/AppSidebar.svelte'));
+
+    expect($sidebar)
+        ->toContain("from '@/routes/gamemaster/kit-templates'")
+        ->toContain('kitTemplatesIndex()')
+        ->toContain('auth.runsAGame')
+        ->not->toContain("'/gamemaster/kit-templates'");
+
+    // And the helper it imports resolves to a route this application actually serves.
+    expect(route('gamemaster.kit-templates.index', absolute: false))->toBe('/gamemaster/kit-templates');
 });
