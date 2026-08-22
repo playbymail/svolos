@@ -10,9 +10,19 @@
     import { Checkbox } from '@/components/ui/checkbox';
     import { Input } from '@/components/ui/input';
     import { Label } from '@/components/ui/label';
+    import {
+        Select,
+        SelectContent,
+        SelectItem,
+        SelectTrigger,
+    } from '@/components/ui/select';
     import { Spinner } from '@/components/ui/spinner';
     import { DEFAULT_MINIMUM_SEPARATION } from '@/types';
-    import type { GenerationStageSummary } from '@/types';
+    import type {
+        GenerationStageSummary,
+        KitSource,
+        KitTemplateSummary,
+    } from '@/types';
     import type { RouteFormDefinition } from '@/wayfinder';
 
     /*
@@ -26,11 +36,19 @@
         generateAction,
         acceptAction,
         canGenerate = false,
+        savedKits = [],
     }: {
         stage: GenerationStageSummary;
         generateAction?: RouteFormDefinition<'post'>;
         acceptAction?: RouteFormDefinition<'post'>;
         canGenerate?: boolean;
+        /*
+         * The gamemaster's own saved kits, for the units stage's picker. Empty on the
+         * administrator's copy of this screen, which offers no controls at all — and empty for a
+         * gamemaster who has never saved one, which is the ordinary state rather than a missing
+         * value.
+         */
+        savedKits?: KitTemplateSummary[];
     } = $props();
 
     const stateVariants: Record<
@@ -138,6 +156,29 @@
     let generateTemplate = $state(false);
 
     const isTemplateStage = $derived(stage.stage === 'home_stellia_template');
+
+    /*
+     * Which of the three ways to settle the kit every player begins with. Drawing is the default and
+     * is what an absent `kit_source` means on the server, so a gamemaster who never touches this gets
+     * a kit drawn from the seed above — which is what the stage did for every game before the library
+     * existed.
+     *
+     * Writable off nothing, like `generateTemplate` and for the same reason: a run remembers the kit
+     * it was given, not which control produced it.
+     */
+    let kitSource = $state<KitSource>('generate');
+
+    const isKitStage = $derived(stage.stage === 'assets');
+
+    let kitTemplateId = $state<string>('');
+
+    const kitTemplateLabel = $derived(
+        savedKits.find((kit) => String(kit.id) === kitTemplateId)?.name ??
+            'Choose a kit',
+    );
+
+    /* True when something other than the seed decides the kit, which changes what the seed means. */
+    const kitFromADocument = $derived(isKitStage && kitSource !== 'generate');
 
     /**
      * A document of the shape the parser accepts, for the gamemaster writing their first one.
@@ -328,6 +369,15 @@
                             The seed is recorded either way. An uploaded
                             template is read from the document rather than drawn
                             from it, so any seed will do here.
+                        {:else if kitFromADocument}
+                            The seed is recorded either way. A kit that comes
+                            from a document is read rather than drawn, so any
+                            seed will do here.
+                        {:else if isKitStage}
+                            The seed draws this game's kit, and every player in
+                            the game is given that same kit. Generating again is
+                            also how somebody seated late is given a colony, so
+                            the seed need not change.
                         {:else if stage.state !== 'review'}
                             The same seed always produces the same result, which
                             is what makes a game reproducible.
@@ -355,7 +405,7 @@
                     >
                         {#if processing}
                             <Spinner />
-                        {:else if isTemplateStage && !generateTemplate}
+                        {:else if (isTemplateStage && !generateTemplate) || kitSource === 'upload'}
                             <Upload class="h-4 w-4" />
                         {:else}
                             <Dices class="h-4 w-4" />
@@ -368,10 +418,16 @@
                         -->
                         {#if isTemplateStage && !generateTemplate}
                             Upload
+                        {:else if kitSource === 'upload'}
+                            Upload
+                        {:else if kitSource === 'saved'}
+                            Use this kit
                         {:else if stage.state !== 'review'}
                             Generate
                         {:else if stage.stage === 'home_stellia'}
                             Try another arrangement
+                        {:else if isKitStage}
+                            Generate again
                         {:else}
                             Try another seed
                         {/if}
@@ -451,6 +507,122 @@
                                 class="mt-2 overflow-x-auto rounded bg-muted p-2">{exampleTemplate}</pre>
                         </details>
                     </div>
+                {/if}
+
+                {#if isKitStage}
+                    <!--
+                        The three ways to settle the kit, as one control and its alternatives. They
+                        share this stage's single form and its single submit, exactly as the two
+                        template controls do: they are three answers to one question rather than
+                        three things a gamemaster might do.
+
+                        Every inactive control is disabled rather than hidden, so the card does not
+                        reflow under the pointer — and a disabled input posts nothing, which is what
+                        the `required_if` rules on the server expect.
+                    -->
+                    <fieldset class="grid gap-3 sm:col-span-2">
+                        <legend class="text-sm font-medium">
+                            What everybody begins with
+                        </legend>
+
+                        <Label
+                            for="kit-source-generate-{stage.stage}"
+                            class="flex items-center gap-3 font-normal"
+                        >
+                            <input
+                                id="kit-source-generate-{stage.stage}"
+                                type="radio"
+                                name="kit_source"
+                                value="generate"
+                                bind:group={kitSource}
+                                data-test="kit-source-generate"
+                            />
+                            <span>Draw a kit from the seed</span>
+                        </Label>
+
+                        <Label
+                            for="kit-source-saved-{stage.stage}"
+                            class="flex items-center gap-3 font-normal"
+                        >
+                            <input
+                                id="kit-source-saved-{stage.stage}"
+                                type="radio"
+                                name="kit_source"
+                                value="saved"
+                                bind:group={kitSource}
+                                disabled={savedKits.length === 0}
+                                data-test="kit-source-saved"
+                            />
+                            <span
+                                class={savedKits.length === 0
+                                    ? 'text-muted-foreground'
+                                    : undefined}
+                            >
+                                Use one of my saved kits
+                                {#if savedKits.length === 0}
+                                    <span class="text-xs">
+                                        — you have none yet
+                                    </span>
+                                {/if}
+                            </span>
+                        </Label>
+
+                        {#if savedKits.length > 0}
+                            <Select
+                                type="single"
+                                name="kit_template_id"
+                                bind:value={kitTemplateId}
+                                disabled={kitSource !== 'saved'}
+                            >
+                                <SelectTrigger
+                                    id="kit-template-{stage.stage}"
+                                    class="w-full"
+                                    data-test="kit-template-select"
+                                >
+                                    {kitTemplateLabel}
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {#each savedKits as kit (kit.id)}
+                                        <SelectItem value={String(kit.id)}>
+                                            {kit.name}
+                                        </SelectItem>
+                                    {/each}
+                                </SelectContent>
+                            </Select>
+                            <InputError message={errors.kit_template_id} />
+                        {/if}
+
+                        <Label
+                            for="kit-source-upload-{stage.stage}"
+                            class="flex items-center gap-3 font-normal"
+                        >
+                            <input
+                                id="kit-source-upload-{stage.stage}"
+                                type="radio"
+                                name="kit_source"
+                                value="upload"
+                                bind:group={kitSource}
+                                data-test="kit-source-upload"
+                            />
+                            <span>Upload a kit document</span>
+                        </Label>
+
+                        <Input
+                            id="kit-{stage.stage}"
+                            type="file"
+                            name="kit"
+                            accept="application/json,.json"
+                            disabled={kitSource !== 'upload'}
+                            data-test="kit-document-input"
+                        />
+                        <InputError message={errors.kit} />
+
+                        <p class="text-xs text-muted-foreground">
+                            A kit is the same for every player in the game.
+                            Saved kits live under Kits, where you can draw one,
+                            edit it and download it.
+                        </p>
+                    </fieldset>
                 {/if}
 
                 {#if stage.stage === 'cluster'}

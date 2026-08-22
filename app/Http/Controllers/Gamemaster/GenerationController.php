@@ -11,9 +11,12 @@ use App\Enums\GenerationStageState;
 use App\Generation\GenerationFailed;
 use App\Generation\HomeStelliumGenerator;
 use App\Generation\HomeTemplate;
+use App\Generation\Kit;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Gamemaster\GenerationRunRequest;
 use App\Models\Game;
+use App\Models\GenerationRun;
+use App\Models\KitTemplate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
@@ -78,6 +81,7 @@ class GenerationController extends Controller
                 (int) $request->validated('minimum_separation', HomeStelliumGenerator::DEFAULT_MINIMUM_SEPARATION),
                 $request->boolean('separation_in_hexes'),
                 $this->uploadedTemplate($request),
+                $this->postedKit($request),
             );
         } catch (GenerationFailed $failure) {
             /*
@@ -96,14 +100,17 @@ class GenerationController extends Controller
         Inertia::flash('toast', [
             'type' => 'success',
             /*
-             * A template that came from a document was not drawn from the seed, so saying so would be
-             * telling a gamemaster their file had been ignored. Everything else here reads its seed
-             * back to them because that is the number they would change to get something different.
+             * A stage settled by a document was not drawn from the seed, so reading the seed back
+             * would be telling a gamemaster their file had been ignored. Everything else reads its
+             * seed back because that is the number they would change to get something different.
+             *
+             * Two stages can arrive this way now — a template and a kit — and `documentBehind()` is
+             * what asks which, so this stays one sentence rather than a `match` over the stages.
              */
-            'message' => is_string($run->template['file'] ?? null)
+            'message' => is_string($file = $this->documentBehind($run))
                 ? __(':stage read from :file. Review it, then accept or upload another.', [
                     'stage' => $stage->label(),
-                    'file' => $run->template['file'],
+                    'file' => $file,
                 ])
                 : __(':stage generated from seed :seed. Review it, then accept or try another seed.', [
                     'stage' => $stage->label(),
@@ -173,6 +180,61 @@ class GenerationController extends Controller
         $game->load('generationRuns');
 
         abort_unless(in_array($game->generationStateFor($stage), $allowed, true), 403);
+    }
+
+    /**
+     * Get the name of the document a run was settled by, if one was.
+     *
+     * A run carries at most one — the two json inputs belong to different stages — so this reads
+     * whichever is there rather than branching on the stage. Null covers both "this stage takes no
+     * document" and "this one was drawn", which are the same thing as far as the sentence goes.
+     *
+     * A kit chosen from the library keeps whatever `file` it was created with, so a kit that was
+     * itself uploaded once is still named by the document it came from. That is the honest answer:
+     * the gamemaster is being told what settled the stage, and it was that document.
+     */
+    private function documentBehind(GenerationRun $run): ?string
+    {
+        $file = $run->template['file'] ?? $run->kit['file'] ?? null;
+
+        return is_string($file) ? $file : null;
+    }
+
+    /**
+     * Read the kit a units run was asked to use, if it was given one.
+     *
+     * Three ways in and one way out. A **document** is parsed here; a **saved kit** is read out of the
+     * gamemaster's library and copied; and **drawing one** is null, which `GenerateUnits` fills in
+     * from the run's seed — the same shape `uploadedTemplate()` has one stage earlier.
+     *
+     * The library row is copied rather than referenced, and the ownership scope has already been
+     * applied by `GenerationRunRequest`'s `exists` rule, so a kit that reaches here is one the
+     * requester owns. Copying is what keeps a run a record of what it was actually given: a gamemaster
+     * tidying their library months later must not be able to reach into a game that has been played.
+     *
+     * Called inside `store()`'s `try`, so a document nobody can read produces a message on the `kit`
+     * field and no run row at all.
+     *
+     * @return array<string, mixed>|null
+     *
+     * @throws GenerationFailed if a document was uploaded and is not a kit
+     */
+    private function postedKit(GenerationRunRequest $request): ?array
+    {
+        $file = $request->file('kit');
+
+        if ($file instanceof UploadedFile) {
+            return Kit::fromJson((string) $file->get(), $file->getClientOriginalName())->toArray();
+        }
+
+        if ($request->filled('kit_template_id')) {
+            return KitTemplate::query()
+                ->findOrFail($request->integer('kit_template_id'))
+                ->kit()
+                ->toArray();
+        }
+
+        return null;
     }
 
     /**

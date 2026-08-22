@@ -12,6 +12,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Gamemaster\GameController as GamemasterGameController;
 use App\Http\Controllers\Gamemaster\GameSeatController as GamemasterGameSeatController;
 use App\Http\Controllers\Gamemaster\GenerationController;
+use App\Http\Controllers\Gamemaster\KitTemplateController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\Player\GameController as PlayerGameController;
@@ -147,6 +148,39 @@ Route::middleware(['auth', 'verified', 'gamemaster'])
             Route::put('games/{game}/seats/{seat}/retire', [GamemasterGameSeatController::class, 'retire'])->name('games.seats.retire');
             Route::put('games/{game}/seats/{seat}/reactivate', [GamemasterGameSeatController::class, 'reactivate'])->name('games.seats.reactivate');
         });
+    });
+
+/*
+ * A gamemaster's private library of opening kits.
+ *
+ * **A second gamemaster group, with a different gate, and the difference is the point.** A kit is
+ * what every player in a game begins holding, and it belongs to the person who wrote it rather than
+ * to any one game — it is written once and used at as many games as its author likes, which is the
+ * whole reason it is worth saving. So there is no `{game}` in these URLs, and
+ * `EnsureUserIsGamemaster` cannot serve them: its first check is `abort_unless($game instanceof
+ * Game)`, so it would refuse everybody. `runs-a-game` asks the weaker question this area needs —
+ * does this account run anything at all — and ownership of a particular kit is checked in
+ * `Gamemaster\KitTemplateController` against `user_id`.
+ *
+ * These are `gamemaster.kit-templates.*`, and `GameManagementTest` sweeps them separately from
+ * `gamemaster.games.*` for that reason: the ten-route list, the no-DELETE rule and the
+ * `gamemaster`-middleware assertion are all statements about **managing one game**, and none of the
+ * three is true here. A kit is a document its author wrote and nothing points at it, so `destroy` is
+ * an ordinary `DELETE`.
+ *
+ * `create` is declared ahead of `{kitTemplate}` so the literal segment wins the match.
+ */
+Route::middleware(['auth', 'verified', 'runs-a-game'])
+    ->prefix('gamemaster')
+    ->name('gamemaster.')
+    ->group(function () {
+        Route::get('kit-templates', [KitTemplateController::class, 'index'])->name('kit-templates.index');
+        Route::get('kit-templates/create', [KitTemplateController::class, 'create'])->name('kit-templates.create');
+        Route::post('kit-templates', [KitTemplateController::class, 'store'])->name('kit-templates.store');
+        Route::get('kit-templates/{kitTemplate}', [KitTemplateController::class, 'show'])->name('kit-templates.show');
+        Route::put('kit-templates/{kitTemplate}', [KitTemplateController::class, 'update'])->name('kit-templates.update');
+        Route::delete('kit-templates/{kitTemplate}', [KitTemplateController::class, 'destroy'])->name('kit-templates.destroy');
+        Route::get('kit-templates/{kitTemplate}/download', [KitTemplateController::class, 'download'])->name('kit-templates.download');
     });
 
 /*

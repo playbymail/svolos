@@ -6,7 +6,8 @@ use App\Enums\EntityType;
 use App\Enums\GameRole;
 use App\Enums\GenerationStage;
 use App\Generation\HomeTemplate;
-use App\Generation\StartingUnits;
+use App\Generation\Kit;
+use App\Generation\KitGenerator;
 use App\Models\Entity;
 use App\Models\Game;
 use App\Models\GameSeat;
@@ -19,21 +20,27 @@ use Illuminate\Database\Eloquent\Collection;
  * Writes the position every player opens the game in.
  *
  * Two entities a player: a **colony** on their home world, and the **ship** that carried its people
- * there in orbit above the same planet. Each is given the kit `App\Generation\StartingUnits`
- * describes, which is identical for everybody.
+ * there in orbit above the same planet. Each is given the same kit, and every player in the game is
+ * given that same kit — see `App\Generation\Kit`.
  *
- * ## The one stage with no generator, because it draws nothing
+ * ## One kit for the game, and every player in it gets that kit
  *
- * Every other stage pairs a pure generator against a seed. There is no seed in this one's stream at
- * all: what a player is handed on turn one is the same for every player, so there is nothing to draw
- * and `StartingUnits` is a description rather than a generator. The run still records the seed it
- * was given, the way a run records `traveler` on a stage that never reads it — a run stores what it
- * was asked for.
+ * The kit is settled **once** and handed to every seat unchanged, which is the fairness rule this
+ * stage has always had: what you are handed on turn one must not depend on which seat you took. What
+ * *has* changed is that the kit is no longer the same in every game. It arrives one of three ways —
+ * drawn from the run's seed by `KitGenerator`, chosen from the gamemaster's library, or uploaded as
+ * a document — and by the time it reaches `handle()` all three look identical, because
+ * `Gamemaster\GenerationController` has already turned the last two into `$run->kit`.
  *
- * That is also why `Gamemaster\GenerationRunRequest` exempts this stage from the "choose a different
- * seed" rule: the premise that rule rests on is that the same seed redraws the same thing, and here
- * *every* seed produces the same thing. What regenerating is actually for is a roster that has
- * changed since the stage ran.
+ * So a null `$run->kit` means "nothing was chosen, draw one", exactly as a null `$run->template`
+ * does one stage earlier, and `App\Generation\StartingUnits` is the baseline `KitGenerator` draws
+ * around rather than the kit itself. See `App\Generation\Kit` for why varying a kit **between**
+ * games leaves the per-player rule untouched.
+ *
+ * Parsing happens at the edge rather than here for the reason `GenerateHomeTemplate` gives: a
+ * malformed document is a message about a *posted file*, and the run should not exist at all if the
+ * file was never usable — where a drawn kit cannot fail and needs the run's seed, which only exists
+ * once the run does.
  *
  * ## Last, because it needs a world to stand on
  *
@@ -55,7 +62,7 @@ class GenerateUnits implements StageGeneration
      */
     public const int INSERT_CHUNK = 500;
 
-    public function __construct(private readonly StartingUnits $startingUnits) {}
+    public function __construct(private readonly KitGenerator $generator) {}
 
     /**
      * Get the stage this generation produces.
@@ -74,6 +81,17 @@ class GenerateUnits implements StageGeneration
     {
         $seats = $this->playerSeats($run->game);
         $homeWorlds = $this->homeWorldsBySeat($run->game);
+
+        /*
+         * Settled once, here, and then handed to every seat below without being consulted again. The
+         * assignment persists because `RunGeneration` saves the run a second time to store the
+         * summary this returns — the same seam `GenerateHomeTemplate` relies on.
+         */
+        $kit = $run->kit === null
+            ? $this->generator->generate($run->seed)
+            : Kit::fromArray($run->kit);
+
+        $run->kit = $kit->toArray();
 
         $now = now();
 
@@ -94,12 +112,12 @@ class GenerateUnits implements StageGeneration
                 continue;
             }
 
-            foreach ($this->startingUnits->entityTypes() as $type) {
+            foreach ($kit->entities as $kitEntity) {
                 $entityRows[] = [
                     'game_seat_id' => $seat->id,
                     'planet_id' => $homeWorld->id,
                     'generation_run_id' => $run->id,
-                    'type' => $type->value,
+                    'type' => $kitEntity->type->value,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ];
@@ -113,7 +131,7 @@ class GenerateUnits implements StageGeneration
         $unitRows = [];
 
         foreach ($this->placedEntities($run) as $entity) {
-            foreach ($this->startingUnits->for($entity->type) as $holding) {
+            foreach ($kit->for($entity->type) as $holding) {
                 $unitRows[] = [
                     'entity_id' => $entity->id,
                     'type' => $holding->type->value,
@@ -130,7 +148,7 @@ class GenerateUnits implements StageGeneration
             Unit::query()->insert($chunk);
         }
 
-        return $this->summary($seats->count(), $entityRows, $unitRows);
+        return $this->summary($seats->count(), $entityRows, $unitRows, $kit);
     }
 
     /**
@@ -244,11 +262,15 @@ class GenerateUnits implements StageGeneration
      * hide: a game with four players and three colonies has a fourth player who was seated late, and
      * the card should say so rather than leaving somebody to subtract.
      *
+     * The kit's own summary is folded in under `kit_` keys so the card says which of the three ways
+     * this one arrived. `GenerationStageCard` drops null values rather than printing them, so a drawn
+     * kit shows its seed and no file and an uploaded one shows the reverse, with nothing branching.
+     *
      * @param  list<array<string, mixed>>  $entityRows
      * @param  list<array<string, mixed>>  $unitRows
      * @return array<string, mixed>
      */
-    private function summary(int $players, array $entityRows, array $unitRows): array
+    private function summary(int $players, array $entityRows, array $unitRows, Kit $kit): array
     {
         $ofType = fn (EntityType $type): int => count(array_filter(
             $entityRows,
@@ -263,6 +285,9 @@ class GenerateUnits implements StageGeneration
             'ships' => $ofType(EntityType::Ship),
             'units' => count($unitRows),
             'players_without_a_home' => $players - $colonies,
+            'kit_file' => $kit->file,
+            'kit_seed' => $kit->seed,
+            'kit_holdings' => $kit->holdingCount(),
         ];
     }
 }

@@ -27,26 +27,29 @@ use Inertia\Testing\AssertableInertia as Assert;
 | when it may run is already covered by `GenerationTest`. Three things are different from every stage
 | before it, and each has tests here:
 |
-| - it **draws nothing**. Every player gets the same kit, so no seed changes the outcome, and the
-|   "choose a different seed" rule is switched off for the opposite reason it is switched off for the
-|   home stellia — not because the same seed gives something new, but because every seed gives the
-|   same thing;
+| - **one kit settles the game, and every player in it gets that kit.** That is the fairness rule and
+|   it is asserted across players rather than against a hard-coded list. What the kit *is* now varies
+|   between games: it is drawn from the run's seed, chosen from the gamemaster's library, or uploaded
+|   as a document, and all three arrive as `generation_runs.kit`. See `App\Generation\Kit` for why
+|   varying it between games leaves the per-player rule untouched;
 | - it reads **three** earlier stages at once: the template for which orbit is home, the home stellia
 |   for which system, the planets for the world itself. That is why it is last;
 | - a player seated after the homes were arranged has nowhere to stand, and is **skipped and counted**
 |   rather than failing the run — the remedy is regenerating the homes, and no field on this form
-|   would fix it.
+|   would fix it. That is also why the "choose a different seed" rule stays switched off here: the
+|   seats are part of this stage's input, so the same seed against a changed roster really does place
+|   something new. `GenerationRunRequest::redrawsFromTheRoster()` carries the whole argument.
 |
 */
 
 /**
  * Generate the opening position.
  */
-function generateUnits(User $gamemaster, Game $game, int $seed): TestResponse
+function generateUnits(User $gamemaster, Game $game, int $seed, array $kit = []): TestResponse
 {
     return test()->actingAs($gamemaster)->post(
         route('gamemaster.games.generation.store', ['game' => $game, 'stage' => 'assets']),
-        ['seed' => $seed],
+        ['seed' => $seed, ...$kit],
     );
 }
 
@@ -447,4 +450,139 @@ test('an administrator without a seat cannot generate the stage', function () {
     generateUnits($administrator, $game, 4242)->assertForbidden();
 
     expect(Entity::query()->count())->toBe(0);
+});
+
+test('the kit is drawn from the seed, so two games open differently', function () {
+    /*
+     * The feature, and the half of it a per-player assertion cannot see: every player in one game
+     * gets the same kit *and* two games with different seeds get different kits. Asserting only the
+     * first would pass just as well on the old behaviour, where every game in the world opened
+     * identically.
+     */
+    $kits = collect([4242, 99])->map(function (int $seed): array {
+        $game = Game::factory()->create();
+
+        seatPlayers($game, 1);
+        $gamemaster = withAcceptedPlanets($game);
+
+        generateUnits($gamemaster, $game, $seed);
+
+        return Unit::query()
+            ->whereHas('entity', fn ($query) => $query->whereHas('gameSeat', fn ($seats) => $seats->where('game_id', $game->id)))
+            ->orderBy('id')
+            ->pluck('quantity')
+            ->all();
+    });
+
+    expect($kits[0])->not->toBe($kits[1]);
+});
+
+test('a saved kit can be chosen, and is copied onto the run rather than referenced', function () {
+    $game = Game::factory()->create();
+
+    seatPlayers($game, 1);
+    $gamemaster = withAcceptedPlanets($game);
+
+    $kitTemplate = kitTemplateFor($gamemaster, seed: 77);
+
+    generateUnits($gamemaster, $game, 5, [
+        'kit_source' => 'saved',
+        'kit_template_id' => $kitTemplate->id,
+    ])->assertSessionHasNoErrors();
+
+    $run = $game->fresh()?->generationRuns()->where('stage', 'assets')->sole();
+
+    expect($run?->kit['entities'])->toBe($kitTemplate->document['entities']);
+
+    /* And what was actually placed is that kit, not one drawn from the run's own seed of 5. */
+    $colony = Entity::query()->where('type', EntityType::OpenAirColony)->with('units')->sole();
+
+    expect($colony->units->sortBy('id')->pluck('quantity')->values()->all())
+        ->toBe(array_column($kitTemplate->document['entities'][0]['holdings'], 'quantity'));
+});
+
+test('somebody else kit is refused with a message rather than a 403', function () {
+    /*
+     * A kit template is a **posted value**, not a route-bound model, so it falls on the message side
+     * of the line this area draws — see `Gamemaster\GenerationController`. The `exists` rule is
+     * scoped to the signed-in account, which gets the refusal and its sentence in one rule and cannot
+     * leak whether somebody else's kit with that id exists.
+     */
+    $game = Game::factory()->create();
+
+    seatPlayers($game, 1);
+    $gamemaster = withAcceptedPlanets($game);
+
+    $theirs = kitTemplateFor(gamemasterOf(Game::factory()->create()), name: 'Theirs');
+
+    generateUnits($gamemaster, $game, 5, [
+        'kit_source' => 'saved',
+        'kit_template_id' => $theirs->id,
+    ])->assertSessionHasErrors('kit_template_id');
+
+    expect(Entity::query()->count())->toBe(0);
+});
+
+test('a kit can be uploaded, and the document is what gets placed', function () {
+    $game = Game::factory()->create();
+
+    seatPlayers($game, 1);
+    $gamemaster = withAcceptedPlanets($game);
+
+    generateUnits($gamemaster, $game, 5, [
+        'kit_source' => 'upload',
+        'kit' => kitDocumentFile(function (array $document): array {
+            $document['entities'][0]['holdings'][0]['quantity'] = 3;
+
+            return $document;
+        }, name: 'opening.json'),
+    ])->assertSessionHasNoErrors();
+
+    $run = $game->fresh()?->generationRuns()->where('stage', 'assets')->sole();
+
+    expect($run?->kit['file'])->toBe('opening.json');
+
+    $colony = Entity::query()->where('type', EntityType::OpenAirColony)->with('units')->sole();
+
+    expect($colony->units->sortBy('id')->first()?->quantity)->toBe(3);
+
+    /* The card says which of the three it was, and drops the seed it did not use. */
+    expect($run?->summary['kit_file'])->toBe('opening.json');
+});
+
+test('an uploaded kit that is not a kit is refused on the kit field, and writes no run', function () {
+    $game = Game::factory()->create();
+
+    seatPlayers($game, 1);
+    $gamemaster = withAcceptedPlanets($game);
+
+    generateUnits($gamemaster, $game, 5, [
+        'kit_source' => 'upload',
+        'kit' => kitDocumentFile(fn (array $document): array => [
+            ...$document,
+            'entities' => [$document['entities'][0]],
+        ]),
+    ])->assertSessionHasErrors('kit');
+
+    /*
+     * Parsed at the edge, inside the controller's `try`, so a document nobody could read leaves no
+     * run row at all — the same reasoning the home template stage gives.
+     */
+    expect($game->fresh()?->generationRuns()->where('stage', 'assets')->count())->toBe(0);
+    expect(Entity::query()->count())->toBe(0);
+});
+
+test('the summary names the seed a drawn kit came from', function () {
+    $game = Game::factory()->create();
+
+    seatPlayers($game, 1);
+    $gamemaster = withAcceptedPlanets($game);
+
+    generateUnits($gamemaster, $game, 4242);
+
+    $run = $game->fresh()?->generationRuns()->where('stage', 'assets')->sole();
+
+    expect($run?->summary['kit_seed'])->toBe(4242);
+    /* Null, and `GenerationStageCard` drops nulls, so nothing renders the word "null" beside a label. */
+    expect($run?->summary['kit_file'])->toBeNull();
 });

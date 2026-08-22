@@ -4,6 +4,7 @@ use App\Http\Middleware\AuthenticateAgent;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsGamemaster;
 use App\Http\Middleware\EnsureUserIsPlayer;
+use App\Http\Middleware\EnsureUserRunsAGame;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'agent' => AuthenticateAgent::class,
             'gamemaster' => EnsureUserIsGamemaster::class,
             'player' => EnsureUserIsPlayer::class,
+            'runs-a-game' => EnsureUserRunsAGame::class,
         ]);
 
         $middleware->web(append: [

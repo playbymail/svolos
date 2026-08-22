@@ -74,6 +74,7 @@
         GameRoleOption,
         GameStatusOption,
         GenerationSummary,
+        KitTemplateSummary,
         LocationDetail,
     } from '@/types';
 
@@ -86,6 +87,7 @@
         assignableAccounts,
         roles,
         statuses,
+        savedKits,
     }: {
         game: GamemasterGame;
         generation: GenerationSummary;
@@ -96,6 +98,8 @@
         assignableAccounts: AssignableAccount[];
         roles: GameRoleOption[];
         statuses: GameStatusOption[];
+        /* This gamemaster's own saved kits, for the units stage's picker. */
+        savedKits: KitTemplateSummary[];
     } = $props();
 
     /*
@@ -309,6 +313,7 @@
                         stage: stage.stage,
                     })}
                     canGenerate={generation.can_generate}
+                    {savedKits}
                 />
             {/each}
         </div>

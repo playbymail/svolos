@@ -1,7 +1,8 @@
 # The opening position: entities and what they hold
 
 Globs: `app/Enums/{UnitType,UnitCategory,Inventory}.php`, `app/Enums/EntityType.php`, `app/Generation/UnitHolding.php`,
-`app/Generation/StartingUnits.php`, `app/Actions/Generation/GenerateUnits.php`,
+`app/Generation/StartingUnits.php`, `app/Generation/Kit*.php`,
+`app/Actions/Generation/GenerateUnits.php`,
 `app/Models/Entity.php`, `app/Models/Unit.php`,
 `database/migrations/*_create_entities_table.php`, `database/migrations/*_{create_assets_table,rename_assets_table_to_units}.php`,
 `database/factories/{Entity,Unit}Factory.php`,
@@ -119,7 +120,10 @@ wherever it is going. That asymmetry is the whole shape of the rule and is worth
 an argument instead, because a holding is written before an entity exists.
 
 **Two of the four kinds start a game.** `StartingUnits::for()` answers an enclosed or an orbital
-colony with an **empty kit** rather than a guess, and `entityTypes()` is the list of the two that do.
+colony with an **empty kit** rather than a guess, and `entityTypes()` is the list of the two that do —
+which now reads `EntityType::startingKinds()`, because `App\Generation\Kit` needs the same answer in
+order to refuse an uploaded document that leaves one of them out, and two copies of "which kinds open
+a game" would eventually disagree about the opening position.
 Sweeps over kits must iterate `entityTypes()`, not `EntityType::cases()` — a case-driven sweep spends
 half its runs asserting nothing, which is how PHPUnit's *risky* flag found a test whose only
 assertion was comparing a value to itself.
@@ -292,26 +296,41 @@ it operates rather than a thing it is. `inventories()` is written case by case w
 arm** on purpose: a `default` would quietly give a new kind the commonest answer, and deciding where a
 new kind may sit is the whole of adding one.
 
-## The stage draws nothing, and three things follow from it
+## One kit per game, and every player in it gets that kit
 
-Every player gets the same kit, down to the last tonne, because the alternative is that the seed
-decides who begins ahead. That is the same fairness argument that makes every player's home *world*
-identical (see [home-template.md](home-template.md)), and it is stronger here: the home template's
-neighbours may differ because what a system is worth to mine is a thing to discover, while what you
-are handed on turn one is not.
+Every player in a game gets the same kit, down to the last tonne, because the alternative is that the
+seed decides who begins ahead. That is the same fairness argument that makes every player's home
+*world* identical (see [home-template.md](home-template.md)), and it is stronger here: the home
+template's neighbours may differ because what a system is worth to mine is a thing to discover, while
+what you are handed on turn one is not.
+
+**Read that sentence carefully, because it says "in a game".** The rule is about **per-player**
+variation. It used to be delivered by the stage drawing nothing at all — `StartingUnits` was the kit,
+and every game in the world opened identically — and it is now delivered by drawing **once per
+game**: `App\Generation\KitGenerator` produces one kit from the run's seed and `GenerateUnits` hands
+it to every seat unchanged. That is exactly what `HomeTemplateGenerator` does for the home system
+every player shares, and it leaves the fairness rule intact while letting two games differ.
+[kit-templates.md](kit-templates.md) has the whole of it, along with the library a gamemaster keeps
+their own kits in and the three ways one reaches the stage.
 
 So:
 
-- **`StartingUnits` is on `generationSources()` and not on `seededGenerators()`.** The second list
-  asserts that a class contains `SeededRandomizer::for`, which this one must never do. Being on the
-  first is what catches somebody later reaching for `Arr::random()` to make the kits "more
-  interesting" — precisely the change that would look like an improvement.
-- **`GenerationRunRequest` exempts the stage from the "choose a different seed" rule**, through
-  `ignoresTheSeedEntirely()`. This is the *opposite* reason the home stellia is exempt, and the two
-  are worth telling apart: there the same seed gives a genuinely new arrangement, here no seed gives
-  anything different at all. What regenerating is for is a roster that has changed.
-- **The run still records a seed.** A run stores what it was asked for, the way it records `traveler`
-  on a stage that never reads it.
+- **`StartingUnits` is still on `generationSources()` and still not on `seededGenerators()`.** It is
+  now the **baseline** `KitGenerator` jitters rather than the kit itself, which changes nothing about
+  what it may do: it opens no stream, and being swept is what catches somebody reaching for
+  `Arr::random()` to make the manifests "more interesting". `KitGenerator` is on **both** lists.
+- **Only the quantities are drawn.** Which kinds, which inventories and which technology levels come
+  from the manifests untouched — which is the line drawn two sections above, and it is what keeps the
+  engines crated, the colony a city and the food out of proportion.
+- **`GenerationRunRequest` still exempts the stage from the "choose a different seed" rule**, but
+  through `redrawsFromTheRoster()` and no longer through `ignoresTheSeedEntirely()`. The old premise
+  — that no seed gives anything different — is gone. What survives is the reason a gamemaster
+  regenerates this stage at all: **the seats are part of its input**, so the same seed against a
+  roster that has grown places genuinely different entities. That makes it the *same* kind of
+  exemption as the home stellia's rather than the opposite one, and keeping the rule would mean
+  seating a latecomer forced a seed change that redrew everybody else's kit.
+- **The run records the seed, and now it means something.** It used to be stored the way `traveler`
+  is stored on a stage that never reads it; it is now what the kit was drawn from.
 
 ## A player with nowhere to stand is skipped and counted, not a failure
 

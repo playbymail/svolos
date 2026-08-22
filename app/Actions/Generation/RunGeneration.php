@@ -45,12 +45,19 @@ class RunGeneration
      * it. A run of a stage that ignores one still stores it, which is why none of them has a
      * validation rule tying it to a stage.
      *
-     * `$template` is the one that can be **absent rather than merely irrelevant**: on a home stellia
+     * Two of them can be **absent rather than merely irrelevant**: on a home stellia
      * template run, null means "nothing was uploaded, so draw one", and `GenerateHomeTemplate` fills
      * it in. It arrives already parsed because a document that cannot be read should not produce a run
      * at all.
      *
+     * `$kit` is the second of those, one stage further on: on a units run, null means "nothing was
+     * chosen or uploaded, so draw one", and `GenerateUnits` fills it in. Like `$template` it arrives
+     * already parsed, whether it came from an uploaded document or from a row in the gamemaster's
+     * library — by the time it reaches here it is a document rather than a reference to one, which is
+     * what keeps a run a record of what it was actually given.
+     *
      * @param  array<string, mixed>|null  $template
+     * @param  array<string, mixed>|null  $kit
      */
     public function handle(
         Game $game,
@@ -60,8 +67,9 @@ class RunGeneration
         int $minimumSeparation = HomeStelliumGenerator::DEFAULT_MINIMUM_SEPARATION,
         bool $separationInHexes = false,
         ?array $template = null,
+        ?array $kit = null,
     ): GenerationRun {
-        return DB::transaction(function () use ($game, $stage, $seed, $traveler, $minimumSeparation, $separationInHexes, $template): GenerationRun {
+        return DB::transaction(function () use ($game, $stage, $seed, $traveler, $minimumSeparation, $separationInHexes, $template, $kit): GenerationRun {
             $game->load('generationRuns');
 
             $generation = $this->registry->for($stage);
@@ -82,6 +90,7 @@ class RunGeneration
             $run->minimum_separation = $minimumSeparation;
             $run->separation_in_hexes = $separationInHexes;
             $run->template = $template;
+            $run->kit = $kit;
             $run->attempt = $game->nextGenerationAttemptFor($stage);
             $run->save();
 

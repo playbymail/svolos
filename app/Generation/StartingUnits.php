@@ -122,10 +122,15 @@ final class StartingUnits
      * things a player builds, not things they are given, so `for()` answers them with an empty kit
      * rather than pretending otherwise.
      *
+     * The list itself lives on `EntityType::startingKinds()`, because `Kit` needs the same answer in
+     * order to refuse an uploaded document that leaves one of them out, and two copies of "which
+     * kinds open a game" would eventually disagree about the opening position. This method stays
+     * because it is the seam every sweep is written against — see `.ai/rules/units.md`.
+     *
      * @return list<EntityType>
      */
     public function entityTypes(): array
     {
-        return [EntityType::OpenAirColony, EntityType::Ship];
+        return EntityType::startingKinds();
     }
 }

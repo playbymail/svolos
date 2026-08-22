@@ -1,6 +1,6 @@
 # The gamemaster's own screen for a game
 
-Globs: `app/Http/Middleware/EnsureUserIsGamemaster.php`,
+Globs: `app/Http/Middleware/EnsureUserIsGamemaster.php`, `app/Http/Middleware/EnsureUserRunsAGame.php`,
 `app/Http/Controllers/Gamemaster/**`, `app/Http/Requests/Gamemaster/**`,
 `resources/js/pages/gamemaster/**`, `resources/js/components/GameSeatRoleForm.svelte`,
 `resources/js/components/GameSeedForm.svelte`, `tests/Feature/Gamemaster/**`
@@ -93,10 +93,22 @@ drifting apart ([games.md](games.md) explains why it carries no `is_active` cond
 `GameSeatStoreRequest` classes differ only by namespace.
 
 There is deliberately **no seat destroy route here either**, and no create, delete or index for
-games: a gamemaster runs a game they were given. A sweep asserts the area holds exactly ten routes —
-show, update, seed update, the three generation routes and the four seat routes — and that none
-accepts `DELETE`. That last part is why starting a generation over is a `POST` despite destroying
-everything it destroys; see [generation.md](generation.md).
+games: a gamemaster runs a game they were given. A sweep asserts `gamemaster.games.*` holds exactly
+ten routes — show, update, seed update, the three generation routes and the four seat routes — and
+that none accepts `DELETE`. That last part is why starting a generation over is a `POST` despite
+destroying everything it destroys; see [generation.md](generation.md).
+
+**The sweeps are scoped to `gamemaster.games.` and not to the whole prefix, which is new.** The area
+now holds a second group — `gamemaster.kit-templates.*`, a gamemaster's private library of opening
+kits — and all three claims above are statements about *managing one game*: none of them is true of a
+document somebody wrote, so that group is swept separately and its `destroy` is an ordinary `DELETE`.
+
+That second group also has a **second gate**, `App\Http\Middleware\EnsureUserRunsAGame` (alias
+`runs-a-game`), because a kit belongs to a person rather than to a game and its URLs carry no
+`{game}` for `EnsureUserIsGamemaster` to read — its first check would refuse everybody. The new gate
+asks the weaker question the area needs (does this account run anything at all) and reads a seat and
+nothing else, exactly as its sibling does; ownership of a particular kit is checked per row in the
+controller. [kit-templates.md](kit-templates.md) has the whole of it.
 
 **Building the game's world is the gamemaster's**, and it lives only here: `/gamemaster/games/{game}/generation/*`
 has no `/admin` counterpart, and the administrator's screen shows the same summary read-only. Running

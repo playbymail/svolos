@@ -3,6 +3,7 @@
 use App\Enums\GameRole;
 use App\Enums\GameStatus;
 use App\Http\Middleware\EnsureUserIsGamemaster;
+use App\Http\Middleware\EnsureUserRunsAGame;
 use App\Models\Game;
 use App\Models\GameSeat;
 use App\Models\User;
@@ -429,10 +430,17 @@ test('the gamemaster area has no route that creates, deletes or lists games', fu
      * A gamemaster runs a game they were given; creating one, deleting one — which cascades every
      * seat and with them the game's history — and browsing the installation's inventory are all the
      * administrator's, and each would be a plausible-looking addition to this area.
+     *
+     * **Scoped to `gamemaster.games.` rather than to the whole prefix**, because the area now holds
+     * a second group that is not about managing one game at all: `gamemaster.kit-templates.*` is a
+     * gamemaster's private library of opening kits, which has no `{game}` in its URLs, carries a
+     * different gate and is swept separately below. Every claim this test makes — the exact ten, no
+     * DELETE, the `gamemaster` middleware — is a statement about managing **a game**, and none of
+     * the three is true of a document somebody wrote. See `.ai/rules/kit-templates.md`.
      */
     $names = collect(Route::getRoutes()->getRoutes())
         ->map(fn (RoutingRoute $route): string => (string) $route->getName())
-        ->filter(fn (string $name): bool => str_starts_with($name, 'gamemaster.'))
+        ->filter(fn (string $name): bool => str_starts_with($name, 'gamemaster.games.'))
         ->values();
 
     expect($names->all())->toEqualCanonicalizing([
@@ -450,7 +458,7 @@ test('the gamemaster area has no route that creates, deletes or lists games', fu
 
     /* And no seat route accepts a DELETE: seats are retired, never deleted. */
     collect(Route::getRoutes()->getRoutes())
-        ->filter(fn (RoutingRoute $route): bool => str_starts_with((string) $route->getName(), 'gamemaster.'))
+        ->filter(fn (RoutingRoute $route): bool => str_starts_with((string) $route->getName(), 'gamemaster.games.'))
         ->each(fn (RoutingRoute $route) => expect($route->methods())->not->toContain('DELETE'));
 });
 
@@ -461,7 +469,7 @@ test('every gamemaster route is gated by auth, verified and the gamemaster middl
      * to be present for the 403s above to be 403s only for signed-in accounts — a guest is redirected.
      */
     $gamemasterRoutes = collect(Route::getRoutes()->getRoutes())
-        ->filter(fn (RoutingRoute $route): bool => str_starts_with((string) $route->getName(), 'gamemaster.'));
+        ->filter(fn (RoutingRoute $route): bool => str_starts_with((string) $route->getName(), 'gamemaster.games.'));
 
     expect($gamemasterRoutes)->not->toBeEmpty();
 
@@ -471,6 +479,58 @@ test('every gamemaster route is gated by auth, verified and the gamemaster middl
             ->toContain('verified')
             ->toContain('gamemaster');
     });
+});
+
+test('the kit template routes are their own group, gated by runs-a-game', function () {
+    /*
+     * The mirror of the two sweeps above for the second gamemaster group, and it exists because
+     * scoping those to `gamemaster.games.` would otherwise leave this half swept by nothing at all.
+     *
+     * The gate is deliberately **not** `gamemaster`: `EnsureUserIsGamemaster` reads `{game}` out of
+     * the URL and aborts when there is not one, so it would refuse every request to a library that
+     * has no game in its URLs by design. `runs-a-game` asks the weaker question — does this account
+     * run anything — and ownership of a particular kit is the controller's, checked per row.
+     */
+    $kitRoutes = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn (RoutingRoute $route): bool => str_starts_with((string) $route->getName(), 'gamemaster.kit-templates.'));
+
+    expect($kitRoutes->map(fn (RoutingRoute $route): string => (string) $route->getName())->values()->all())
+        ->toEqualCanonicalizing([
+            'gamemaster.kit-templates.index',
+            'gamemaster.kit-templates.create',
+            'gamemaster.kit-templates.store',
+            'gamemaster.kit-templates.show',
+            'gamemaster.kit-templates.update',
+            'gamemaster.kit-templates.destroy',
+            'gamemaster.kit-templates.download',
+        ]);
+
+    $kitRoutes->each(function (RoutingRoute $route): void {
+        expect($route->gatherMiddleware())
+            ->toContain('auth')
+            ->toContain('verified')
+            ->toContain('runs-a-game')
+            ->not->toContain('gamemaster');
+    });
+});
+
+test('the runs-a-game alias resolves to its middleware, and reads no application role', function () {
+    expect(app(HttpKernel::class)->getMiddlewareAliases())
+        ->toHaveKey('runs-a-game', EnsureUserRunsAGame::class);
+
+    /*
+     * The same source assertion the game gate carries, and for the same reason: an authorisation
+     * check reads exactly one of the two role systems, and behaviour cannot see which one a passing
+     * check consulted. Comments are stripped first, so the prose above may name what the code may
+     * not.
+     */
+    $source = executableSourceOf(EnsureUserRunsAGame::class);
+
+    expect($source)
+        ->not->toContain('UserRole')
+        ->not->toContain('isAdmin')
+        ->not->toContain('users.role')
+        ->not->toContain('admin');
 });
 
 test('the gamemaster alias resolves to the gamemaster middleware', function () {

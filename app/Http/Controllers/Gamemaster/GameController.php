@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Gamemaster;
 
 use App\Actions\Games\AnnounceGameActivation;
 use App\Concerns\PresentsGeneration;
+use App\Concerns\PresentsKits;
 use App\Enums\GameRole;
 use App\Enums\GameStatus;
 use App\Http\Controllers\Controller;
@@ -11,6 +12,7 @@ use App\Http\Requests\Gamemaster\GameSeedUpdateRequest;
 use App\Http\Requests\Gamemaster\GameStatusUpdateRequest;
 use App\Models\Game;
 use App\Models\GameSeat;
+use App\Models\KitTemplate;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,6 +49,7 @@ use Inertia\Response;
 class GameController extends Controller
 {
     use PresentsGeneration;
+    use PresentsKits;
 
     /**
      * Show the game and its roster.
@@ -77,6 +80,21 @@ class GameController extends Controller
         return Inertia::render('gamemaster/games/Show', [
             'game' => $this->present($game),
             'generation' => $this->presentGeneration($game, withSuggestions: true),
+            /*
+             * The gamemaster's own kits, for the picker on the units stage card. Their **own**: the
+             * library is private, and the `exists` rule on the stage's request is scoped the same
+             * way, so the list and the refusal cannot disagree about whose kits these are.
+             *
+             * Absent from the administrator's copy of this screen, which shows the same summary with
+             * no controls to put them in — the same reason `suggested_seed` is.
+             */
+            'savedKits' => KitTemplate::query()
+                ->where('user_id', $this->authenticatedUser($request)->getKey())
+                ->orderBy('name')
+                ->get()
+                ->map(fn (KitTemplate $kitTemplate): array => $this->presentKitTemplate($kitTemplate))
+                ->values()
+                ->all(),
             /*
              * The whole cluster ships with the page: a hundred locations of four small numbers each is
              * a smaller payload than the request that would fetch them, and reviewing a cluster means

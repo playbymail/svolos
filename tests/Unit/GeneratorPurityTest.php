@@ -4,6 +4,9 @@ use App\Generation\ClusterGenerator;
 use App\Generation\HomeStelliumGenerator;
 use App\Generation\HomeTemplate;
 use App\Generation\HomeTemplateGenerator;
+use App\Generation\Kit;
+use App\Generation\KitEntity;
+use App\Generation\KitGenerator;
 use App\Generation\PlanetGenerator;
 use App\Generation\SeededRandomizer;
 use App\Generation\StartingUnits;
@@ -45,6 +48,14 @@ function seededGenerators(): array
          */
         HomeStelliumGenerator::class,
         HomeTemplateGenerator::class,
+        /*
+         * The newest, and the one whose *presence on this list* is the decision worth knowing. The
+         * units stage used to draw nothing at all, on the grounds that the seed must not decide who
+         * begins ahead — and that rule is intact, because a kit is drawn once per game and handed to
+         * every player in it unchanged. What the seed now varies is what one game's opening is, the
+         * way `HomeTemplateGenerator` varies the home system every player shares.
+         */
+        KitGenerator::class,
     ];
 }
 
@@ -75,7 +86,19 @@ function seededGenerators(): array
  */
 function generationSources(): array
 {
-    return [...seededGenerators(), HomeTemplate::class, StartingUnits::class];
+    return [
+        ...seededGenerators(),
+        HomeTemplate::class,
+        /*
+         * Still here, and still **not** on the seeded list. It is now the baseline `KitGenerator`
+         * jitters rather than the kit itself, which changes nothing about what it may do: it is a
+         * description, it opens no stream, and being swept here is what catches somebody reaching
+         * for `Arr::random()` to make the manifests "more interesting".
+         */
+        StartingUnits::class,
+        Kit::class,
+        KitEntity::class,
+    ];
 }
 
 test('nothing in the generation subsystem reaches for an unseeded source of randomness', function (string $class) {

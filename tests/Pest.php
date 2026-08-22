@@ -2,11 +2,14 @@
 
 use App\Enums\GameRole;
 use App\Enums\GenerationStage;
+use App\Generation\KitGenerator;
+use App\Generation\StartingUnits;
 use App\Models\Game;
 use App\Models\GameSeat;
 use App\Models\GenerationRun;
 use App\Models\HomeStellium;
 use App\Models\Invitation;
+use App\Models\KitTemplate;
 use App\Models\Location;
 use App\Models\Stellium;
 use App\Models\User;
@@ -256,6 +259,40 @@ function generateStage(User $gamemaster, Game $game, GenerationStage $stage, int
         route('gamemaster.games.generation.store', ['game' => $game, 'stage' => $stage->value]),
         $traveler ? ['seed' => $seed, 'traveler' => '1'] : ['seed' => $seed],
     );
+}
+
+/**
+ * Build a kit document as a file, the way a gamemaster's browser sends one.
+ *
+ * Drawn rather than written as a literal, for the reason `KitTemplateFactory` draws one: a hand-kept
+ * fixture would need updating every time the catalogue gains a kind, and would quietly stop
+ * describing every kind a game opens with — which is the one thing `Kit` refuses hardest.
+ *
+ * `$mutate` is how a test breaks exactly one thing about an otherwise valid document.
+ *
+ * @param  callable(array<string, mixed>): array<string, mixed>|null  $mutate
+ */
+function kitDocumentFile(?callable $mutate = null, int $seed = 4242, string $name = 'kit.json'): UploadedFile
+{
+    $document = (new KitGenerator(new StartingUnits))->generate($seed)->toArray();
+
+    if ($mutate !== null) {
+        $document = $mutate($document);
+    }
+
+    return UploadedFile::fake()->createWithContent($name, (string) json_encode($document));
+}
+
+/**
+ * Save a kit in somebody's library.
+ */
+function kitTemplateFor(User $owner, int $seed = 4242, string $name = 'Lean start'): KitTemplate
+{
+    return KitTemplate::factory()->for($owner)->create([
+        'name' => $name,
+        'seed' => $seed,
+        'document' => (new KitGenerator(new StartingUnits))->generate($seed)->toArray(),
+    ]);
 }
 
 /**

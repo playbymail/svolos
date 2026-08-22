@@ -7,6 +7,7 @@ use App\Enums\GenerationStage;
 use App\Generation\ClusterGenerator;
 use App\Models\Game;
 use App\Models\GenerationRun;
+use App\Models\KitTemplate;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -76,7 +77,7 @@ class GenerationRunRequest extends FormRequest
         if ($pending !== null
             && ! $this->redrawsFromTheAttempt()
             && ! $this->templateDecidedByADocument()
-            && ! $this->ignoresTheSeedEntirely()
+            && ! $this->redrawsFromTheRoster()
         ) {
             $rules[] = Rule::notIn([$pending]);
         }
@@ -87,6 +88,7 @@ class GenerationRunRequest extends FormRequest
             'minimum_separation' => ['sometimes', 'integer', 'between:1,'.(ClusterGenerator::RADIUS * 2)],
             'separation_in_hexes' => ['sometimes', 'boolean'],
             ...$this->templateRules(),
+            ...$this->kitRules(),
         ];
     }
 
@@ -122,6 +124,47 @@ class GenerationRunRequest extends FormRequest
     }
 
     /**
+     * Get the rules for the kit the units stage may arrive with.
+     *
+     * The **second** pair tied to a stage, for the same reason the template's is: on this stage a kit
+     * is genuinely part of the input, and on any other one a posted kit is a value nothing would ever
+     * read. Everything `templateRules()` says applies here unchanged.
+     *
+     * `kit_source` is `sometimes` and its absence means `generate`, which is the same shape as an
+     * unticked `generate_template` — a stage that is asked for nothing draws one. It matters
+     * practically as well as conceptually: `withAcceptedUnits()` in `tests/Pest.php` walks a whole
+     * world into existence by posting a bare seed at every stage, and a `required` rule here would
+     * fail that helper, and with it a great many tests about nothing to do with kits.
+     *
+     * **`kit_template_id` is scoped to the signed-in account inside the `exists` rule**, which is what
+     * makes "that kit is not yours" a message rather than a 403. A kit template is a *posted value*
+     * and not a route-bound model, so it falls on the message side of the line this area draws — see
+     * `Gamemaster\GenerationController`. Scoping the lookup gets the refusal and its sentence in one
+     * rule, and cannot leak whether somebody else's kit with that id exists.
+     *
+     * The document's *contents* are `App\Generation\Kit::fromJson()`'s, reported through
+     * `GenerationFailed`'s field so its messages land on this same `kit` key.
+     *
+     * @return array<string, array<mixed>>
+     */
+    private function kitRules(): array
+    {
+        if ($this->route('stage') !== GenerationStage::Assets) {
+            return [];
+        }
+
+        return [
+            'kit_source' => ['sometimes', Rule::in(['generate', 'saved', 'upload'])],
+            'kit_template_id' => [
+                'required_if:kit_source,saved',
+                'integer',
+                Rule::exists(KitTemplate::class, 'id')->where('user_id', $this->user()?->getKey()),
+            ],
+            'kit' => ['required_if:kit_source,upload', 'file', 'mimes:json,txt', 'max:64'],
+        ];
+    }
+
+    /**
      * Get the error messages for the defined validation rules.
      *
      * @return array<string, string>
@@ -136,6 +179,10 @@ class GenerationRunRequest extends FormRequest
             ]),
             'template.required_without' => __('Upload a template document, or tick the box to generate one from the seed.'),
             'template.mimes' => __('A template is a JSON document.'),
+            'kit_template_id.required_if' => __('Choose one of your saved kits.'),
+            'kit_template_id.exists' => __('That is not one of your kits.'),
+            'kit.required_if' => __('Upload a kit document, or choose another way to settle the kit.'),
+            'kit.mimes' => __('A kit is a JSON document.'),
         ];
     }
 
@@ -153,18 +200,29 @@ class GenerationRunRequest extends FormRequest
     }
 
     /**
-     * Determine whether this stage reads the seed at all.
+     * Determine whether this stage's outcome is decided by the roster rather than by the seed.
      *
-     * False for four of the five stages and true for the units, which draws nothing: every player is
-     * given the same kit, so no seed produces a different result and `App\Actions\Generation\GenerateUnits`
-     * never opens a stream. The rule above would then be demanding a change to a number nothing reads,
-     * to permit a regeneration that is not about the seed in the first place — it is how a player
-     * seated since the stage ran is given somewhere to begin.
+     * True only for the units, and it is the counterpart of `redrawsFromTheAttempt()` rather than of
+     * `templateDecidedByADocument()` — both say the same seed can honestly produce something new.
      *
-     * The stage still *records* a seed, the way a run records `traveler` on a stage that never reads
-     * it. A run stores what it was asked for; this asks whether the answer changes anything.
+     * **The reason changed when kits became drawable, and the rule did not.** This exemption used to
+     * be called `ignoresTheSeedEntirely()` and rested on the units stage drawing nothing at all: every
+     * seed gave every player the same kit, so demanding a different number was asking somebody to
+     * change something nothing read. `App\Generation\KitGenerator` now draws a kit from the seed, so
+     * that premise is gone.
+     *
+     * What replaces it is the reason a gamemaster actually regenerates this stage: **a roster that has
+     * grown since it ran.** A player seated after the homes were arranged has nowhere to stand and is
+     * skipped, and the remedy is running the stage again — see `App\Actions\Generation\GenerateUnits`.
+     * The seed is not the whole input here; the seats are, and running the same seed against a
+     * different roster places genuinely different entities.
+     *
+     * Keeping the rule instead would break exactly that repair: the only way to seat a latecomer would
+     * be to change the seed, which would redraw the kit every other player has already been given. The
+     * cost of the exemption is that pressing the button twice with nothing changed quietly repeats
+     * itself, which was already true of this stage and is what accepting is for.
      */
-    private function ignoresTheSeedEntirely(): bool
+    private function redrawsFromTheRoster(): bool
     {
         return $this->route('stage') === GenerationStage::Assets;
     }

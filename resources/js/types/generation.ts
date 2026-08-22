@@ -10,7 +10,19 @@ export type GenerationStage =
     | 'stelliums'
     | 'home_stellia_template'
     | 'home_stellia'
-    | 'planets';
+    | 'planets'
+    | 'assets';
+
+/**
+ * How the units stage was told to settle the kit every player begins with.
+ *
+ * Mirrors the `kit_source` field `App\Http\Requests\Gamemaster\GenerationRunRequest` validates.
+ * It is a *request* rather than a fact about a run: what a run stores afterwards is the kit itself,
+ * so a saved kit and an uploaded one are indistinguishable once the stage has run except by the
+ * `file` the kit remembers. Absent means `generate`, which is why the server treats the field as
+ * optional.
+ */
+export type KitSource = 'generate' | 'saved' | 'upload';
 
 /**
  * How many hexes apart two home stellia stand when nobody has said otherwise.

@@ -5,6 +5,7 @@ export * from './dashboard';
 export * from './games';
 export * from './generation';
 export * from './invitations';
+export * from './kits';
 export * from './navigation';
 export * from './player';
 export * from './ui';

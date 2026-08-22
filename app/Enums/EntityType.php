@@ -55,6 +55,42 @@ enum EntityType: string
     }
 
     /**
+     * Determine whether a player is given entities of this kind when a game opens.
+     *
+     * Two of the four are. An enclosed colony and an orbital colony are things a player builds, not
+     * things they are handed, which is why `StartingUnits::for()` answers them with an empty kit
+     * rather than a guess and why `Kit` refuses a document that describes one.
+     *
+     * It lives here rather than on `StartingUnits` because it is a fact about the *kind*, the way
+     * `isMobile()` is — and because two things now need it: the catalogue's own kit, and the parser
+     * that decides whether an uploaded document describes a whole opening position.
+     */
+    public function startsAGame(): bool
+    {
+        return match ($this) {
+            self::OpenAirColony, self::Ship => true,
+            self::EnclosedColony, self::OrbitalColony => false,
+        };
+    }
+
+    /**
+     * Get the kinds a player is given when a game opens, in the order they are created.
+     *
+     * **Sweep this rather than `cases()`** whenever the question is about kits. A `cases()` sweep
+     * spends half its runs on kinds that start nothing, which is how a test came to assert a value
+     * against itself and be flagged as risky — see `.ai/rules/units.md`.
+     *
+     * @return list<self>
+     */
+    public static function startingKinds(): array
+    {
+        return array_values(array_filter(
+            self::cases(),
+            fn (self $type): bool => $type->startsAGame(),
+        ));
+    }
+
+    /**
      * Get what a structural unit's assembled volume is multiplied by when it is built for this kind.
      *
      * A `Structure` unit encloses **TL²** VU in a ship or an orbital colony, **TL² × 2** in an

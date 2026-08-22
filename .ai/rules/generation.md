@@ -25,7 +25,7 @@ this order:
 5. `Planets` — one to ten around every star, **except** a home system, which is copied from the
    template;
 6. `Assets` — a colony on every player's home world and a ship above it, with what each begins
-   holding.
+   holding, from a **kit** the run is drawn, given or handed.
 
 Read [games.md](games.md) for the seed itself, [gamemaster.md](gamemaster.md) for the area's gate,
 [home-template.md](home-template.md) for the third stage, [home-stellia.md](home-stellia.md) for the
@@ -86,12 +86,18 @@ the game's at a time. `attempt` counts superseded runs too, so "attempt 3" keeps
 asked.
 
 **Inputs are columns on the run; artefacts get tables.** That is the line to hold when adding
-anything: `seed`, `traveler`, `minimum_separation`, `separation_in_hexes` and `template` are all
-records of what somebody *asked for*, so they live on the run and survive being superseded, while
+anything: `seed`, `traveler`, `minimum_separation`, `separation_in_hexes`, `template` and `kit` are
+all records of what somebody *asked for*, so they live on the run and survive being superseded, while
 locations, stelliums, stars, planets and home stelliums are what a run *produced* and are deleted by
 its `discard()`. `template` is the one that looks like it wants a table of its own — it is a list of
 nine planets — and putting it in one would mean a superseded template run losing the very document
 that identifies it, which is the thing a seed exists to be.
+
+`kit` is the case that tests the line hardest, because a saved kit **does** have a table
+(`kit_templates`). That table is not an exception to the rule: it belongs to a *person* and outlives
+every game it is used at, so it is outside the run lifecycle entirely. Choosing one **copies its
+document onto the run**, with no foreign key in either direction — see
+[kit-templates.md](kit-templates.md).
 
 The game's generation state is derived from those runs by `Game::generationStateFor()`; there is **no
 `generation_stage` column**, and adding one would create a copy that can disagree with the rows it
@@ -393,9 +399,13 @@ Three smaller things that are load-bearing:
   **The template stage is the one that nearly broke this, and did not.** It is settled by a *file*,
   which looks like a reason for an endpoint of its own; it is not, because the stage is still run from
   a seed and the document rides beside it exactly as `traveler` rides with the cluster. `store()` just
-  takes a multipart request. The gamemaster area therefore still holds **ten** routes and
-  `GameManagementTest`'s sweep passes untouched — worth knowing before adding an eleventh for the next
-  stage that carries something bulky.
+  takes a multipart request. The units stage's **kit** arrives the same way and added no route either,
+  despite having three ways in rather than two.
+
+  So `gamemaster.games.*` still holds **ten** routes. What *did* change is the sweep: a gamemaster's
+  kit library lives at `gamemaster.kit-templates.*`, which is not about managing one game at all, so
+  `GameManagementTest`'s three prefix sweeps are now scoped to `gamemaster.games.` with a matching
+  pair beside them. See [kit-templates.md](kit-templates.md) and [gamemaster.md](gamemaster.md).
 - **`RunGeneration` owns the transaction and the bookkeeping**; a `StageGeneration` implementation only
   writes and discards its own rows. A generator that throws must leave the game exactly as it was
   rather than with a run row claiming a cluster that was never written.

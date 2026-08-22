@@ -102,6 +102,39 @@ class GenerationFailed extends RuntimeException
     }
 
     /**
+     * An uploaded kit was not JSON at all.
+     *
+     * The same failure as `templateUnreadable()` one stage further on, and worded the same way for
+     * the same reason: "Syntax error" on its own tells a gamemaster nothing about what to do next.
+     */
+    public static function kitUnreadable(string $reason): self
+    {
+        $failure = new self("That file is not readable as JSON ({$reason}). Upload the kit document itself.");
+
+        $failure->field = 'kit';
+
+        return $failure;
+    }
+
+    /**
+     * An uploaded kit was JSON, but not a kit a game could open with.
+     *
+     * `Kit` composes the sentence naming the entity and the holding, and this only carries it to the
+     * form. Some of those sentences come from `UnitHolding`'s and `KitEntity`'s constructors, which
+     * throw `InvalidArgumentException` because they are also how the catalogue's own kits are written
+     * — `Kit` catches those and rethrows them through here, which is the seam where a mistake in the
+     * source and a mistake in somebody's document stop being the same kind of problem.
+     */
+    public static function kitMalformed(string $problem): self
+    {
+        $failure = new self($problem);
+
+        $failure->field = 'kit';
+
+        return $failure;
+    }
+
+    /**
      * A weighted choice rolled past the end of the table it was choosing from.
      *
      * Only reachable if a table's weights no longer sum to what was rolled against them, which means
